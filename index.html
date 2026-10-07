@@ -13,7 +13,7 @@
   --bg:#12171d; --panel:#1a2129; --panel-2:#232c36; --line:#313c48;
   --fg:#e9eef2; --muted:#93a1ae;
   --accent:#f0b03c; --on-accent:#1c1404;
-  --clip-video:#2f8f8a; --clip-image:#7a6fc4; --clip-text:#b0506e; --clip-bgm:#4d6fa8; --on-clip:#ffffff;
+  --clip-video:#2f8f8a; --clip-image:#7a6fc4; --clip-text:#b0506e; --clip-bgm:#4d6fa8; --clip-ov:#4f8f4a; --on-clip:#ffffff;
   --danger:#e8705f; --letterbox:#000;
   --ui:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP","Segoe UI",sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
@@ -23,7 +23,7 @@
   --bg:#eef1f3; --panel:#ffffff; --panel-2:#e3e8ec; --line:#c9d1d8;
   --fg:#18212a; --muted:#5b6975;
   --accent:#b97a08; --on-accent:#ffffff;
-  --clip-video:#23807b; --clip-image:#6a5fb8; --clip-text:#a4455f; --clip-bgm:#3f629c; --on-clip:#ffffff;
+  --clip-video:#23807b; --clip-image:#6a5fb8; --clip-text:#a4455f; --clip-bgm:#3f629c; --clip-ov:#3f7d3b; --on-clip:#ffffff;
   --danger:#c2412f; --letterbox:#000;
 }}
 :root[data-theme="light"]{
@@ -31,7 +31,7 @@
   --bg:#eef1f3; --panel:#ffffff; --panel-2:#e3e8ec; --line:#c9d1d8;
   --fg:#18212a; --muted:#5b6975;
   --accent:#b97a08; --on-accent:#ffffff;
-  --clip-video:#23807b; --clip-image:#6a5fb8; --clip-text:#a4455f; --clip-bgm:#3f629c; --on-clip:#ffffff;
+  --clip-video:#23807b; --clip-image:#6a5fb8; --clip-text:#a4455f; --clip-bgm:#3f629c; --clip-ov:#3f7d3b; --on-clip:#ffffff;
   --danger:#c2412f; --letterbox:#000;
 }
 html,body{height:100%}
@@ -120,6 +120,10 @@ input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--lin
 .slider{grid-template-columns:6em 1fr 3em}
 .clip.tro::after{content:"";position:absolute;right:0;top:0;bottom:0;width:6px;background:var(--accent)}
 .note{font-size:12px;color:var(--muted)}
+.oitem{background-color:var(--clip-ov);background-size:auto 100%;background-repeat:no-repeat;padding-left:58px}
+.footer{gap:6px}
+.footer button{font-size:13px;padding:0 2px}
+.slider{grid-template-columns:7.2em 1fr 3em}
 </style>
 </head>
 <body>
@@ -148,6 +152,7 @@ input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--lin
     <div class="tl-inner" id="tlInner">
       <div class="ruler" id="ruler"></div>
       <div class="track" id="track"></div>
+      <div class="ttrack" id="otrack" hidden></div>
       <div class="ttrack" id="ttrack"></div>
       <div class="btrack" id="btrack" hidden></div>
       <div class="playhead" id="playhead"></div>
@@ -157,9 +162,10 @@ input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--lin
   <div class="inspector" id="inspector"></div>
 
   <div class="footer">
-    <button id="addBtn">＋ 動画・写真</button>
-    <button id="addTextBtn">＋ 文字</button>
-    <button id="addBgmBtn">＋ BGM</button>
+    <button id="addBtn">＋動画・写真</button>
+    <button id="addOvBtn">＋重ねる</button>
+    <button id="addTextBtn">＋文字</button>
+    <button id="addBgmBtn">＋BGM</button>
     <input id="bgmInput" type="file" accept="audio/*,.mp3,.m4a,.wav,.aac" hidden>
     <input id="fileInput" type="file" accept="video/*,image/*" multiple hidden>
   </div>
@@ -3352,7 +3358,7 @@ const ICON = {
   pause: '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
 };
 // Project data. Kept plain so later modes (templates, multi-track) can share it.
-const state = { aspect: '9:16', clips: [], texts: [], bgm: null, sel: null, t: 0, playing: false, pps: 60 };
+const state = { aspect: '9:16', clips: [], texts: [], overlays: [], bgm: null, sel: null, t: 0, playing: false, pps: 60 };
 let uid = 1;
 
 const canvas = $('preview'), ctx = canvas.getContext('2d');
@@ -3507,7 +3513,7 @@ const ptmp = document.createElement('canvas'), psnap = document.createElement('c
 let psnapClip = null;
 function drawPreview() {
   const W = canvas.width, H = canvas.height, loc = locate(state.t);
-  if (!loc) { draw(ctx, W, H, null); drawTexts(ctx, W, H, state.t, true); return; }
+  if (!loc) { draw(ctx, W, H, null); drawOverlays(ctx, W, H, state.t, ovSrc, true); drawTexts(ctx, W, H, state.t, true); return; }
   const c = loc.clip, m = c.media;
   let prev = null;
   if (loc.prev) {
@@ -3520,6 +3526,7 @@ function drawPreview() {
   composeBase(ctx, W, H, frameOf(c, loc.local, m.el, m.w, m.h, 1280), c, loc.local, prev);
   const next = state.clips[loc.idx + 1];
   if (state.playing && !loc.prev && next && next.media === m && m.kind === 'video' && inDur(next)) { psnap.getContext('2d').drawImage(canvas, 0, 0); psnapClip = c; }
+  drawOverlays(ctx, W, H, state.t, ovSrc, true);
   drawTexts(ctx, W, H, state.t, true);
 }
 function fitCanvas() {
@@ -3534,6 +3541,110 @@ function applyAspect() {
   [canvas.width, canvas.height] = dims(720);
   for (const c of [ptmp, psnap]) { c.width = canvas.width; c.height = canvas.height; }
   psnapClip = null; fitCanvas(); drawPreview();
+}
+
+/* ---------- picture-in-picture overlays ---------- */
+const isOv = x => state.overlays.includes(x);
+const ovOn = (o, t) => t >= o.start && t < o.start + o.dur;
+const ovSrc = o => [o.media.el, o.media.w, o.media.h];
+const BLENDS = [['source-over', '通常'], ['screen', 'スクリーン'], ['multiply', '乗算'], ['overlay', 'オーバーレイ']];
+// Draws every layer visible at time t, in list order (later ones on top). frameFor(o) returns [source, width, height] or null.
+function drawOverlays(c2d, W, H, t, frameFor, editing, cap = 1280) {
+  for (const o of state.overlays) {
+    if (!ovOn(o, t)) { continue; }
+    const f = frameFor(o); if (!f) continue;
+    let [src, sw, sh] = f;
+    const M = fxMatrix(o), g = M && fxApply(src, sw, sh, M, cap);
+    if (g) { src = g; sw = g.width; sh = g.height; }
+    const fi = o.fadeIn ?? 0.2, fo = o.fadeOut ?? 0.2;
+    const alpha = (o.opacity ?? 1) * clamp(Math.min(fi ? (t - o.start) / fi : 1, fo ? (o.start + o.dur - t) / fo : 1), 0, 1);
+    let x, y, w, h;
+    c2d.save();
+    c2d.globalAlpha = alpha; c2d.globalCompositeOperation = o.blend || 'source-over';
+    if (o.full) {
+      const sc = o.fit === 'cover' ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh);
+      w = sw * sc; h = sh * sc; x = (W - w) / 2; y = (H - h) / 2;
+      try { c2d.drawImage(src, x, y, w, h); } catch (e) {}
+    } else {
+      w = o.size * W; h = o.shape === 'circle' ? w : w * sh / sw; x = o.x * W - w / 2; y = o.y * H - h / 2;
+      const r = o.shape === 'circle' ? w / 2 : o.shape === 'round' ? w * 0.08 : 0;
+      const path = () => { c2d.beginPath(); if (r && c2d.roundRect) c2d.roundRect(x, y, w, h, r); else if (o.shape === 'circle') c2d.arc(x + w / 2, y + h / 2, w / 2, 0, Math.PI * 2); else c2d.rect(x, y, w, h); };
+      c2d.save(); path(); c2d.clip();
+      const sc = Math.max(w / sw, h / sh), dw = sw * sc, dh = sh * sc;
+      try { c2d.drawImage(src, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh); } catch (e) {}
+      c2d.restore();
+      if (o.border) { path(); c2d.lineWidth = Math.max(2, Math.min(W, H) * 0.008); c2d.strokeStyle = '#fff'; c2d.stroke(); }
+    }
+    c2d.restore();
+    if (editing) {
+      o._box = [Math.max(0, x), Math.max(0, y), Math.min(W, w), Math.min(H, h)];
+      if (o === state.sel && !state.playing) { const [bx, by, bw, bh] = o._box, d = o.full ? -4 : 8; c2d.save(); c2d.strokeStyle = '#f0b03c'; c2d.lineWidth = 3; c2d.setLineDash([10, 8]); c2d.strokeRect(bx - d, by - d, bw + d * 2, bh + d * 2); c2d.restore(); }
+    }
+  }
+}
+async function addOverlayFiles(files) {
+  let failed = 0, added = null;
+  if (state.playing) pause();
+  for (const f of files) {
+    try {
+      const m = await loadMedia(f), n = state.overlays.length;
+      const o = { id: uid++, media: m, start: clamp(state.t, 0, Math.max(0, total() - 0.5)), in: 0, dur: m.kind === 'video' ? m.duration : 3, x: 0.72 - (n % 3) * 0.05, y: 0.24 + (n % 3) * 0.06, size: 0.36, shape: 'round', border: true, mute: false };
+      state.overlays.push(o); added = o;
+    } catch (e) { failed++; }
+  }
+  if (failed) toast(failed + '件のファイルを読み込めませんでした。');
+  if (added) { state.sel = added; renderAll(); setTime(added.start + 0.3); }
+}
+function renderOvInspector(box, o) {
+  const m = o.media, tot = total();
+  const head = document.createElement('div'); head.className = 'insp-head';
+  const nm = document.createElement('b'); nm.textContent = '重ねる映像: ' + m.name;
+  const du = document.createElement('span'); du.textContent = o.full ? '全画面で重ねます' : 'プレビュー上でドラッグして移動';
+  head.append(nm, du); box.appendChild(head);
+  box.appendChild(chipRow('表示', [[false, 'ワイプ'], [true, '全画面']], !!o.full, v => o.full = v));
+  const moved = () => { if (state.playing) pause(); renderTimeline(); setTime(clamp(state.t, o.start, o.start + o.dur - 0.05)); };
+  box.appendChild(sliderRow('ovStart', '出る時間', 0, Math.max(0.1, tot - 0.1), o.start, v => { o.start = v; moved(); return v; }));
+  if (m.kind === 'video') {
+    box.appendChild(sliderRow('ovIn', '開始位置', 0, m.duration, o.in, v => { const out = o.in + o.dur; o.in = clamp(v, 0, out - MIN_DUR); o.dur = out - o.in; moved(); return o.in; }));
+    box.appendChild(sliderRow('ovOut', '終了位置', 0, m.duration, o.in + o.dur, v => { const out = clamp(v, o.in + MIN_DUR, m.duration); o.dur = out - o.in; moved(); return out; }));
+  } else box.appendChild(sliderRow('ovDur', '表示時間', 0.5, Math.max(30, tot), o.dur, v => { o.dur = v; moved(); return v; }));
+  if (o.full) box.appendChild(chipRow('合わせ方', [['contain', '全体を表示'], ['cover', '画面いっぱい']], o.fit || 'contain', v => o.fit = v));
+  else {
+    box.appendChild(sliderRow('ovSize', '大きさ', 10, 100, Math.round(o.size * 100), v => { o.size = v / 100; drawPreview(); return v; }, ''));
+    box.appendChild(chipRow('形', [['rect', '四角'], ['round', '角丸'], ['circle', '丸']], o.shape, v => o.shape = v));
+    box.appendChild(chipRow('白い枠', [[true, 'あり'], [false, 'なし']], o.border, v => o.border = v));
+  }
+  box.appendChild(sliderRow('ovOpacity', '不透明度', 10, 100, Math.round((o.opacity ?? 1) * 100), v => { o.opacity = v / 100; drawPreview(); return v; }, ''));
+  box.appendChild(chipRow('合成', BLENDS, o.blend || 'source-over', v => o.blend = v));
+  box.appendChild(sliderRow('ovFadeIn', 'フェードイン', 0, 2, o.fadeIn ?? 0.2, v => { o.fadeIn = v; if (state.playing) pause(); setTime(o.start + v * 0.5); return v; }));
+  box.appendChild(sliderRow('ovFadeOut', 'フェードアウト', 0, 2, o.fadeOut ?? 0.2, v => { o.fadeOut = v; if (state.playing) pause(); setTime(o.start + o.dur - v * 0.5 - 0.02); return v; }));
+  box.appendChild(chipRow('フィルター', FILTERS, o.filter || 'none', v => o.filter = v));
+  if (m.kind === 'video') box.appendChild(chipRow('音', [[false, 'あり'], [true, '消す']], !!o.mute, v => o.mute = v));
+  const acts = document.createElement('div'); acts.className = 'actions';
+  const btn = (label, fn, cls) => { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; if (cls) b.className = cls; acts.appendChild(b); };
+  const oi = state.overlays.indexOf(o), reorder = d => { state.overlays.splice(oi, 1); state.overlays.splice(oi + d, 0, o); renderAll(); drawPreview(); };
+  if (state.overlays.length > 1) {
+    const up = document.createElement('button'); up.textContent = '前面へ'; up.disabled = oi === state.overlays.length - 1; up.onclick = () => reorder(1); acts.appendChild(up);
+    const dn = document.createElement('button'); dn.textContent = '背面へ'; dn.disabled = oi === 0; dn.onclick = () => reorder(-1); acts.appendChild(dn);
+  }
+  btn('ここで分割', () => {
+    const local = state.t - o.start;
+    if (local < MIN_DUR || local > o.dur - MIN_DUR) return toast('再生位置(黄色の線)をこの映像の途中に合わせてから分割してください。');
+    const y = { ...o, id: uid++, start: state.t, in: o.media.kind === 'video' ? o.in + local : 0, dur: o.dur - local, fadeIn: 0 }; delete y._box;
+    o.dur = local; o.fadeOut = 0; state.overlays.splice(oi + 1, 0, y); state.sel = y; renderAll(); drawPreview();
+  });
+  btn('複製', () => { const y = { ...o, id: uid++, start: Math.min(o.start + o.dur, Math.max(0, tot - 0.5)) }; delete y._box; state.overlays.push(y); state.sel = y; renderAll(); setTime(y.start + 0.3); });
+  btn('削除', () => { if (state.playing) pause(); state.overlays.splice(state.overlays.indexOf(o), 1); state.sel = null; renderAll(); drawPreview(); }, 'danger');
+  box.appendChild(acts);
+}
+// Items that overlap in time go on separate rows.
+function laneMap(items, pps) {
+  const ends = [], lane = new Map();
+  for (const x of [...items].sort((a, b) => a.start - b.start)) {
+    let l = ends.findIndex(e => e <= x.start + 1e-6); if (l < 0) l = ends.length;
+    ends[l] = x.start + Math.max(x.dur, 14 / pps); lane.set(x, l);
+  }
+  lane.rows = ends.length; return lane;
 }
 
 /* ---------- text overlays ---------- */
@@ -3631,6 +3742,11 @@ canvas.addEventListener('pointerdown', e => {
     const [bx, by, bw, bh] = x._box, m = 24;
     if (px >= bx - m && px <= bx + bw + m && py >= by - m && py <= by + bh + m) hit = x;
   }
+  if (!hit) for (const o of state.overlays) {
+    if (!o._box || !ovOn(o, state.t)) continue;
+    const [bx, by, bw, bh] = o._box;
+    if (px >= bx && px <= bx + bw && py >= by && py <= by + bh) hit = o;
+  }
   if (!hit) return;
   if (state.playing) pause();
   if (state.sel !== hit) { state.sel = hit; renderAll(); }
@@ -3642,6 +3758,7 @@ canvas.addEventListener('pointermove', e => {
   const [px, py] = canvasPoint(e);
   let nx = clamp(px / canvas.width + textDrag.ox, 0.02, 0.98), ny = clamp(py / canvas.height + textDrag.oy, 0.02, 0.98);
   if (Math.abs(nx - 0.5) < 0.02) nx = 0.5;
+  if (textDrag.x.full) return;
   textDrag.x.x = nx; textDrag.x.y = ny; drawPreview();
 });
 canvas.addEventListener('pointerup', () => textDrag = null);
@@ -3715,7 +3832,8 @@ async function addFiles(files) {
 
 /* ---------- playback ---------- */
 let lastNow = 0, active = null, exporting = false;
-function pauseVideos() { for (const c of state.clips) if (c.media.kind === 'video') c.media.el.pause(); }
+const allItems = () => [...state.clips, ...state.overlays];
+function pauseVideos() { for (const c of allItems()) if (c.media.kind === 'video') c.media.el.pause(); }
 let actx = null, bgmNode = null;
 function decodeAny(ab) {
   const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, off = new OAC(2, 1, 48000);
@@ -3747,7 +3865,7 @@ function play() {
   if (!state.clips.length || exporting) return;
   if (state.t >= total() - 0.02) state.t = 0;
   // Start every video once inside the tap, so phones allow later clips to start with sound.
-  for (const c of state.clips) if (c.media.kind === 'video') { const v = c.media.el; const p = v.play(); if (p) p.then(() => { if (!state.playing) v.pause(); }).catch(() => {}); }
+  for (const c of allItems()) if (c.media.kind === 'video') { const v = c.media.el; const p = v.play(); if (p) p.then(() => { if (!state.playing) v.pause(); }).catch(() => {}); }
   state.playing = true; active = null; lastNow = performance.now(); startBgm();
   $('playBtn').innerHTML = ICON.pause + '停止'; requestAnimationFrame(tick);
 }
@@ -3763,7 +3881,8 @@ function tick(now) {
   const need = (c, local) => { if (c.media.kind === 'video') want.set(c.media.el, { c, time: c.in + local }); };
   if (loc.prev) need(loc.prev.clip, loc.prev.local);
   need(loc.clip, loc.local);
-  for (const c of state.clips) if (c.media.kind === 'video' && !want.has(c.media.el) && !c.media.el.paused) c.media.el.pause();
+  for (const o of state.overlays) if (ovOn(o, state.t) && !want.has(o.media.el)) need(o, state.t - o.start);
+  for (const c of allItems()) if (c.media.kind === 'video' && !want.has(c.media.el) && !c.media.el.paused) c.media.el.pause();
   for (const [v, w] of want) {
     if (Math.abs(v.currentTime - w.time) > (v.paused ? 0.15 : 0.35) && !v.seeking) v.currentTime = w.time;
     v.muted = !!w.c.mute;
@@ -3777,6 +3896,7 @@ function syncPaused() {
   const loc = locate(state.t), jobs = [];
   const need = (c, local) => { if (c.media.kind === 'video') jobs.push(seek(c.media.el, Math.min(c.in + local, c.media.duration - 0.01))); };
   if (loc) { if (loc.prev && loc.prev.clip.media !== loc.clip.media) need(loc.prev.clip, loc.prev.local); need(loc.clip, loc.local); }
+  for (const o of state.overlays) if (ovOn(o, state.t) && !(loc && (o.media === loc.clip.media || loc.prev && o.media === loc.prev.clip.media))) need(o, state.t - o.start);
   if (jobs.length) Promise.all(jobs).then(() => { if (!state.playing) drawPreview(); }); else drawPreview();
 }
 function setTime(t) { state.t = clamp(t, 0, total()); syncPaused(); }
@@ -3813,6 +3933,17 @@ function renderTimeline() {
     b.style.width = Math.max(40, tot * pps) + 'px'; b.textContent = '♪ ' + state.bgm.name;
     b.onclick = () => { state.sel = state.sel === state.bgm ? null : state.bgm; renderAll(); drawPreview(); };
     bt.appendChild(b);
+  }
+  const ot = $('otrack'); ot.textContent = ''; ot.hidden = !state.overlays.length;
+  const olane = laneMap(state.overlays, pps); ot.style.height = Math.max(1, olane.rows) * 34 - 4 + 'px';
+  for (const o of state.overlays) {
+    const b = document.createElement('button');
+    b.className = 'titem oitem' + (o === state.sel ? ' sel' : '');
+    b.style.top = olane.get(o) * 34 + 'px'; b.style.left = o.start * pps + 'px'; b.style.width = Math.max(14, o.dur * pps) + 'px';
+    if (o.media.thumb) b.style.backgroundImage = 'url(' + o.media.thumb + ')';
+    b.textContent = (o.full ? '全画面 ' : 'ワイプ ') + o.media.name;
+    b.onclick = () => { state.sel = state.sel === o ? null : o; renderAll(); if (state.sel && !ovOn(o, state.t)) setTime(o.start + 0.3); else drawPreview(); };
+    ot.appendChild(b);
   }
   const tt = $('ttrack'); tt.textContent = '';
   // Overlapping texts go on separate rows so each one stays tappable.
@@ -3888,6 +4019,7 @@ function renderInspector() {
   const box = $('inspector'); box.textContent = '';
   const c = state.sel;
   if (isText(c)) return renderTextInspector(box, c);
+  if (isOv(c)) return renderOvInspector(box, c);
   if (c && c === state.bgm) return renderBgmInspector(box, c);
   if (!c || !state.clips.includes(c)) {
     state.sel = null;
@@ -3983,7 +4115,7 @@ async function decodeAudio(m, off) {
   return m.audio;
 }
 async function buildAudio() {
-  if (!state.bgm && !state.clips.some(c => c.media.kind === 'video' && !c.mute)) return null;
+  if (!state.bgm && !allItems().some(c => c.media.kind === 'video' && !c.mute)) return null;
   const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!OAC) return null;
   const sr = 48000, off = new OAC(2, Math.ceil(total() * sr), sr);
   let any = false;
@@ -4001,6 +4133,15 @@ async function buildAudio() {
         const s = off.createBufferSource(); s.buffer = ch.buffer; s.connect(g);
         s.start(Math.max(0, start + (a - c.in)), a - ch.ts, b - a); any = true;
       }
+    }
+  }
+  for (const o of state.overlays) {
+    if (o.media.kind !== 'video' || o.mute) continue;
+    for (const ch of await decodeAudio(o.media, off) || []) {
+      const a = Math.max(ch.ts, o.in), b = Math.min(ch.ts + ch.buffer.duration, o.in + o.dur);
+      if (b <= a) continue;
+      const s = off.createBufferSource(); s.buffer = ch.buffer; s.connect(off.destination);
+      s.start(o.start + (a - o.in), a - ch.ts, b - a); any = true;
     }
   }
   const b = state.bgm, tot = total();
@@ -4025,7 +4166,7 @@ async function runExport() {
     const vcodec = await MB.getFirstEncodableVideoCodec(['avc', 'hevc', 'vp9', 'av1'], { width: W, height: H, bitrate });
     if (!vcodec) throw new Error('この端末ではこの画質で書き出せません。標準 (720p) でお試しください。');
     status('音声を準備中');
-    const hasVideoClip = state.clips.some(c => c.media.kind === 'video' && !c.mute);
+    const hasVideoClip = allItems().some(c => c.media.kind === 'video' && !c.mute);
     let audio = null;
     try { audio = await buildAudio(); } catch (e) {}
     const ec = document.createElement('canvas'); ec.width = W; ec.height = H;
@@ -4053,28 +4194,31 @@ async function runExport() {
     };
     const tmp = document.createElement('canvas'); tmp.width = W; tmp.height = H;
     // Which source times each clip must deliver, in order (a clip can be on screen as the incoming or the outgoing one).
-    const times = state.clips.map(() => []);
+    const times = state.clips.map(() => []), ovTimes = new Map(state.overlays.map(o => [o, []]));
     for (let idx = 0; idx < N; idx++) {
       const loc = locate(idx / FPS);
       if (loc.prev) times[loc.idx - 1].push(loc.prev.clip.in + loc.prev.local);
       times[loc.idx].push(loc.clip.in + loc.local);
+      for (const o of state.overlays) if (ovOn(o, idx / FPS)) ovTimes.get(o).push(o.in + idx / FPS - o.start);
     }
-    const readers = [];
+    const readers = [], ovReaders = new Map();
     let fast = 0, compat = 0;
-    const reader = async i => {
-      if (readers[i]) return readers[i];
-      const c = state.clips[i], m = c.media, dec = m.kind === 'video' ? await openDecoder(m) : null;
-      let r, k = 0, last = null;
+    const makeReader = async (m, ts) => {
+      const dec = m.kind === 'video' ? await openDecoder(m) : null;
+      let k = 0, last = null;
       if (dec) {
         fast++;
-        const gen = new MB.CanvasSink(dec.vt, { poolSize: 2 }).canvasesAtTimestamps(times[i].map(s => s + dec.first));
-        r = { next: async () => { const x = await gen.next(); if (x.value) last = [x.value.canvas, x.value.canvas.width, x.value.canvas.height]; return last; }, close: () => gen.return() };
-      } else if (m.kind === 'video') {
+        const gen = new MB.CanvasSink(dec.vt, { poolSize: 2 }).canvasesAtTimestamps(ts.map(s => s + dec.first));
+        return { next: async () => { const x = await gen.next(); if (x.value) last = [x.value.canvas, x.value.canvas.width, x.value.canvas.height]; return last; }, close: () => gen.return() };
+      }
+      if (m.kind === 'video') {
         compat++;
-        r = { next: async () => { await seekFrame(m.el, Math.min(times[i][k++], m.duration - 0.01)); return [m.el, m.w, m.h]; }, close: () => {} };
-      } else r = { next: async () => [m.el, m.w, m.h], close: () => {} };
-      return readers[i] = r;
+        return { next: async () => { await seekFrame(m.el, Math.min(ts[k++], m.duration - 0.01)); const c = document.createElement('canvas'); c.width = m.w; c.height = m.h; c.getContext('2d').drawImage(m.el, 0, 0, m.w, m.h); return [c, m.w, m.h]; }, close: () => {} };
+      }
+      return { next: async () => [m.el, m.w, m.h], close: () => {} };
     };
+    const reader = async i => readers[i] || (readers[i] = await makeReader(state.clips[i].media, times[i]));
+    const ovReader = async o => { if (!ovReaders.has(o)) ovReaders.set(o, await makeReader(o.media, ovTimes.get(o))); return ovReaders.get(o); };
     for (let idx = 0; idx < N; idx++) {
       if (abortExport) throw new Error('abort');
       const loc = locate(idx / FPS), c = loc.clip;
@@ -4085,6 +4229,12 @@ async function runExport() {
       }
       const fb = await (await reader(loc.idx)).next();
       composeBase(ex, W, H, fb && frameOf(c, loc.local, fb[0], fb[1], fb[2], 1920), c, loc.local, prev);
+      const t = idx / FPS, ovFrames = new Map();
+      for (const o of state.overlays) {
+        if (ovOn(o, t)) ovFrames.set(o, await (await ovReader(o)).next());
+        else if (t >= o.start + o.dur && ovReaders.has(o) && !ovReaders.get(o).closed) { ovReaders.get(o).closed = true; try { await ovReaders.get(o).close(); } catch (e) {} }
+      }
+      drawOverlays(ex, W, H, t, o => ovFrames.get(o), false, 1920);
       drawTexts(ex, W, H, idx / FPS, false);
       await vs.add(idx / FPS, 1 / FPS);
       const done = loc.idx - (loc.prev ? 2 : 1);
@@ -4131,14 +4281,16 @@ $('playBtn').onclick = () => state.playing ? pause() : play();
 $('aspect').onchange = e => { state.aspect = e.target.value; applyAspect(); };
 $('zoomIn').onclick = () => { state.pps = Math.min(240, state.pps * 1.5); renderTimeline(); };
 $('zoomOut').onclick = () => { state.pps = Math.max(8, state.pps / 1.5); renderTimeline(); };
-$('addBtn').onclick = () => $('fileInput').click();
+$('addBtn').onclick = () => { addMode = 'clip'; $('fileInput').click(); };
 $('addTextBtn').onclick = addText;
 $('tplBtn').onclick = () => { if (!state.clips.length) return toast('先に動画や写真を追加してください。'); if (state.playing) pause(); renderTemplates(); $('tplOverlay').hidden = false; };
 $('tplCancel').onclick = () => $('tplOverlay').hidden = true;
 $('tplApply').onclick = applyTemplate;
 $('addBgmBtn').onclick = () => $('bgmInput').click();
 $('bgmInput').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) addBgm(f); };
-$('fileInput').onchange = e => { const fs = [...e.target.files]; e.target.value = ''; addFiles(fs); };
+let addMode = 'clip';
+$('fileInput').onchange = e => { const fs = [...e.target.files]; e.target.value = ''; if (addMode === 'ov') addOverlayFiles(fs); else addFiles(fs); };
+$('addOvBtn').onclick = () => { addMode = 'ov'; $('fileInput').click(); };
 $('exportBtn').onclick = () => { if (state.playing) pause(); showStep('exSetup'); $('exportOverlay').hidden = false; };
 $('exCancel').onclick = $('exClose').onclick = () => { $('exVideo').pause(); $('exportOverlay').hidden = true; };
 $('exStart').onclick = runExport;
