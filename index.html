@@ -62,8 +62,8 @@ svg{width:18px;height:18px;fill:currentColor;flex:none}
 .tl-inner{position:relative;padding:0 16px;min-width:100%}
 .ruler{height:30px;position:sticky;top:0;z-index:2;background:var(--panel);touch-action:none;cursor:ew-resize;border-bottom:1px solid var(--line)}
 .ruler span{position:absolute;top:0;height:100%;border-left:1px solid var(--line);padding:6px 0 0 4px;font:11px var(--mono);color:var(--muted);pointer-events:none;user-select:none}
-.track{display:flex;height:64px;padding:6px 0;position:relative}
-.clip{height:100%;flex:none;border:0;border-radius:6px;min-height:0;padding:0;overflow:hidden;position:relative;background-color:var(--clip-video);background-size:auto 100%;background-repeat:repeat-x;color:var(--on-clip);box-shadow:inset 0 0 0 1px var(--panel);justify-content:flex-start;align-items:flex-end}
+.track{height:64px;position:relative}
+.clip{position:absolute;top:6px;height:52px;border:0;border-radius:6px;min-height:0;padding:0;overflow:hidden;background-color:var(--clip-video);background-size:auto 100%;background-repeat:repeat-x;color:var(--on-clip);box-shadow:inset 0 0 0 1px var(--panel);justify-content:flex-start;align-items:flex-end}
 .clip.image{background-color:var(--clip-image)}
 .clip span{font-size:11px;line-height:1.3;padding:1px 5px;background:rgba(0,0,0,.55);border-radius:0 4px 0 0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .clip.sel{box-shadow:inset 0 0 0 3px var(--accent)}
@@ -107,7 +107,7 @@ textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);borde
 .btrack{height:28px;margin-bottom:6px}
 .bitem{height:100%;min-height:0;border:0;border-radius:6px;background:var(--clip-bgm);color:var(--on-clip);font-size:11px;padding:0 8px;justify-content:flex-start;overflow:hidden}
 .bitem.sel{box-shadow:inset 0 0 0 3px var(--accent)}
-.clip.tr::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--accent)}
+.clip.tr::before{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--ov,6px);background:var(--accent);opacity:.6}
 .footer button{padding:0 6px}
 input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px;min-height:42px;font:inherit;font-size:16px;color:inherit}
 .bar button{padding:0 10px}
@@ -119,6 +119,7 @@ input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--lin
 .slider label{white-space:nowrap;font-size:13px}
 .slider{grid-template-columns:6em 1fr 3em}
 .clip.tro::after{content:"";position:absolute;right:0;top:0;bottom:0;width:6px;background:var(--accent)}
+.note{font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -3362,16 +3363,26 @@ function dims(short) {
   const [a, b] = ASPECTS[state.aspect], m = Math.min(a, b), even = n => Math.round(n / 2) * 2;
   return [even(short * a / m), even(short * b / m)];
 }
-const total = () => state.clips.reduce((s, c) => s + c.dur, 0);
-function clipStart(clip) { let s = 0; for (const c of state.clips) { if (c === clip) return s; s += c.dur; } return 0; }
+// Timing: a clip with an entry transition starts early and overlaps the end of the previous clip.
+function ovOf(i) {
+  const c = state.clips[i]; if (!c || (c.trans || 'none') === 'none') return 0;
+  const d = Math.min(c.transDur || 0.5, c.dur / 2);
+  return i > 0 ? Math.min(d, state.clips[i - 1].dur / 2) : d;
+}
+function layout() {
+  const L = []; let s = 0;
+  state.clips.forEach((c, i) => { const ov = i > 0 ? ovOf(i) : 0; s -= ov; L.push({ clip: c, start: s, ov }); s += c.dur; });
+  L.total = s; return L;
+}
+const total = () => layout().total;
+function clipStart(clip) { const e = layout().find(e => e.clip === clip); return e ? e.start : 0; }
 function locate(t) {
-  let s = 0;
-  for (let i = 0; i < state.clips.length; i++) {
-    const c = state.clips[i];
-    if (t < s + c.dur || i === state.clips.length - 1) return { clip: c, idx: i, start: s, local: clamp(t - s, 0, c.dur) };
-    s += c.dur;
-  }
-  return null;
+  const L = layout(); if (!L.length) return null;
+  let i = 0; for (let k = 0; k < L.length; k++) if (t >= L[k].start) i = k;
+  const e = L[i], local = clamp(t - e.start, 0, e.clip.dur);
+  let prev = null;
+  if (i > 0 && e.ov && local < e.ov) { const a = L[i - 1]; prev = { clip: a.clip, local: clamp(t - a.start, 0, a.clip.dur) }; }
+  return { clip: e.clip, idx: i, start: e.start, local, prev };
 }
 function fmt(t) { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
 let toastTimer;
@@ -3459,8 +3470,9 @@ function frameOf(c, local, src, sw, sh, cap) {
 }
 // Draws one frame of a clip, blending in from the previous clip's last frame while its transition runs.
 const TRANS = [['none', 'なし'], ['fade', 'フェード'], ['slide', 'スライド'], ['zoom', 'ズーム']];
-const inDur = c => (c.trans || 'none') === 'none' ? 0 : Math.min(c.transDur || 0.5, c.dur / 2);
-const outDur = c => (c.transOut || 'none') === 'none' ? 0 : Math.min(c.transOutDur || 0.5, c.dur / 2);
+const inDur = c => ovOf(state.clips.indexOf(c));
+const outBlocked = c => { const n = state.clips[state.clips.indexOf(c) + 1]; return !!n && (n.trans || 'none') !== 'none'; };
+const outDur = c => (c.transOut || 'none') === 'none' || outBlocked(c) ? 0 : Math.min(c.transOutDur || 0.5, c.dur / 2);
 const ease = k => k * k * (3 - 2 * k);
 function composeIn(c2d, W, H, cur, clip, local, prev) {
   const D = clip ? inDur(clip) : 0;
@@ -3491,26 +3503,23 @@ function composeBase(c2d, W, H, cur, clip, local, prev) {
   draw(c2d, W, H, ...cur);
   c2d.restore();
 }
-const pbase = document.createElement('canvas'), psnap = document.createElement('canvas');
-let pbaseClip = null, psnapClip = null;
+const ptmp = document.createElement('canvas'), psnap = document.createElement('canvas');
+let psnapClip = null;
 function drawPreview() {
   const W = canvas.width, H = canvas.height, loc = locate(state.t);
   if (!loc) { draw(ctx, W, H, null); drawTexts(ctx, W, H, state.t, true); return; }
   const c = loc.clip, m = c.media;
-  const prevClip = state.clips[loc.idx - 1], next = state.clips[loc.idx + 1];
-  if (pbaseClip && pbaseClip !== c) { psnap.getContext('2d').drawImage(pbase, 0, 0); psnapClip = pbaseClip; pbaseClip = null; }
   let prev = null;
-  if (loc.local < inDur(c) && prevClip) {
-    if (psnapClip !== prevClip && (prevClip.media.kind === 'image' || prevClip.media !== m)) {
-      const pm = prevClip.media, pc = psnap.getContext('2d');
-      if (outDur(prevClip)) draw(pc, W, H, null); else draw(pc, W, H, ...frameOf(prevClip, prevClip.dur, pm.el, pm.w, pm.h, 1280));
-      psnapClip = prevClip;
-    }
-    if (psnapClip === prevClip) prev = psnap;
+  if (loc.prev) {
+    const a = loc.prev.clip, am = a.media;
+    // The outgoing clip keeps moving under the incoming one. One video element can only show one moment,
+    // so when both clips come from the same video the preview uses a frozen frame (the export does not).
+    if (am.kind === 'image' || am !== m) { draw(ptmp.getContext('2d'), W, H, ...frameOf(a, loc.prev.local, am.el, am.w, am.h, 1280)); prev = ptmp; }
+    else if (psnapClip === a) prev = psnap;
   }
-  const cur = frameOf(c, loc.local, m.el, m.w, m.h, 1280);
-  composeBase(ctx, W, H, cur, c, loc.local, prev);
-  if (state.playing && next && inDur(next)) { pbase.getContext('2d').drawImage(canvas, 0, 0); pbaseClip = c; }
+  composeBase(ctx, W, H, frameOf(c, loc.local, m.el, m.w, m.h, 1280), c, loc.local, prev);
+  const next = state.clips[loc.idx + 1];
+  if (state.playing && !loc.prev && next && next.media === m && m.kind === 'video' && inDur(next)) { psnap.getContext('2d').drawImage(canvas, 0, 0); psnapClip = c; }
   drawTexts(ctx, W, H, state.t, true);
 }
 function fitCanvas() {
@@ -3523,8 +3532,8 @@ function fitCanvas() {
 }
 function applyAspect() {
   [canvas.width, canvas.height] = dims(720);
-  for (const c of [pbase, psnap]) { c.width = canvas.width; c.height = canvas.height; }
-  pbaseClip = psnapClip = null; fitCanvas(); drawPreview();
+  for (const c of [ptmp, psnap]) { c.width = canvas.width; c.height = canvas.height; }
+  psnapClip = null; fitCanvas(); drawPreview();
 }
 
 /* ---------- text overlays ---------- */
@@ -3738,7 +3747,7 @@ function play() {
   if (!state.clips.length || exporting) return;
   if (state.t >= total() - 0.02) state.t = 0;
   // Start every video once inside the tap, so phones allow later clips to start with sound.
-  for (const c of state.clips) if (c.media.kind === 'video') { const v = c.media.el; const p = v.play(); if (p) p.then(() => { if (!state.playing || active !== c && active?.media !== c.media) v.pause(); }).catch(() => {}); }
+  for (const c of state.clips) if (c.media.kind === 'video') { const v = c.media.el; const p = v.play(); if (p) p.then(() => { if (!state.playing) v.pause(); }).catch(() => {}); }
   state.playing = true; active = null; lastNow = performance.now(); startBgm();
   $('playBtn').innerHTML = ICON.pause + '停止'; requestAnimationFrame(tick);
 }
@@ -3750,25 +3759,25 @@ function tick(now) {
   if (!state.playing) return;
   state.t += Math.min(0.25, (now - lastNow) / 1000); lastNow = now;
   if (state.t >= total()) { state.t = total(); pause(); return; }
-  const loc = locate(state.t), c = loc.clip;
-  if (c.media.kind === 'video') {
-    const v = c.media.el, want = c.in + loc.local;
-    if (c !== active) {
-      if (active && active.media !== c.media && active.media.kind === 'video') active.media.el.pause();
-      if (Math.abs(v.currentTime - want) > 0.15) v.currentTime = want;
-    } else if (Math.abs(v.currentTime - want) > 0.35 && !v.seeking) v.currentTime = want;
-    v.muted = !!c.mute;
+  const loc = locate(state.t), want = new Map();
+  const need = (c, local) => { if (c.media.kind === 'video') want.set(c.media.el, { c, time: c.in + local }); };
+  if (loc.prev) need(loc.prev.clip, loc.prev.local);
+  need(loc.clip, loc.local);
+  for (const c of state.clips) if (c.media.kind === 'video' && !want.has(c.media.el) && !c.media.el.paused) c.media.el.pause();
+  for (const [v, w] of want) {
+    if (Math.abs(v.currentTime - w.time) > (v.paused ? 0.15 : 0.35) && !v.seeking) v.currentTime = w.time;
+    v.muted = !!w.c.mute;
     if (v.paused) v.play().catch(() => {});
-  } else if (active && active !== c && active.media.kind === 'video') active.media.el.pause();
-  active = c;
+  }
   drawPreview(); updatePlayhead(true);
   requestAnimationFrame(tick);
 }
 function syncPaused() {
   updatePlayhead(false);
-  const loc = locate(state.t);
-  if (loc && loc.clip.media.kind === 'video') seek(loc.clip.media.el, Math.min(loc.clip.in + loc.local, loc.clip.media.duration - 0.01)).then(() => { if (!state.playing) drawPreview(); });
-  else drawPreview();
+  const loc = locate(state.t), jobs = [];
+  const need = (c, local) => { if (c.media.kind === 'video') jobs.push(seek(c.media.el, Math.min(c.in + local, c.media.duration - 0.01))); };
+  if (loc) { if (loc.prev && loc.prev.clip.media !== loc.clip.media) need(loc.prev.clip, loc.prev.local); need(loc.clip, loc.local); }
+  if (jobs.length) Promise.all(jobs).then(() => { if (!state.playing) drawPreview(); }); else drawPreview();
 }
 function setTime(t) { state.t = clamp(t, 0, total()); syncPaused(); }
 
@@ -3786,8 +3795,9 @@ function renderTimeline() {
   const step = pps >= 80 ? 1 : pps >= 35 ? 2 : pps >= 15 ? 5 : 10;
   for (let s = 0; s <= tot + step; s += step) { const el = document.createElement('span'); el.style.left = s * pps + 'px'; el.textContent = fmt(s).replace(/\.0$/, ''); ruler.appendChild(el); }
   const track = $('track'); track.textContent = '';
-  for (const c of state.clips) {
+  for (const { clip: c, start, ov } of layout()) {
     const b = document.createElement('button');
+    b.style.left = start * pps + 'px'; b.style.setProperty('--ov', Math.max(6, ov * pps) + 'px');
     b.className = 'clip ' + c.media.kind + (c === state.sel ? ' sel' : '') + (inDur(c) ? ' tr' : '') + (outDur(c) ? ' tro' : '');
     b.style.width = Math.max(4, c.dur * pps) + 'px';
     if (c.media.thumb) b.style.backgroundImage = 'url(' + c.media.thumb + ')';
@@ -3865,6 +3875,7 @@ function applyTemplate() {
 function renderAll() { renderTimeline(); renderInspector(); }
 
 /* ---------- inspector ---------- */
+function note(text) { const p = document.createElement('div'); p.className = 'note'; p.textContent = text; return p; }
 function sliderRow(id, label, min, max, val, onInput, unit = '秒') {
   const row = document.createElement('div'); row.className = 'slider';
   const lab = document.createElement('label'); lab.htmlFor = id; lab.textContent = label;
@@ -3903,8 +3914,10 @@ function renderInspector() {
   const showAt = t => { if (state.playing) pause(); renderTimeline(); setTime(t); };
   box.appendChild(chipRow('前の切替', TRANS, c.trans || 'none', v => { c.trans = v; showAt(clipStart(c) + inDur(c) * 0.4); }));
   if (inDur(c)) box.appendChild(sliderRow('trInDur', '前の長さ', 0.2, 2, c.transDur || 0.5, v => { c.transDur = v; showAt(clipStart(c) + inDur(c) * 0.4); return v; }));
+  if (inDur(c) && state.clips.indexOf(c) > 0) box.appendChild(note('前のクリップと重なりながら切り替わります。重なる分だけ全体が短くなります。'));
   box.appendChild(chipRow('後の切替', TRANS, c.transOut || 'none', v => { c.transOut = v; showAt(clipStart(c) + c.dur - outDur(c) * 0.6); }));
   if (outDur(c)) box.appendChild(sliderRow('trOutDur', '後の長さ', 0.2, 2, c.transOutDur || 0.5, v => { c.transOutDur = v; showAt(clipStart(c) + c.dur - outDur(c) * 0.6); return v; }));
+  if ((c.transOut || 'none') !== 'none' && outBlocked(c)) box.appendChild(note('次のクリップに「前の切替」があるため、後の切替は使われません。'));
   box.appendChild(chipRow('フィルター', FILTERS, c.filter || 'none', v => c.filter = v));
   box.appendChild(sliderRow('fxBright', '明るさ', -50, 50, c.bright || 0, v => { c.bright = Math.round(v); drawPreview(); return c.bright; }, ''));
   box.appendChild(sliderRow('fxContrast', 'コントラスト', -50, 50, c.contrast || 0, v => { c.contrast = Math.round(v); drawPreview(); return c.contrast; }, ''));
@@ -3973,18 +3986,22 @@ async function buildAudio() {
   if (!state.bgm && !state.clips.some(c => c.media.kind === 'video' && !c.mute)) return null;
   const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!OAC) return null;
   const sr = 48000, off = new OAC(2, Math.ceil(total() * sr), sr);
-  let any = false, start = 0;
-  for (const c of state.clips) {
+  let any = false;
+  const L = layout();
+  for (let i = 0; i < L.length; i++) {
+    const c = L[i].clip, start = L[i].start, ov = L[i].ov, ovNext = L[i + 1] ? L[i + 1].ov : 0;
     if (c.media.kind === 'video' && !c.mute) {
       const chunks = await decodeAudio(c.media, off);
+      const g = off.createGain(); g.connect(off.destination);
+      if (ov) { g.gain.setValueAtTime(0, Math.max(0, start)); g.gain.linearRampToValueAtTime(1, start + ov); }
+      if (ovNext) { g.gain.setValueAtTime(1, start + c.dur - ovNext); g.gain.linearRampToValueAtTime(0, start + c.dur); }
       for (const ch of chunks || []) {
         const a = Math.max(ch.ts, c.in), b = Math.min(ch.ts + ch.buffer.duration, c.in + c.dur);
         if (b <= a) continue;
-        const s = off.createBufferSource(); s.buffer = ch.buffer; s.connect(off.destination);
-        s.start(start + (a - c.in), a - ch.ts, b - a); any = true;
+        const s = off.createBufferSource(); s.buffer = ch.buffer; s.connect(g);
+        s.start(Math.max(0, start + (a - c.in)), a - ch.ts, b - a); any = true;
       }
     }
-    start += c.dur;
   }
   const b = state.bgm, tot = total();
   if (b) {
@@ -4034,47 +4051,46 @@ async function runExport() {
       for (let ch = 0; ch < audio.numberOfChannels; ch++) piece.copyToChannel(audio.getChannelData(ch).subarray(aPos, end), ch);
       aPos = end; await as.add(piece);
     };
-    let cur = null;
-    const snap = document.createElement('canvas'); snap.width = W; snap.height = H;
-    let hasSnap = false;
-    const emit = async (idx, c, cStart, isLast) => {
-      if (abortExport) throw new Error('abort');
-      const local = Math.max(0, idx / FPS - cStart), fr = cur && frameOf(c, local, cur[0], cur[1], cur[2], 1920);
-      composeBase(ex, W, H, fr, c, local, hasSnap ? snap : null);
-      if (isLast) { snap.getContext('2d').drawImage(ec, 0, 0); hasSnap = true; }
-      drawTexts(ex, W, H, idx / FPS, false);
-      await vs.add(idx / FPS, 1 / FPS);
-      if ((idx + 1) % FPS === 0) await addAudioUntil((idx + 1) / FPS);
-      if (idx % 5 === 0) { bar.value = idx / N; status('書き出し中 ' + Math.round(idx / N * 100) + '%'); await sleep(0); }
-    };
-    let i = 0, fast = 0, compat = 0;
-    while (i < N) {
-      const loc = locate(i / FPS), c = loc.clip, m = c.media, last = loc.idx === state.clips.length - 1;
-      const times = [];
-      let j = i;
-      while (j < N && (last || j / FPS < loc.start + c.dur - 1e-6)) { times.push(c.in + clamp(j / FPS - loc.start, 0, c.dur)); j++; }
-      if (!times.length) { times.push(c.in); j = i + 1; }
-      cur = null;
-      const dec = m.kind === 'video' ? await openDecoder(m) : null;
+    const tmp = document.createElement('canvas'); tmp.width = W; tmp.height = H;
+    // Which source times each clip must deliver, in order (a clip can be on screen as the incoming or the outgoing one).
+    const times = state.clips.map(() => []);
+    for (let idx = 0; idx < N; idx++) {
+      const loc = locate(idx / FPS);
+      if (loc.prev) times[loc.idx - 1].push(loc.prev.clip.in + loc.prev.local);
+      times[loc.idx].push(loc.clip.in + loc.local);
+    }
+    const readers = [];
+    let fast = 0, compat = 0;
+    const reader = async i => {
+      if (readers[i]) return readers[i];
+      const c = state.clips[i], m = c.media, dec = m.kind === 'video' ? await openDecoder(m) : null;
+      let r, k = 0, last = null;
       if (dec) {
         fast++;
-        const sink = new MB.CanvasSink(dec.vt, { poolSize: 2 });
-        let k = 0;
-        for await (const wc of sink.canvasesAtTimestamps(times.map(s => s + dec.first))) {
-          if (wc) cur = [wc.canvas, wc.canvas.width, wc.canvas.height, c.fit];
-          await emit(i + k, c, loc.start, k === times.length - 1); k++;
-        }
+        const gen = new MB.CanvasSink(dec.vt, { poolSize: 2 }).canvasesAtTimestamps(times[i].map(s => s + dec.first));
+        r = { next: async () => { const x = await gen.next(); if (x.value) last = [x.value.canvas, x.value.canvas.width, x.value.canvas.height]; return last; }, close: () => gen.return() };
       } else if (m.kind === 'video') {
         compat++;
-        for (let k = 0; k < times.length; k++) {
-          await seekFrame(m.el, Math.min(times[k], m.duration - 0.01));
-          cur = [m.el, m.w, m.h, c.fit]; await emit(i + k, c, loc.start, k === times.length - 1);
-        }
-      } else {
-        cur = [m.el, m.w, m.h, c.fit];
-        for (let k = 0; k < times.length; k++) await emit(i + k, c, loc.start, k === times.length - 1);
+        r = { next: async () => { await seekFrame(m.el, Math.min(times[i][k++], m.duration - 0.01)); return [m.el, m.w, m.h]; }, close: () => {} };
+      } else r = { next: async () => [m.el, m.w, m.h], close: () => {} };
+      return readers[i] = r;
+    };
+    for (let idx = 0; idx < N; idx++) {
+      if (abortExport) throw new Error('abort');
+      const loc = locate(idx / FPS), c = loc.clip;
+      let prev = null;
+      if (loc.prev) {
+        const fa = await (await reader(loc.idx - 1)).next();
+        if (fa) { draw(tmp.getContext('2d'), W, H, ...frameOf(loc.prev.clip, loc.prev.local, fa[0], fa[1], fa[2], 1920)); prev = tmp; }
       }
-      i = j;
+      const fb = await (await reader(loc.idx)).next();
+      composeBase(ex, W, H, fb && frameOf(c, loc.local, fb[0], fb[1], fb[2], 1920), c, loc.local, prev);
+      drawTexts(ex, W, H, idx / FPS, false);
+      await vs.add(idx / FPS, 1 / FPS);
+      const done = loc.idx - (loc.prev ? 2 : 1);
+      if (done >= 0 && readers[done] && !readers[done].closed) { readers[done].closed = true; try { await readers[done].close(); } catch (e) {} }
+      if ((idx + 1) % FPS === 0) await addAudioUntil((idx + 1) / FPS);
+      if (idx % 5 === 0) { bar.value = idx / N; status('書き出し中 ' + Math.round(idx / N * 100) + '%'); await sleep(0); }
     }
     await addAudioUntil(tot + 1);
     status('仕上げ中');
