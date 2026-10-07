@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>花チャン動画エディタ</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="花チャン">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#12171d">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAZc0lEQVR42u2da3QdV3XH//ucMzP3KdmSbTmOEqcOsRXbOFlOsGUXGqAYpS0E0hJKS8sikBZYLbBCKRQorzbQJou+QttAC6Evuha4XYGQVUgMoXnJr9g4TuKYhARTbMeWbMt63MfMnDm7H+ZeSbalRPK9d+7cm9lLH7wkWXfmnN/5773PYx86/a1XIrHEZjKRNEFiCRyJJXAklsCRWAJHYgkciSVwJJbAkVgCR2IJHIklcCSWWAJHYgkciSVwJJbAkVgCR2KxMpU0AQCAZvomJ3C8ZHkQgAABRoP1TKpqgwjMYPPSZEW95BRCSBgNNqxLMB44ILuTrPy5smGKx8AMIrKygICwgElQEjjaigoJNmDNpVNkL4C0rJ6NsmsddFEtvlp2rQUbkKgqBMH43qG72XjgwDt0NwLXlIYgFMk0hAKbl4KQUPtvMCYBgL1xkg6lF9u9r1NL+uXCy2dSi5mNdQlB2fvZPfrEXn1iL3tjpFIQKXDQ3oi0NxwEIvYnQEIt2Zha+buyay2p7PRuBwMkQDMFpBV5IJCc+p474h76lvfsN03hCFk5CKuNHU37wkESgcus1ZKNzmVvt3o2Vbs3CKGZJUPBrGlLxe8QAPbH3We3es9tNaVhUpl2DVfbEg4CwEFJ2J3pqz5tXfCqSucxz5OJWUBhE2oJe2PFvZ/zj2wjkYK0wUGbtaNoQ8EAs56wlr02P3CXdcGrqikGTY77ml2VBBisye7I9t+a3Xw7WRnWRQiVwBFnMhT7YzB+dvPt2f5bycpPw6Lu0YwCGGDrglfmB+6yll3DhaMA1YO/JJVtBBneiOrZnOp7l1p8NdiAGoHF2f4LHJCVz278y/KCPvfpf4XxIez2iFJV+5DhnrB6X5/d9FeVqHNaihGBIwNRqu/dcuHq4uDNMBqkgJbnQ7SNZli9A9n+LwAmUjKmJETA+FbPpszmvwUHgGkD/yLagQx/VC3ZlO2/DcTVodyUtrTA2urpz2z+a9aFBnu0BI65DFnWJFRqzftAAsxNfiNSYG31bLZ6X8/eCEglcDTTWBcym/9Oda9rhjeZJQThILvhc6pnM3unY/FIL0U4SCIo2b0DVs+muJAxmcKQTK1+H1nZSi6dwBF1HxiXrHz66k9PW1CNDbWsVfc6p+8mLg+3rnNpWTiIYHT6FX9OMlVZHoubqrF2Lv1Ntew17I+2qHNpTThIsj+ulvRbS39xcqUjdsIGIpVOrX5POFOWwBFdGEoQTt+7wwns+IZEHKjuK9TSX2R/vBXFQ7SmbIypns1q0ZVgjn+jO6vehdYUjxaEgw0Jx7n8XbGWjSnxMGrRlday17aieLQcHAT2RXqp6lrbmOXWupsBWC3ZUNlklMDRWJ/ijasLXwsIsG6B5iYJkNW7hewFMF5r8SFaTTY0OZ3W0s112rkTTdpihJ1XizfAuAkcDQ04AhKO7L4SQMusbHEAUnLh5ayLrRV2qJgNskkpntF5EwJPLukHB4BomVFIEoBcuJrshWAdOpqZGar+K4FjGhPhfhnjhU3D3ukZGkg4pLLsT8hF60k6YN0609IEwFryCrKy7I2yMTDlc3+HrGwFGmEDFIdDMaqZTSYkTAD22RsBSGQuABjCdlbdeGbHM0DByJP6xGPkdLXoDjwOymTlWJetpRvkwtVnT/mz9g7dHUaspvg8wGTlQFaliZpESVOOJhBIwHjsjZGVp1S3vfwNpLL2JddBKICqJ0HOaV9/AkQkbAirFfFgXQbr2U7asS4CDKO9Q3ezLng/u4fLJ9kfJ7ujuimV2xsOAkkYl/0JkbvYvmhALdkgu15+Ng0zKiq10V7oGQ7101mRFuticOpxPbTL+/m9ZuL/yMpBOBH7mgjhIAkO2BsV2QvtFTc4K95CdscZNEy1zmyRJr/gT1sAijm83eSZvEprsDfmPvdf3nNbTeEI2Z1hM7YXHMJid4SsnLPqxiksWAOiHqfQ2tIYzIAJJTNExP3x19ifIGchjN8WcJAAM5dPqGWvTvXdqBa/opr6i4SJOVNS2Zagh3eXD35NH/1fSi0CUaNj8wbDQRK6BOU4K9+R6nt3OMU5a6Kf2IsgEoTH7MoHv+o+/W/QLlS6oS5GNJQM1kWyc5mNt6b6bqqOAJWQcb6xfKVoTKrvpszGW8nONXrKtWFwkMXuSWvZNfmBb1s9m6rhRVK8sGYfDQHWVs+m/MC3rWXXsHsS1KjEXjVKM9xhq3cgu/FWkKjqYWL1al4FDsjKZTfeWmD2D99LTncj/ItoBBnQRat3INt/G4gA09JnN+LKhwQMiLL9t1m9A2iMfxH1/4NBiaxcZsPnQQLgpA5uI0MCBonMhs+TlUNQqntT1/fPEcCQTnrDLSSt6tppYo3kgwOSVnrDLZBO3Y9o1LXzhOLysLPyRqtnc5yOoLW7f+HA6tnsrLyRy8P1rS4k6viU7I6oZa9xXva26mRGYpHxoZ2XvU0tew27I3Vs+XrBQeCArGxq9XtJpdus+lELTIFUDlC9l6xsHXcyi7rJhnfa6btJda9LZKNZ4lE5nVu/o/2iPuQaV2R7nRW/EdfDiS8RPoyz4jdEtrdeO5lFfWTDn7BX3EBWvj3KHbWsczFk5e0VN7A/UZchKuojG7mLnUtvqPCbWBPFA3AuvUHkLq6LeIh6yMaY1TtAVr41Thm1t3iwJitv9Q6wP1b7QK0ZDg5I5a2e/qqytagx+MyvFnYusHr6SeVrX20RNaPqi/RitXg9gNZbdGVGEMBUS+VP/wIQBDCtdq8KCQBq8XqRXgz2axyutXUnSfYnrIt+tbKLp1WUI2QCABGkhJDsulwucbnM5RK7ZVMqAoCUEAIgmJCSlvEsAFkX/WrtYamqw9NYOZBomeMkJoCQkBKAGR8t7XyIy6XSzgfZ9yuCQcSua69aY13Qa72sz16xkpxUBSlwa6gjCVi52sdqLdsEw/Anl9+ylezOOBbmOhsLAyEAmMJ4afsD3k8Oes8cMIVxGCNSGRBVX4FBxJ7PnisyWbFgYWp9v71yrbN6XcXXyJhnZAwQe6Pj28KcVp23Z6zHOo2wW0EwDIQA88T37io9/AM9fJyUItsR2TyIYMwZbDNTKk2ZDILAjI5M/M9/07bv2H0vz73+TfaqNZVwleI9EurRKapWSIXdAiEbGwjhPX1g4rt3lffvlvkO0dEJZhhzRjDBZ/6XMNiXSnQsALP35L6Rnz6T3XJdbuA6CDmpQ/HVj5q7pobXI8l+wV7+RlLp+EajYV5Kwn1876kvft47uF91LQLJaiYy94zGUDYPYOybXxv5yu1cKkKIuEapBNak0vbyN7JfqCUmFbXiKe34hhohGcaM/PPfjPzjbaQUZXOs9XmOJxOAWXUvcffvHv7UB92n9seYDwAE2UTlmOyAeMcZp//l78s7H6JsFkSVDLaW1w00OSnjlkb+4VbvuadjzUfNXdO+2/iMgZTugcfKjw6KzoUwpm4cG0O2g0BPfGcrgqB6brENTbQtGUJ4zz098o+3USoNnokM5soc13lYEFA25x3Yd/pf/h5CJnDMngjEUk7Zcyfu2YpAQ87SeUpxYQJsIOR58pHLlx/d7j7xo5g6l5q7puaAVKXjKRuF+7/rPrabcvkZ4gwhTHEi80tbOn7rJjBzYRxCnE9eyky2ffrf7uBiIZxEiVc7qHTzAlI2EE4wvIeNXzlDERPZkNJMjBUf2ibynTNHoEQwTE46c83rF7zvj+01V3K5xKUiyXme42WGZZnRkcKD9509ZdLcGQ4INn4wvAfCqUU/alEOJpnSJ/YgcGO04mAMgNKj24Oh56HUC41mZpjA6Xt51/s/vvAPPmb3rdMjJ8DznB03Rjip0iM/DKGMi3iQQODqE3uq9400x60YUjmKlWchQhB4Bx8ny37xrhISvg9mZ/W6rvd/rOMt7xDZvBkbrfxojuKhVDA64v3kqVgl9qTSpHI1Xl9ak3KEd3b6Q7urahYDnyKEKRW8Zw6Q7cypq4SorK0Q5X7l17s/fmv+138HRPMIRITgYsE9sD82u4QYgD+0u3oDYbOUgyz2TgcjB8Lpobj4lJ0PmYnxF/Ep5yICwAQim8td++aF7/nwPAIRY0Q2V/7RDva8WHgWDgAEIwfYO11jdQZV43OQygQjT8XqrIopFc8zNgxdSRDYq9Z0rVrjHthf+P495cd2yXwHlPXCs6vsuux75Dgx8CgSrIORp0hlahyxNaeywtHDu4w33vyEhRlScrlU3vmgyGTOP3eQMpw0m2sgwgzLCkZOlrY/MKlezU1VjDeuh3dBOM1dW2EIm73T/uFtlaJVcXC5fq17J0EzByJmfHRWr8HM2o/BywcA+4e3sXe6qUv2U2Gp1EO7Kve5xyRhqYudHYj8UerqzeTMnhzGYvuPAEgP7aqUk6/5b9WKKll5/+j9+sS+SoWnNjMS4X4Oe9Xa7KsHZPdi1kFMt4FxABL6xD7/6P1k1eFoQl3KORAA98d3qkW3t5VyoLq5UEpTnBj9j39y9+6EpWadQYkHMe6P75zslBjAwQFZeX3sEX3yMdV9RZPLtjCz59ahn4wBUTiHUXhwW+nBbcHoKcpkgFlKwxrDntts2ZD65GP62CN1kQ3UsT4HA+UDX2ZdaualjcywLHvlGva8mvgIV/OJ3Mf3Dn/m5vG7vm4KY5RKg3kGMogQBCLf4Vy2unn6wQCzLpUPfJnrJBv1g4MDsjr10R+6z34jLITYHG9iDCnLungFu+XzW2WdPOzkHth/6ot/MfKlL5hySeQ7INUL5aiGYdv2ZX1Ng4MDkHKf/YY++kOyOuvV/vUrIcWaUovdg19Ri9ar7nXNcS5EAKzlKyibm/eOwGnhxdh/fqW8ZzuIKJUOp8Ve+EPZd52+tWwMkWkCHByAlD653z34FUotnum+jia7lTCnFewXygfuqJLLTYHDWbVGLuyG1nPtp3AHoRBcLEx871snb/lo+Uc7KZ2hdGZOyyVErAN79RWVQDVqODjko3zgDvYL1fKesYMD4IDsBfr4YGHXJ6K8FuQs9w9Q6soNJjw98KIt+wLhxVzmOomgA9HRmV6/cWpqJPI4tLDrE/r4INkL6tvm9X4Z1mQv9A/f5x8fBKk6Stw8+BDCuXwd2S+2ZG8MQJByfuHFubLhla1LLhWZXCXBiZQMDVL+8UH/8H2VqyfrPaFW9yc2pLLFwQ/5x3eAVDTXxkx7IQFj7L619uoreGJ81p07zOQ47Hun/+mvR774Oe+px8hxSCkEwfyWVZnZmNy11zfhAK3xQco/vqM4+CFS2UZs5pV/8raLG9FFAPyff1d2rZH55dUtJ1GNKmYAsntJ+Uc7Z00fiGCC4rbveD85SOnMnHYGzdB4ksvl9Cs2Z3/516I9HRme91f+8e3FwZtBsi6T5ZHBwRASMP7R+8FGdV9ZvTshkuYjgjGyezGIyrsfFtn8uaOKlAqGjplysTp7wecjUZ5L6Wz3zZ8iIadKvkQRZAiwKf/4a+X9XwAMhFXjjq+I4cDkhX768H1B4edWz6Zp+xkpCj7YWBf/QjByUh/52YzCQErReR85CTmQcsG7PqCWLqsegYkkMSHB/nhx9ye9g3eSyjVIMxoWc5ypfpRd5h99YPze6/3nH65UNmbd8CyXCCTISS145x9QOgvfhVQzeJ/z3bVFlhWcOpkdeLOz5opIHApXj6qT//zD4/de7x99gLLLGj0Z3XjejSaVYb9YGPxAYcdH2RuL6Cav6oTpghv/kBlcGK9PzEgEIj10LL351dlXDyAIItEMAin2xgo7PloY/AD7RVIZmIZngpHdK0sAWBdFerFz6VvtX7ie7M4oEGEGkff0gYnv3eU+uU/k8jVtAxaCXZdsJ7vlDbmBN1cOMjU81GD2Rr2f3uU++01TGq5e0BzFBGO0N1KTgPHZG5UL+nKv/Q+qHMlqcONWa/qM/PPfuPt2wbLIsud9rlqIcL1XZLKd7/xDZ/UVkdT3YYBYlybu/53g9EGyOyGsKM+fRnv1GhuIFGTJuuhaUqlwDieamQ8AC3//Q+7je0f//UvB6IhwUlCq8iOefSCGLiMIuFQEc+qqTZ2//XuUyUZVGSwsw5KyLro2GH8OIgWOdNIo8rvs2Sd7QX7LVrJyUdeYYwYRlwqFB+4rPfwDMzZqSgWRyQIEZZ39IEEQSgWbQOQ6rOUvy77u15zL101JUXRTGsT+xPi2G6pHDbhNlYME+2Wn761k5SKSjXND1HQ2d+312df8ivfTZ7yDj5f37mC3HJwemZoyJ8AYkeuAUs6qtfZll6c3vFJ0LJjEK9oFlErJRnvFW8tP3E62E+WKVZTKUbkpsuPa75Dd0bTSlMzTpyXYLbPvl3Y8wNoHERgQBNe1Vq62Ll4h0pmzY5dmPDFA7I2Nfe+N1WvzuO2UgwT7BeuCa0hlwKZpZ68rU5kMw2AmJ0VOKvu6N8z6+2GyGrVgnCUehlRGLbrKf/6Bem0BjMc8x/SXNL7q6YdQDZrund/DCAEpK6v2QXD212Q6I2UMdg4bCKV6+mH8KOVWREiGJ9I9Vu8WIFbXslClAvpZX6FaxOUZJQCrd4tI98B4kfEhIsVfOhTDSkAtYqTSkE6UoisiY5/9gr38OpJOcmfPeeYs0rGXX1dj3dkYK4dQCRa1xUmqHZUDAIn63pf8UjShoszyRETIG1ekljqXvClm0WgLqYYE4FzyJpFaWq+bQWOlHGE17sRqMGlHmUNFO7HTppV+27UBRdLgiSVwJBZ3t2KSFm+hBoxwXwKJZHq01phepet7GjYOcITlbEf94T2JftSiGf7wHvZGayw9Gz/lIIu9UR2fWsctSAcAPbSbvdEaS8/G062QSHUlnVxTb6W6qvffthMcbCBTemg3B26M7t9oJdkQHLh6aDdkKjK/HJ1ykLCDk/tAsjVu/I5dLCpAMji5jyK8yDfK6XPJxg1O7kti0vOLRoOT+9i4Ua5MRRlzKHZH/WODYJO4lXm3Hhv/2CC70aUq0SoHB2Tn9ZH7ARPlG7YDGaQAo4/cT3Y+yqMJItqXtEzpmD71RDgUkm6fs09hfeoJUzoW8aGmaGNDEmxc96k7K7UYEptbqwHkPnUnm6jv0ot4bSUgq0MfH9Qn9oGoDavoN6DFQKRP7NPHB8nqiLjFos8qiWHcg19NxGMesnHwqwwTfXM1oW4mWXk9tMM/9kh7XsFRZ9kQ/rFH9NCOKA+6NVE5wrLzqrT7kxyUAUrSllnjdxAH5dLuT0Kopmyia9LJYOGwP1569LNhYbwEhJmTFBKlRz/L/njtt7W1EBwAB5Bp7/C9/vHtzSmE3QIORfrHt3uH74VMN6t9mrnMQSpbHPygPrk/LnywiYWMVa7V2V8c/CCpbBMfpIlwMEix0eUn7wCHVcNNk8kgEQM3Z8IiquUn72CjmzuV3NQFUtZkdeqh7YUdHwFTZdA0p0f8MC+o5FDGb5pmAGAq7PiIHtpOVmcTbhaICxyYvGXh3sKODwOiGf6FwwrRYR3x4uDN/vHt1YLRHDUZJAFR2PFh//C9jbgFYb7WuPLW8xi2pHLB6QP65H6R6RHZXrABIZIqpWfVESeQ9I/+IPJ67QxmkNTDjxb33qKff5Cc7qaTgcirCb5QdMr+KAk70/8F64JXTgUBDRQMAMT+eHHPn/mH7qZ0z9TPSsetS67LXPUpsvINr9defU3/+YeLOz7Mxmu6N4kfHEDoU1gXrAu3ZK7600rHMNcbEQ4vRQv7o7TnM8YbIyt7RrVoodgvCLsjfdVnqqRqkKwzIpUwPAT0Fv/INlLZWCX2cYKjOkA5KAm7M33Vp60LXjVNdWtfi2GwCXdSsTdW3Ps5/8g2EilIe4b+IInAY1O2LtySWf8Jsjum3FAdHmPqdfznHyrt+azxRkmmp0laAscLSEjgMmu1ZKNz2dutnk3TgnmaJyU8TboJAPvj7rNbvee2zqGO+FS9dnvFDc6lN5CVnwaZmKe7CWuu8+Q+P//4dveZr+uhnUQK0onhTGAs4QgbnYj9CZBQSzamVv6u7Fp7xowQa3C47ZZmVuywzum0HZfsjriHvuU9+01TOEJWbq51xMN67f6EyF5oX/pW55I3k7PwzOQz/KCZfF94STFhejle1oXg1BPlp/9dD+0EG7JyFWhi2AdxhaPaMQB74yQdSi+2e1+nlvTLhZdXR/BcMuUSgrL3s3v0ib36xF72xkilIFLVTp07qRKmzLpMdodatF4tWm8vfwNkau4HPNkfD0ae0kM7vMPf59IwBy7Z+SrHcW3+WMMxFagasGZvjOwFkEotWi+71kEX1eKrZdfaaSLPYbVT79DdbDxw4B26G4FrSkMQimQaQtWwvZlAAkZzUILRIr0E0rEvuQ4kSdj2JddBWFNlmdmARHDqCT38KFQmOLVfn9iLQLN3muwOkGqJ7QqtAMdk3wgJo8GGAxfGAwdkd86kImyKx8Kgj6wsICrdVq8xGoYvxgcM+4Xwg0Rm6bnxB/vj7I2CJIRN0qlURTNBq+xSaKEKblzJNkmQlQXyIMBo9sdn6D6nC0QVl496z8qHf5MkICc/iP2JGTWP0kvAAKpLeka3ToOjNcv7sQFMdXZqplfgoPGDk8/4oJlvgODWoqEt4Di3k5LHaIAlx1YTS+BILIEjsQSOxBI4EkvgSCyBI7EEjsQSOBJL4EgsgSOxxBI4EkvgSCyBI7EEjsQSOBJL4EgsgSOxBI7EEjgSS+BILLEEjsQSOBKrwf4fMd1DEmqFT3sAAAAASUVORK5CYII=">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22%E8%8A%B1%E3%83%81%E3%83%A3%E3%83%B3%E5%8B%95%E7%94%BB%E3%82%A8%E3%83%87%E3%82%A3%E3%82%BF%22%2C%22short_name%22%3A%22%E8%8A%B1%E3%83%81%E3%83%A3%E3%83%B3%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%2312171d%22%2C%22theme_color%22%3A%22%2312171d%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAZc0lEQVR42u2da3QdV3XH%2F%2FucMzP3KdmSbTmOEqcOsRXbOFlOsGUXGqAYpS0E0hJKS8sikBZYLbBCKRQorzbQJou%2BQttAC6Evuha4XYGQVUgMoXnJr9g4TuKYhARTbMeWbMt63MfMnDm7H%2BZeSbalRPK9d%2B7cm9lLH7wkWXfmnN%2F5773PYx86%2Fa1XIrHEZjKRNEFiCRyJJXAklsCRWAJHYgkciSVwJJbAkVgCR2IJHIklcCSWWAJHYgkciSVwJJbAkVgCR2KxMpU0AQCAZvomJ3C8ZHkQgAABRoP1TKpqgwjMYPPSZEW95BRCSBgNNqxLMB44ILuTrPy5smGKx8AMIrKygICwgElQEjjaigoJNmDNpVNkL4C0rJ6NsmsddFEtvlp2rQUbkKgqBMH43qG72XjgwDt0NwLXlIYgFMk0hAKbl4KQUPtvMCYBgL1xkg6lF9u9r1NL%2BuXCy2dSi5mNdQlB2fvZPfrEXn1iL3tjpFIQKXDQ3oi0NxwEIvYnQEIt2Zha%2Bbuyay2p7PRuBwMkQDMFpBV5IJCc%2Bp474h76lvfsN03hCFk5CKuNHU37wkESgcus1ZKNzmVvt3o2Vbs3CKGZJUPBrGlLxe8QAPbH3We3es9tNaVhUpl2DVfbEg4CwEFJ2J3pqz5tXfCqSucxz5OJWUBhE2oJe2PFvZ%2Fzj2wjkYK0wUGbtaNoQ8EAs56wlr02P3CXdcGrqikGTY77ml2VBBisye7I9t%2Ba3Xw7WRnWRQiVwBFnMhT7YzB%2BdvPt2f5bycpPw6Lu0YwCGGDrglfmB%2B6yll3DhaMA1YO%2FJJVtBBneiOrZnOp7l1p8NdiAGoHF2f4LHJCVz278y%2FKCPvfpf4XxIez2iFJV%2B5DhnrB6X5%2Fd9FeVqHNaihGBIwNRqu%2FdcuHq4uDNMBqkgJbnQ7SNZli9A9n%2BLwAmUjKmJETA%2BFbPpszmvwUHgGkD%2FyLagQx%2FVC3ZlO2%2FDcTVodyUtrTA2urpz2z%2Ba9aFBnu0BI65DFnWJFRqzftAAsxNfiNSYG31bLZ6X8%2FeCEglcDTTWBcym%2F9Oda9rhjeZJQThILvhc6pnM3unY%2FFIL0U4SCIo2b0DVs%2BmuJAxmcKQTK1%2BH1nZSi6dwBF1HxiXrHz66k9PW1CNDbWsVfc6p%2B8mLg%2B3rnNpWTiIYHT6FX9OMlVZHoubqrF2Lv1Ntew17I%2B2qHNpTThIsj%2BulvRbS39xcqUjdsIGIpVOrX5POFOWwBFdGEoQTt%2B7wwns%2BIZEHKjuK9TSX2R%2FvBXFQ7SmbIypns1q0ZVgjn%2BjO6vehdYUjxaEgw0Jx7n8XbGWjSnxMGrRlday17aieLQcHAT2RXqp6lrbmOXWupsBWC3ZUNlklMDRWJ%2FijasLXwsIsG6B5iYJkNW7hewFMF5r8SFaTTY0OZ3W0s112rkTTdpihJ1XizfAuAkcDQ04AhKO7L4SQMusbHEAUnLh5ayLrRV2qJgNskkpntF5EwJPLukHB4BomVFIEoBcuJrshWAdOpqZGar%2BK4FjGhPhfhnjhU3D3ukZGkg4pLLsT8hF60k6YN0609IEwFryCrKy7I2yMTDlc3%2BHrGwFGmEDFIdDMaqZTSYkTAD22RsBSGQuABjCdlbdeGbHM0DByJP6xGPkdLXoDjwOymTlWJetpRvkwtVnT%2Fmz9g7dHUaspvg8wGTlQFaliZpESVOOJhBIwHjsjZGVp1S3vfwNpLL2JddBKICqJ0HOaV9%2FAkQkbAirFfFgXQbr2U7asS4CDKO9Q3ezLng%2Fu4fLJ9kfJ7ujuimV2xsOAkkYl%2F0JkbvYvmhALdkgu15%2BNg0zKiq10V7oGQ7101mRFuticOpxPbTL%2B%2Fm9ZuL%2FyMpBOBH7mgjhIAkO2BsV2QvtFTc4K95CdscZNEy1zmyRJr%2FgT1sAijm83eSZvEprsDfmPvdf3nNbTeEI2Z1hM7YXHMJid4SsnLPqxiksWAOiHqfQ2tIYzIAJJTNExP3x19ifIGchjN8WcJAAM5dPqGWvTvXdqBa%2Fopr6i4SJOVNS2Zagh3eXD35NH%2F1fSi0CUaNj8wbDQRK6BOU4K9%2BR6nt3OMU5a6Kf2IsgEoTH7MoHv%2Bo%2B%2FW%2FQLlS6oS5GNJQM1kWyc5mNt6b6bqqOAJWQcb6xfKVoTKrvpszGW8nONXrKtWFwkMXuSWvZNfmBb1s9m6rhRVK8sGYfDQHWVs%2Bm%2FMC3rWXXsHsS1KjEXjVKM9xhq3cgu%2FFWkKjqYWL1al4FDsjKZTfeWmD2D99LTncj%2FItoBBnQRat3INt%2FG4gA09JnN%2BLKhwQMiLL9t1m9A2iMfxH1%2F4NBiaxcZsPnQQLgpA5uI0MCBonMhs%2BTlUNQqntT1%2FfPEcCQTnrDLSSt6tppYo3kgwOSVnrDLZBO3Y9o1LXzhOLysLPyRqtnc5yOoLW7f%2BHA6tnsrLyRy8P1rS4k6viU7I6oZa9xXva26mRGYpHxoZ2XvU0tew27I3Vs%2BXrBQeCArGxq9XtJpdus%2BlELTIFUDlC9l6xsHXcyi7rJhnfa6btJda9LZKNZ4lE5nVu%2Fo%2F2iPuQaV2R7nRW%2FEdfDiS8RPoyz4jdEtrdeO5lFfWTDn7BX3EBWvj3KHbWsczFk5e0VN7A%2FUZchKuojG7mLnUtvqPCbWBPFA3AuvUHkLq6LeIh6yMaY1TtAVr41Thm1t3iwJitv9Q6wP1b7QK0ZDg5I5a2e%2Fqqytagx%2BMyvFnYusHr6SeVrX20RNaPqi%2FRitXg9gNZbdGVGEMBUS%2BVP%2FwIQBDCtdq8KCQBq8XqRXgz2axyutXUnSfYnrIt%2BtbKLp1WUI2QCABGkhJDsulwucbnM5RK7ZVMqAoCUEAIgmJCSlvEsAFkX%2FWrtYamqw9NYOZBomeMkJoCQkBKAGR8t7XyIy6XSzgfZ9yuCQcSua69aY13Qa72sz16xkpxUBSlwa6gjCVi52sdqLdsEw%2FAnl9%2BylezOOBbmOhsLAyEAmMJ4afsD3k8Oes8cMIVxGCNSGRBVX4FBxJ7PnisyWbFgYWp9v71yrbN6XcXXyJhnZAwQe6Pj28KcVp23Z6zHOo2wW0EwDIQA88T37io9%2FAM9fJyUItsR2TyIYMwZbDNTKk2ZDILAjI5M%2FM9%2F07bv2H0vz73%2BTfaqNZVwleI9EurRKapWSIXdAiEbGwjhPX1g4rt3lffvlvkO0dEJZhhzRjDBZ%2F6XMNiXSnQsALP35L6Rnz6T3XJdbuA6CDmpQ%2FHVj5q7pobXI8l%2BwV7%2BRlLp%2BEajYV5Kwn1876kvft47uF91LQLJaiYy94zGUDYPYOybXxv5yu1cKkKIuEapBNak0vbyN7JfqCUmFbXiKe34hhohGcaM%2FPPfjPzjbaQUZXOs9XmOJxOAWXUvcffvHv7UB92n9seYDwAE2UTlmOyAeMcZp%2F%2Fl78s7H6JsFkSVDLaW1w00OSnjlkb%2B4VbvuadjzUfNXdO%2B2%2FiMgZTugcfKjw6KzoUwpm4cG0O2g0BPfGcrgqB6brENTbQtGUJ4zz098o%2B3USoNnokM5soc13lYEFA25x3Yd%2Fpf%2Fh5CJnDMngjEUk7Zcyfu2YpAQ87SeUpxYQJsIOR58pHLlx%2Fd7j7xo5g6l5q7puaAVKXjKRuF%2B7%2FrPrabcvkZ4gwhTHEi80tbOn7rJjBzYRxCnE9eyky2ffrf7uBiIZxEiVc7qHTzAlI2EE4wvIeNXzlDERPZkNJMjBUf2ibynTNHoEQwTE46c83rF7zvj%2B01V3K5xKUiyXme42WGZZnRkcKD9509ZdLcGQ4INn4wvAfCqUU%2FalEOJpnSJ%2FYgcGO04mAMgNKj24Oh56HUC41mZpjA6Xt51%2Fs%2FvvAPPmb3rdMjJ8DznB03Rjip0iM%2FDKGMi3iQQODqE3uq9400x60YUjmKlWchQhB4Bx8ny37xrhISvg9mZ%2FW6rvd%2FrOMt7xDZvBkbrfxojuKhVDA64v3kqVgl9qTSpHI1Xl9ak3KEd3b6Q7urahYDnyKEKRW8Zw6Q7cypq4SorK0Q5X7l17s%2Ffmv%2B138HRPMIRITgYsE9sD82u4QYgD%2B0u3oDYbOUgyz2TgcjB8Lpobj4lJ0PmYnxF%2FEp5yICwAQim8td%2B%2BaF7%2FnwPAIRY0Q2V%2F7RDva8WHgWDgAEIwfYO11jdQZV43OQygQjT8XqrIopFc8zNgxdSRDYq9Z0rVrjHthf%2BP495cd2yXwHlPXCs6vsuux75Dgx8CgSrIORp0hlahyxNaeywtHDu4w33vyEhRlScrlU3vmgyGTOP3eQMpw0m2sgwgzLCkZOlrY%2FMKlezU1VjDeuh3dBOM1dW2EIm73T%2FuFtlaJVcXC5fq17J0EzByJmfHRWr8HM2o%2FBywcA%2B4e3sXe6qUv2U2Gp1EO7Kve5xyRhqYudHYj8UerqzeTMnhzGYvuPAEgP7aqUk6%2F5b9WKKll5%2F%2Bj9%2BsS%2BSoWnNjMS4X4Oe9Xa7KsHZPdi1kFMt4FxABL6xD7%2F6P1k1eFoQl3KORAA98d3qkW3t5VyoLq5UEpTnBj9j39y9%2B6EpWadQYkHMe6P75zslBjAwQFZeX3sEX3yMdV9RZPLtjCz59ahn4wBUTiHUXhwW%2BnBbcHoKcpkgFlKwxrDntts2ZD65GP62CN1kQ3UsT4HA%2BUDX2ZdaualjcywLHvlGva8mvgIV%2FOJ3Mf3Dn%2Fm5vG7vm4KY5RKg3kGMogQBCLf4Vy2unn6wQCzLpUPfJnrJBv1g4MDsjr10R%2B6z34jLITYHG9iDCnLungFu%2BXzW2WdPOzkHth%2F6ot%2FMfKlL5hySeQ7INUL5aiGYdv2ZX1Ng4MDkHKf%2FYY%2B%2BkOyOuvV%2FvUrIcWaUovdg19Ri9ar7nXNcS5EAKzlKyibm%2FeOwGnhxdh%2FfqW8ZzuIKJUOp8Ve%2BEPZd52%2BtWwMkWkCHByAlD653z34FUotnum%2Bjia7lTCnFewXygfuqJLLTYHDWbVGLuyG1nPtp3AHoRBcLEx871snb%2Flo%2BUc7KZ2hdGZOyyVErAN79RWVQDVqODjko3zgDvYL1fKesYMD4IDsBfr4YGHXJ6K8FuQs9w9Q6soNJjw98KIt%2BwLhxVzmOomgA9HRmV6%2FcWpqJPI4tLDrE%2Fr4INkL6tvm9X4Z1mQv9A%2Ff5x8fBKk6Stw8%2BBDCuXwd2S%2B2ZG8MQJByfuHFubLhla1LLhWZXCXBiZQMDVL%2B8UH%2F8H2VqyfrPaFW9yc2pLLFwQ%2F5x3eAVDTXxkx7IQFj7L619uoreGJ81p07zOQ47Hun%2F%2BmvR774Oe%2Bpx8hxSCkEwfyWVZnZmNy11zfhAK3xQco%2FvqM4%2BCFS2UZs5pV%2F8raLG9FFAPyff1d2rZH55dUtJ1GNKmYAsntJ%2BUc7Z00fiGCC4rbveD85SOnMnHYGzdB4ksvl9Cs2Z3%2F516I9HRme91f%2B8e3FwZtBsi6T5ZHBwRASMP7R%2B8FGdV9ZvTshkuYjgjGyezGIyrsfFtn8uaOKlAqGjplysTp7wecjUZ5L6Wz3zZ8iIadKvkQRZAiwKf%2F4a%2BX9XwAMhFXjjq%2BI4cDkhX768H1B4edWz6Zp%2BxkpCj7YWBf%2FQjByUh%2F52YzCQErReR85CTmQcsG7PqCWLqsegYkkMSHB%2Fnhx9ye9g3eSyjVIMxoWc5ypfpRd5h99YPze6%2F3nH65UNmbd8CyXCCTISS145x9QOgvfhVQzeJ%2Fz3bVFlhWcOpkdeLOz5opIHApXj6qT%2F%2FzD4%2Fde7x99gLLLGj0Z3XjejSaVYb9YGPxAYcdH2RuL6Cav6oTpghv%2FkBlcGK9PzEgEIj10LL351dlXDyAIItEMAin2xgo7PloY%2FAD7RVIZmIZngpHdK0sAWBdFerFz6VvtX7ie7M4oEGEGkff0gYnv3eU%2BuU%2Fk8jVtAxaCXZdsJ7vlDbmBN1cOMjU81GD2Rr2f3uU%2B%2B01TGq5e0BzFBGO0N1KTgPHZG5UL%2BnKv%2FQ%2BqHMlqcONWa%2FqM%2FPPfuPt2wbLIsud9rlqIcL1XZLKd7%2FxDZ%2FUVkdT3YYBYlybu%2F53g9EGyOyGsKM%2BfRnv1GhuIFGTJuuhaUqlwDieamQ8AC3%2F%2FQ%2B7je0f%2F%2FUvB6IhwUlCq8iOefSCGLiMIuFQEc%2BqqTZ2%2F%2FXuUyUZVGSwsw5KyLro2GH8OIgWOdNIo8rvs2Sd7QX7LVrJyUdeYYwYRlwqFB%2B4rPfwDMzZqSgWRyQIEZZ39IEEQSgWbQOQ6rOUvy77u15zL101JUXRTGsT%2BxPi2G6pHDbhNlYME%2B2Wn761k5SKSjXND1HQ2d%2B312df8ivfTZ7yDj5f37mC3HJwemZoyJ8AYkeuAUs6qtfZll6c3vFJ0LJjEK9oFlErJRnvFW8tP3E62E%2BWKVZTKUbkpsuPa75Dd0bTSlMzTpyXYLbPvl3Y8wNoHERgQBNe1Vq62Ll4h0pmzY5dmPDFA7I2Nfe%2BN1WvzuO2UgwT7BeuCa0hlwKZpZ68rU5kMw2AmJ0VOKvu6N8z6%2B2GyGrVgnCUehlRGLbrKf%2F6Bem0BjMc8x%2FSXNL7q6YdQDZrund%2FDCAEpK6v2QXD212Q6I2UMdg4bCKV6%2BmH8KOVWREiGJ9I9Vu8WIFbXslClAvpZX6FaxOUZJQCrd4tI98B4kfEhIsVfOhTDSkAtYqTSkE6UoisiY5%2F9gr38OpJOcmfPeeYs0rGXX1dj3dkYK4dQCRa1xUmqHZUDAIn63pf8UjShoszyRETIG1ekljqXvClm0WgLqYYE4FzyJpFaWq%2BbQWOlHGE17sRqMGlHmUNFO7HTppV%2B27UBRdLgiSVwJBZ3t2KSFm%2BhBoxwXwKJZHq01phepet7GjYOcITlbEf94T2JftSiGf7wHvZGayw9Gz%2FlIIu9UR2fWsctSAcAPbSbvdEaS8%2FG062QSHUlnVxTb6W6qvffthMcbCBTemg3B26M7t9oJdkQHLh6aDdkKjK%2FHJ1ykLCDk%2FtAsjVu%2FI5dLCpAMji5jyK8yDfK6XPJxg1O7kti0vOLRoOT%2B9i4Ua5MRRlzKHZH%2FWODYJO4lXm3Hhv%2F2CC70aUq0SoHB2Tn9ZH7ARPlG7YDGaQAo4%2FcT3Y%2ByqMJItqXtEzpmD71RDgUkm6fs09hfeoJUzoW8aGmaGNDEmxc96k7K7UYEptbqwHkPnUnm6jv0ot4bSUgq0MfH9Qn9oGoDavoN6DFQKRP7NPHB8nqiLjFos8qiWHcg19NxGMesnHwqwwTfXM1oW4mWXk9tMM%2F9kh7XsFRZ9kQ%2FrFH9NCOKA%2B6NVE5wrLzqrT7kxyUAUrSllnjdxAH5dLuT0Kopmyia9LJYOGwP1569LNhYbwEhJmTFBKlRz%2FL%2Fnjtt7W1EBwAB5Bp7%2FC9%2FvHtzSmE3QIORfrHt3uH74VMN6t9mrnMQSpbHPygPrk%2FLnywiYWMVa7V2V8c%2FCCpbBMfpIlwMEix0eUn7wCHVcNNk8kgEQM3Z8IiquUn72CjmzuV3NQFUtZkdeqh7YUdHwFTZdA0p0f8MC%2Bo5FDGb5pmAGAq7PiIHtpOVmcTbhaICxyYvGXh3sKODwOiGf6FwwrRYR3x4uDN%2FvHt1YLRHDUZJAFR2PFh%2F%2FC9jbgFYb7WuPLW8xi2pHLB6QP65H6R6RHZXrABIZIqpWfVESeQ9I%2F%2BIPJ67QxmkNTDjxb33qKff5Cc7qaTgcirCb5QdMr%2BKAk70%2F8F64JXTgUBDRQMAMT%2BeHHPn%2FmH7qZ0z9TPSsetS67LXPUpsvINr9defU3%2F%2BYeLOz7Mxmu6N4kfHEDoU1gXrAu3ZK7600rHMNcbEQ4vRQv7o7TnM8YbIyt7RrVoodgvCLsjfdVnqqRqkKwzIpUwPAT0Fv%2FINlLZWCX2cYKjOkA5KAm7M33Vp60LXjVNdWtfi2GwCXdSsTdW3Ps5%2F8g2EilIe4b%2BIInAY1O2LtySWf8Jsjum3FAdHmPqdfznHyrt%2BazxRkmmp0laAscLSEjgMmu1ZKNz2dutnk3TgnmaJyU8TboJAPvj7rNbvee2zqGO%2BFS9dnvFDc6lN5CVnwaZmKe7CWuu8%2BQ%2BP%2F%2F4dveZr%2BuhnUQK0onhTGAs4QgbnYj9CZBQSzamVv6u7Fp7xowQa3C47ZZmVuywzum0HZfsjriHvuU9%2B01TOEJWbq51xMN67f6EyF5oX%2FpW55I3k7PwzOQz%2FKCZfF94STFhejle1oXg1BPlp%2F9dD%2B0EG7JyFWhi2AdxhaPaMQB74yQdSi%2B2e1%2BnlvTLhZdXR%2FBcMuUSgrL3s3v0ib36xF72xkilIFLVTp07qRKmzLpMdodatF4tWm8vfwNkau4HPNkfD0ae0kM7vMPf59IwBy7Z%2BSrHcW3%2BWMMxFagasGZvjOwFkEotWi%2B71kEX1eKrZdfaaSLPYbVT79DdbDxw4B26G4FrSkMQimQaQtWwvZlAAkZzUILRIr0E0rEvuQ4kSdj2JddBWFNlmdmARHDqCT38KFQmOLVfn9iLQLN3muwOkGqJ7QqtAMdk3wgJo8GGAxfGAwdkd86kImyKx8Kgj6wsICrdVq8xGoYvxgcM%2B4Xwg0Rm6bnxB%2Fvj7I2CJIRN0qlURTNBq%2BxSaKEKblzJNkmQlQXyIMBo9sdn6D6nC0QVl496z8qHf5MkICc%2FiP2JGTWP0kvAAKpLeka3ToOjNcv7sQFMdXZqplfgoPGDk8%2F4oJlvgODWoqEt4Di3k5LHaIAlx1YTS%2BBILIEjsQSOxBI4EkvgSCyBI7EEjsQSOBJL4EgsgSOxxBI4EkvgSCyBI7EEjsQSOBJL4EgsgSOxBI7EEjgSS%2BBILLEEjsQSOBKrwf4fMd1DEmqFT3sAAAAASUVORK5CYII%3D%22%2C%22sizes%22%3A%22180x180%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
 <style>
 :root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);box-sizing:border-box;height:100%}
 [hidden]{display:none!important}
@@ -127,13 +135,26 @@ input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--lin
 .nums{display:flex;gap:8px}
 .nums label{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
 .nums input{width:100%;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:40px;font:16px var(--mono);color:var(--fg)}
+button.brand{background:none;border:0;padding:0 4px 0 0;margin-right:auto;min-height:40px;gap:5px}
+.clip,.titem{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.dragging{opacity:.85;z-index:5;outline:2px solid var(--accent);cursor:grabbing}
+#projList{display:flex;flex-direction:column;gap:8px}
+.proj{display:flex;align-items:center;gap:8px}
+.proj.cur .pinfo b{color:var(--accent)}
+.pthumb{width:44px;height:44px;flex:none;border-radius:6px;background:var(--panel-2) center/cover}
+.pinfo{flex:1;min-width:0;display:flex;flex-direction:column}
+.pinfo b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pinfo span{font-size:12px;color:var(--muted)}
+.proj button{min-height:36px;padding:0 10px;flex:none}
+#aspect{flex:none}
+#aspect{width:78px}
 </style>
 </head>
 <body>
 <div class="app">
   <header class="bar">
-    <div class="brand">花チャン<small>動画エディタ</small></div>
-    <button id="tplBtn">テンプレート</button>
+    <button id="projBtn" class="brand" aria-label="プロジェクトを開く"><svg viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>花チャン</button>
+    <button id="tplBtn">テンプレ</button>
     <select id="aspect" aria-label="画面の比率">
       <option value="9:16">縦 9:16</option>
       <option value="16:9">横 16:9</option>
@@ -217,6 +238,18 @@ input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--lin
       <input id="tplTitle" type="text" maxlength="40" placeholder="例: 北海道旅行 2026">
     </label>
     <div class="row"><button id="tplCancel">やめる</button><button id="tplApply" class="primary">適用する</button></div>
+  </div>
+</div>
+<div class="overlay" id="projOverlay" hidden>
+  <div class="sheet">
+    <h2>プロジェクト</h2>
+    <label>編集中のプロジェクト名
+      <input id="projName" type="text" maxlength="40">
+    </label>
+    <p id="projStatus"></p>
+    <div id="projList"></div>
+    <p>保存先はこの端末のこのブラウザの中です。ブラウザのデータを消すと、プロジェクトも消えます。</p>
+    <div class="row"><button id="projClose">閉じる</button><button id="projNew" class="primary">新しく作る</button></div>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -3548,6 +3581,11 @@ function applyAspect() {
 
 /* ---------- picture-in-picture overlays ---------- */
 const isOv = x => state.overlays.includes(x);
+const SPEEDS = [[0.5, '0.5倍'], [1, '1倍'], [1.5, '1.5倍'], [2, '2倍'], [4, '4倍']];
+const sp = x => x.speed || 1;
+// Source time shown at a given local time; a clip's dur is its length on the timeline.
+const srcAt = (x, local) => x.in + local * sp(x);
+const setSpeed = (x, v) => { x.dur = Math.max(MIN_DUR, x.dur * sp(x) / v); x.speed = v; };
 const ovOn = (o, t) => t >= o.start && t < o.start + o.dur;
 const ovSrc = o => [o.media.el, o.media.w, o.media.h];
 const BLENDS = [['source-over', '通常'], ['screen', 'スクリーン'], ['multiply', '乗算'], ['overlay', 'オーバーレイ']];
@@ -3604,14 +3642,14 @@ function renderOvInspector(box, o) {
   const m = o.media, tot = total();
   const head = document.createElement('div'); head.className = 'insp-head';
   const nm = document.createElement('b'); nm.textContent = '重ねる映像: ' + m.name;
-  const du = document.createElement('span'); du.textContent = o.full ? '全画面で重ねます' : 'プレビュー上でドラッグして移動';
+  const du = document.createElement('span'); du.textContent = 'プレビュー上でドラッグして移動';
   head.append(nm, du); box.appendChild(head);
-  box.appendChild(chipRow('表示', [[false, 'ワイプ'], [true, '全画面']], !!o.full, v => o.full = v));
   const moved = () => { if (state.playing) pause(); renderTimeline(); setTime(clamp(state.t, o.start, o.start + o.dur - 0.05)); };
   box.appendChild(sliderRow('ovStart', '出る時間', 0, Math.max(0.1, tot - 0.1), o.start, v => { o.start = v; moved(); return v; }));
   if (m.kind === 'video') {
-    box.appendChild(sliderRow('ovIn', '開始位置', 0, m.duration, o.in, v => { const out = o.in + o.dur; o.in = clamp(v, 0, out - MIN_DUR); o.dur = out - o.in; moved(); return o.in; }));
-    box.appendChild(sliderRow('ovOut', '終了位置', 0, m.duration, o.in + o.dur, v => { const out = clamp(v, o.in + MIN_DUR, m.duration); o.dur = out - o.in; moved(); return out; }));
+    box.appendChild(sliderRow('ovIn', '開始位置', 0, m.duration, o.in, v => { const out = srcAt(o, o.dur); o.in = clamp(v, 0, out - MIN_DUR); o.dur = (out - o.in) / sp(o); moved(); return o.in; }));
+    box.appendChild(sliderRow('ovOut', '終了位置', 0, m.duration, srcAt(o, o.dur), v => { const out = clamp(v, o.in + MIN_DUR, m.duration); o.dur = (out - o.in) / sp(o); moved(); return out; }));
+    box.appendChild(chipRow('速さ', SPEEDS, sp(o), v => { setSpeed(o, v); if (state.playing) pause(); renderTimeline(); }));
   } else box.appendChild(sliderRow('ovDur', '表示時間', 0.5, Math.max(30, tot), o.dur, v => { o.dur = v; moved(); return v; }));
   if (o.full) box.appendChild(chipRow('合わせ方', [['contain', '全体を表示'], ['cover', '画面いっぱい']], o.fit || 'contain', v => o.fit = v));
   else {
@@ -3639,10 +3677,11 @@ function renderOvInspector(box, o) {
     const up = document.createElement('button'); up.textContent = '前面へ'; up.disabled = oi === state.overlays.length - 1; up.onclick = () => reorder(1); acts.appendChild(up);
     const dn = document.createElement('button'); dn.textContent = '背面へ'; dn.disabled = oi === 0; dn.onclick = () => reorder(-1); acts.appendChild(dn);
   }
+  btn('画面に合わせる', () => { const W = canvas.width, H = canvas.height; o.size = Math.min(1, H * m.w / (W * m.h)); o.x = o.y = 0.5; o.rot = 0; o.shape = 'rect'; o.border = false; renderInspector(); drawPreview(); });
   btn('ここで分割', () => {
     const local = state.t - o.start;
     if (local < MIN_DUR || local > o.dur - MIN_DUR) return toast('再生位置(黄色の線)をこの映像の途中に合わせてから分割してください。');
-    const y = { ...o, id: uid++, start: state.t, in: o.media.kind === 'video' ? o.in + local : 0, dur: o.dur - local, fadeIn: 0 }; delete y._box;
+    const y = { ...o, id: uid++, start: state.t, in: o.media.kind === 'video' ? srcAt(o, local) : 0, dur: o.dur - local, fadeIn: 0 }; delete y._box;
     o.dur = local; o.fadeOut = 0; state.overlays.splice(oi + 1, 0, y); state.sel = y; renderAll(); drawPreview();
   });
   btn('複製', () => { const y = { ...o, id: uid++, start: Math.min(o.start + o.dur, Math.max(0, tot - 0.5)) }; delete y._box; state.overlays.push(y); state.sel = y; renderAll(); setTime(y.start + 0.3); });
@@ -3870,7 +3909,7 @@ async function addBgm(file) {
   try {
     const buffer = await decodeAny(await file.arrayBuffer());
     if (state.playing) pause();
-    state.bgm = { name: file.name, buffer, vol: 0.5, loop: true, fade: true };
+    state.bgm = { name: file.name, buffer, vol: 0.5, loop: true, fade: true, file };
     state.sel = state.bgm; renderAll();
   } catch (e) { toast('この音楽ファイルは読み込めませんでした。mp3 / m4a / wav などをお試しください。'); }
 }
@@ -3891,7 +3930,7 @@ function tick(now) {
   state.t += Math.min(0.25, (now - lastNow) / 1000); lastNow = now;
   if (state.t >= total()) { state.t = total(); pause(); return; }
   const loc = locate(state.t), want = new Map();
-  const need = (c, local) => { if (c.media.kind === 'video') want.set(c.media.el, { c, time: c.in + local }); };
+  const need = (c, local) => { if (c.media.kind === 'video') want.set(c.media.el, { c, time: srcAt(c, local) }); };
   if (loc.prev) need(loc.prev.clip, loc.prev.local);
   need(loc.clip, loc.local);
   for (const o of state.overlays) if (ovOn(o, state.t) && !want.has(o.media.el)) need(o, state.t - o.start);
@@ -3899,6 +3938,7 @@ function tick(now) {
   for (const [v, w] of want) {
     if (Math.abs(v.currentTime - w.time) > (v.paused ? 0.15 : 0.35) && !v.seeking) v.currentTime = w.time;
     v.muted = !!w.c.mute;
+    if (v.playbackRate !== sp(w.c)) { v.preservesPitch = false; v.playbackRate = sp(w.c); }
     if (v.paused) v.play().catch(() => {});
   }
   drawPreview(); updatePlayhead(true);
@@ -3907,7 +3947,7 @@ function tick(now) {
 function syncPaused() {
   updatePlayhead(false);
   const loc = locate(state.t), jobs = [];
-  const need = (c, local) => { if (c.media.kind === 'video') jobs.push(seek(c.media.el, Math.min(c.in + local, c.media.duration - 0.01))); };
+  const need = (c, local) => { if (c.media.kind === 'video') jobs.push(seek(c.media.el, Math.min(srcAt(c, local), c.media.duration - 0.01))); };
   if (loc) { if (loc.prev && loc.prev.clip.media !== loc.clip.media) need(loc.prev.clip, loc.prev.local); need(loc.clip, loc.local); }
   for (const o of state.overlays) if (ovOn(o, state.t) && !(loc && (o.media === loc.clip.media || loc.prev && o.media === loc.prev.clip.media))) need(o, state.t - o.start);
   if (jobs.length) Promise.all(jobs).then(() => { if (!state.playing) drawPreview(); }); else drawPreview();
@@ -3921,6 +3961,51 @@ function updatePlayhead(follow) {
   $('tcNow').textContent = fmt(state.t); $('tcTotal').textContent = fmt(total());
   if (follow) { const sc = $('tlScroll'); if (x > sc.scrollLeft + sc.clientWidth - 40 || x < sc.scrollLeft) sc.scrollLeft = x - 60; }
 }
+/* ---------- dragging items on the timeline ---------- */
+// Mouse: drag straight away. Touch: press and hold first, so a normal swipe still scrolls the timeline.
+let tlDrag = null, suppressClick = false;
+function startTlDrag(d) {
+  d.on = true; if (state.playing) pause();
+  d.el.classList.add('dragging'); try { d.el.setPointerCapture(d.id); } catch (e) {}
+  try { navigator.vibrate && navigator.vibrate(10); } catch (e) {}
+}
+function makeDraggable(el, item, kind) {
+  el.addEventListener('pointerdown', e => {
+    if (e.button) return;
+    const d = tlDrag = { el, item, kind, x0: e.clientX, y0: e.clientY, sl0: $('tlScroll').scrollLeft, on: false, id: e.pointerId, orig: item.start, mouse: e.pointerType === 'mouse', dx: 0 };
+    if (!d.mouse) d.timer = setTimeout(() => { if (tlDrag === d) startTlDrag(d); }, 350);
+  });
+}
+window.addEventListener('pointermove', e => {
+  const d = tlDrag; if (!d || e.pointerId !== d.id) return;
+  if (!d.on) {
+    const far = Math.abs(e.clientX - d.x0) > (d.mouse ? 4 : 8) || Math.abs(e.clientY - d.y0) > 8;
+    if (far && d.mouse) startTlDrag(d);
+    else if (far) { clearTimeout(d.timer); tlDrag = null; return; }
+    else return;
+  }
+  d.dx = e.clientX - d.x0 + ($('tlScroll').scrollLeft - d.sl0);
+  if (d.kind === 'clip') d.el.style.transform = 'translateX(' + d.dx + 'px)';
+  else { d.item.start = clamp(d.orig + d.dx / state.pps, 0, Math.max(0, total() - 0.1)); d.el.style.left = d.item.start * state.pps + 'px'; drawPreview(); }
+});
+function endTlDrag() {
+  const d = tlDrag; if (!d) return;
+  clearTimeout(d.timer); tlDrag = null;
+  if (!d.on) return;
+  suppressClick = true; setTimeout(() => suppressClick = false, 80);
+  if (d.kind === 'clip') {
+    const L = layout(), me = L.find(x => x.clip === d.item), center = me.start + d.item.dur / 2 + d.dx / state.pps;
+    const others = L.filter(x => x.clip !== d.item);
+    state.clips = others.map(x => x.clip);
+    state.clips.splice(others.filter(x => x.start + x.clip.dur / 2 < center).length, 0, d.item);
+  }
+  state.sel = d.item; renderAll();
+  if (d.kind === 'clip') setTime(clipStart(d.item)); else setTime(clamp(state.t, d.item.start, d.item.start + d.item.dur - 0.05));
+}
+window.addEventListener('pointerup', endTlDrag);
+window.addEventListener('pointercancel', endTlDrag);
+document.addEventListener('touchmove', e => { if (tlDrag && tlDrag.on) e.preventDefault(); }, { passive: false });
+
 function renderTimeline() {
   const tot = total(), pps = state.pps;
   $('tlInner').style.width = (tot * pps + PAD * 2 + 80) + 'px';
@@ -3936,7 +4021,8 @@ function renderTimeline() {
     if (c.media.thumb) b.style.backgroundImage = 'url(' + c.media.thumb + ')';
     b.setAttribute('aria-label', c.media.name + ' ' + fmt(c.dur));
     const s = document.createElement('span'); s.textContent = c.media.name; b.appendChild(s);
-    b.onclick = () => { state.sel = state.sel === c ? null : c; renderAll(); drawPreview(); };
+    b.onclick = () => { if (suppressClick) return; state.sel = state.sel === c ? null : c; renderAll(); drawPreview(); };
+    makeDraggable(b, c, 'clip');
     track.appendChild(b);
   }
   const bt = $('btrack'); bt.textContent = ''; bt.hidden = !state.bgm;
@@ -3954,8 +4040,9 @@ function renderTimeline() {
     b.className = 'titem oitem' + (o === state.sel ? ' sel' : '');
     b.style.top = olane.get(o) * 34 + 'px'; b.style.left = o.start * pps + 'px'; b.style.width = Math.max(14, o.dur * pps) + 'px';
     if (o.media.thumb) b.style.backgroundImage = 'url(' + o.media.thumb + ')';
-    b.textContent = (o.full ? '全画面 ' : 'ワイプ ') + o.media.name;
-    b.onclick = () => { state.sel = state.sel === o ? null : o; renderAll(); if (state.sel && !ovOn(o, state.t)) setTime(o.start + 0.3); else drawPreview(); };
+    b.textContent = '重ね ' + o.media.name;
+    makeDraggable(b, o, 'free');
+    b.onclick = () => { if (suppressClick) return; state.sel = state.sel === o ? null : o; renderAll(); if (state.sel && !ovOn(o, state.t)) setTime(o.start + 0.3); else drawPreview(); };
     ot.appendChild(b);
   }
   const tt = $('ttrack'); tt.textContent = '';
@@ -3971,7 +4058,8 @@ function renderTimeline() {
     b.className = 'titem' + (x === state.sel ? ' sel' : '');
     b.style.top = lane.get(x) * 34 + 'px'; b.style.left = x.start * pps + 'px'; b.style.width = Math.max(14, x.dur * pps) + 'px';
     b.textContent = x.text.replace(/\n/g, ' ') || '(空)';
-    b.onclick = () => { state.sel = state.sel === x ? null : x; renderAll(); if (state.sel && !textOn(x, state.t)) setTime(x.start + 0.3); else drawPreview(); };
+    makeDraggable(b, x, 'free');
+    b.onclick = () => { if (suppressClick) return; state.sel = state.sel === x ? null : x; renderAll(); if (state.sel && !textOn(x, state.t)) setTime(x.start + 0.3); else drawPreview(); };
     tt.appendChild(b);
   }
   updatePlayhead(false);
@@ -4050,7 +4138,7 @@ function renderInspector() {
   if (!c || !state.clips.includes(c)) {
     state.sel = null;
     const p = document.createElement('div'); p.className = 'hint';
-    p.textContent = state.clips.length ? 'タイムラインのクリップをタップすると、長さの調整・分割・並べ替えができます。目盛りをなぞると好きな位置へ移動します。' : '下のボタンから動画や写真を追加してください。';
+    p.textContent = state.clips.length ? 'クリップをタップすると細かく設定できます。長押ししてから左右にドラッグすると、順番や出る位置を動かせます。目盛りをなぞると再生位置が動きます。' : '下のボタンから動画や写真を追加してください。';
     box.appendChild(p); return;
   }
   const head = document.createElement('div'); head.className = 'insp-head';
@@ -4061,10 +4149,10 @@ function renderInspector() {
   if (c.media.kind === 'video') {
     const D = c.media.duration;
     box.appendChild(sliderRow('trimIn', '開始位置', 0, D, c.in, v => {
-      const out = c.in + c.dur; c.in = clamp(v, 0, out - MIN_DUR); c.dur = out - c.in; changed(clipStart(c)); return c.in;
+      const out = srcAt(c, c.dur); c.in = clamp(v, 0, out - MIN_DUR); c.dur = (out - c.in) / sp(c); changed(clipStart(c)); return c.in;
     }));
-    box.appendChild(sliderRow('trimOut', '終了位置', 0, D, c.in + c.dur, v => {
-      const out = clamp(v, c.in + MIN_DUR, D); c.dur = out - c.in; changed(clipStart(c) + c.dur - 0.04); return out;
+    box.appendChild(sliderRow('trimOut', '終了位置', 0, D, srcAt(c, c.dur), v => {
+      const out = clamp(v, c.in + MIN_DUR, D); c.dur = (out - c.in) / sp(c); changed(clipStart(c) + c.dur - 0.04); return out;
     }));
   } else {
     box.appendChild(sliderRow('imgDur', '表示時間', 0.5, 15, c.dur, v => { c.dur = v; changed(clipStart(c)); return v; }));
@@ -4080,6 +4168,7 @@ function renderInspector() {
   box.appendChild(sliderRow('fxBright', '明るさ', -50, 50, c.bright || 0, v => { c.bright = Math.round(v); drawPreview(); return c.bright; }, ''));
   box.appendChild(sliderRow('fxContrast', 'コントラスト', -50, 50, c.contrast || 0, v => { c.contrast = Math.round(v); drawPreview(); return c.contrast; }, ''));
   box.appendChild(chipRow('動き', MOTIONS, c.motion || 'none', v => { c.motion = v; if (state.playing) pause(); setTime(clipStart(c)); }));
+  if (c.media.kind === 'video') box.appendChild(chipRow('速さ', SPEEDS, sp(c), v => { setSpeed(c, v); if (state.playing) pause(); renderTimeline(); setTime(clipStart(c)); }));
   if (c.media.kind === 'video') box.appendChild(chipRow('音', [[false, 'あり'], [true, '消す']], !!c.mute, v => c.mute = v));
   const acts = document.createElement('div'); acts.className = 'actions';
   const idx = state.clips.indexOf(c);
@@ -4090,7 +4179,7 @@ function renderInspector() {
   btn('ここで分割', () => {
     const local = state.t - clipStart(c);
     if (local < MIN_DUR || local > c.dur - MIN_DUR) return toast('再生位置(黄色の線)をこのクリップの途中に合わせてから分割してください。');
-    const b2 = { ...c, id: uid++, in: c.in + local, dur: c.dur - local, trans: 'none' }; c.dur = local; c.transOut = 'none';
+    const b2 = { ...c, id: uid++, in: srcAt(c, local), dur: c.dur - local, trans: 'none' }; c.dur = local; c.transOut = 'none';
     state.clips.splice(idx + 1, 0, b2); state.sel = b2; renderAll(); syncPaused();
   });
   btn('複製', () => { const b2 = { ...c, id: uid++ }; state.clips.splice(idx + 1, 0, b2); state.sel = b2; renderAll(); setTime(clipStart(b2)); });
@@ -4154,20 +4243,22 @@ async function buildAudio() {
       if (ov) { g.gain.setValueAtTime(0, Math.max(0, start)); g.gain.linearRampToValueAtTime(1, start + ov); }
       if (ovNext) { g.gain.setValueAtTime(1, start + c.dur - ovNext); g.gain.linearRampToValueAtTime(0, start + c.dur); }
       for (const ch of chunks || []) {
-        const a = Math.max(ch.ts, c.in), b = Math.min(ch.ts + ch.buffer.duration, c.in + c.dur);
+        const a = Math.max(ch.ts, c.in), b = Math.min(ch.ts + ch.buffer.duration, srcAt(c, c.dur));
         if (b <= a) continue;
         const s = off.createBufferSource(); s.buffer = ch.buffer; s.connect(g);
-        s.start(Math.max(0, start + (a - c.in)), a - ch.ts, b - a); any = true;
+        s.playbackRate.value = sp(c);
+        s.start(Math.max(0, start + (a - c.in) / sp(c)), a - ch.ts, b - a); any = true;
       }
     }
   }
   for (const o of state.overlays) {
     if (o.media.kind !== 'video' || o.mute) continue;
     for (const ch of await decodeAudio(o.media, off) || []) {
-      const a = Math.max(ch.ts, o.in), b = Math.min(ch.ts + ch.buffer.duration, o.in + o.dur);
+      const a = Math.max(ch.ts, o.in), b = Math.min(ch.ts + ch.buffer.duration, srcAt(o, o.dur));
       if (b <= a) continue;
       const s = off.createBufferSource(); s.buffer = ch.buffer; s.connect(off.destination);
-      s.start(o.start + (a - o.in), a - ch.ts, b - a); any = true;
+      s.playbackRate.value = sp(o);
+      s.start(o.start + (a - o.in) / sp(o), a - ch.ts, b - a); any = true;
     }
   }
   const b = state.bgm, tot = total();
@@ -4223,9 +4314,9 @@ async function runExport() {
     const times = state.clips.map(() => []), ovTimes = new Map(state.overlays.map(o => [o, []]));
     for (let idx = 0; idx < N; idx++) {
       const loc = locate(idx / FPS);
-      if (loc.prev) times[loc.idx - 1].push(loc.prev.clip.in + loc.prev.local);
-      times[loc.idx].push(loc.clip.in + loc.local);
-      for (const o of state.overlays) if (ovOn(o, idx / FPS)) ovTimes.get(o).push(o.in + idx / FPS - o.start);
+      if (loc.prev) times[loc.idx - 1].push(srcAt(loc.prev.clip, loc.prev.local));
+      times[loc.idx].push(srcAt(loc.clip, loc.local));
+      for (const o of state.overlays) if (ovOn(o, idx / FPS)) ovTimes.get(o).push(srcAt(o, idx / FPS - o.start));
     }
     const readers = [], ovReaders = new Map();
     let fast = 0, compat = 0;
@@ -4331,10 +4422,129 @@ document.addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|SE
 new ResizeObserver(fitCanvas).observe($('stage'));
 if (window.claude && window.claude.use) window.claude.use('downloads').then(d => downloads = d).catch(() => {});
 
+
+/* ---------- projects: autosave in this browser (IndexedDB) ---------- */
+const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+let dbP = null, project = { id: rid(), name: '無題のプロジェクト', stored: false }, lastSaved = '', saving = false, loading = false, storageOk = !!window.indexedDB, savedAt = 0;
+function idb() {
+  return dbP || (dbP = new Promise((res, rej) => {
+    const r = indexedDB.open('hanachan-editor', 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore('projects', { keyPath: 'id' }); r.result.createObjectStore('media', { keyPath: 'id' }); };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+}
+async function dbRun(store, mode, fn) {
+  const db = await idb();
+  return new Promise((res, rej) => { const t = db.transaction(store, mode), rq = fn(t.objectStore(store)); t.oncomplete = () => res(rq && rq.result); t.onerror = t.onabort = () => rej(t.error); });
+}
+const dbGet = (s, id) => dbRun(s, 'readonly', o => o.get(id)), dbPut = (s, v) => dbRun(s, 'readwrite', o => o.put(v)), dbDel = (s, id) => dbRun(s, 'readwrite', o => o.delete(id));
+function serialize() {
+  const medias = new Set();
+  const item = x => { const { media, _box, ...r } = x; if (!media.id) media.id = rid(); medias.add(media); return { ...r, mid: media.id }; };
+  const b = state.bgm; if (b && !b.id) b.id = rid();
+  const data = {
+    aspect: state.aspect, clips: state.clips.filter(c => !c.media.sample).map(item), overlays: state.overlays.map(item),
+    texts: state.texts.map(({ _box, ...r }) => r), bgm: b ? { name: b.name, vol: b.vol, loop: b.loop, fade: b.fade, mid: b.id } : null };
+  return { medias: [...medias], data };
+}
+async function autosave() {
+  if (saving || loading || exporting || !storageOk) return;
+  const { data, medias } = serialize(), json = JSON.stringify([project.name, data]);
+  if (json === lastSaved) return;
+  if (!project.stored && !data.clips.length && !data.overlays.length && !data.texts.length && !data.bgm) return;
+  saving = true;
+  try {
+    for (const m of medias) if (!m.saved) { await dbPut('media', { id: m.id, blob: m.file, name: m.name, type: m.file.type }); m.saved = true; }
+    const b = state.bgm; if (b && !b.saved) { await dbPut('media', { id: b.id, blob: b.file, name: b.name, type: b.file.type }); b.saved = true; }
+    const first = state.clips.find(c => c.media.thumb);
+    await dbPut('projects', { id: project.id, name: project.name, updated: Date.now(), thumb: first ? first.media.thumb : '', data });
+    if (!project.stored) { project.stored = true; try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {} }
+    lastSaved = json; savedAt = Date.now();
+    try { localStorage.setItem('hanachan.last', project.id); } catch (e) {}
+  } catch (e) {
+    storageOk = false;
+    toast('この端末に保存できませんでした。空き容量が足りない可能性があります。自動保存を止めました。');
+  }
+  saving = false;
+}
+function resetEditor() {
+  if (state.playing) pause();
+  pauseVideos();
+  state.clips = []; state.overlays = []; state.texts = []; state.bgm = null; state.sel = null; state.t = 0;
+}
+function newProject() {
+  resetEditor();
+  project = { id: rid(), name: '無題のプロジェクト', stored: false }; lastSaved = '';
+  state.clips = [newClip(sampleMedia('サンプル 1', '#2f8f8a', '#1d3f5e')), newClip(sampleMedia('サンプル 2', '#7a6fc4', '#c2577a'))];
+  try { localStorage.removeItem('hanachan.last'); } catch (e) {}
+  applyAspect(); renderAll();
+}
+async function openProject(id) {
+  const p = await dbGet('projects', id); if (!p) return false;
+  loading = true; resetEditor(); renderAll(); drawPreview();
+  const cache = new Map(); let missing = 0;
+  const media = async mid => {
+    if (cache.has(mid)) return cache.get(mid);
+    let m = null;
+    try { const r = await dbGet('media', mid); if (r) { m = await loadMedia(new File([r.blob], r.name, { type: r.type || r.blob.type })); m.id = mid; m.saved = true; } } catch (e) {}
+    cache.set(mid, m); return m;
+  };
+  const revive = async list => { const out = []; for (const x of list || []) { const m = await media(x.mid); if (!m) { missing++; continue; } const { mid, ...r } = x; out.push({ ...r, media: m }); } return out; };
+  const d = p.data;
+  try {
+    state.clips = await revive(d.clips); state.overlays = await revive(d.overlays); state.texts = d.texts || [];
+    if (d.bgm) { try { const r = await dbGet('media', d.bgm.mid), file = new File([r.blob], r.name, { type: r.type || r.blob.type }); state.bgm = { ...d.bgm, id: d.bgm.mid, file, saved: true, buffer: await decodeAny(await file.arrayBuffer()) }; delete state.bgm.mid; } catch (e) { missing++; } }
+  } catch (e) {}
+  state.aspect = d.aspect || '9:16'; $('aspect').value = state.aspect;
+  uid = 1 + Math.max(0, ...[...state.clips, ...state.overlays, ...state.texts].map(x => x.id || 0));
+  project = { id: p.id, name: p.name, stored: true }; lastSaved = JSON.stringify([project.name, serialize().data]); savedAt = p.updated;
+  try { localStorage.setItem('hanachan.last', p.id); } catch (e) {}
+  loading = false; state.sel = null; state.t = 0; applyAspect(); renderAll(); syncPaused();
+  if (missing) toast(missing + '件の素材が見つからず、読み込めませんでした。');
+  return true;
+}
+async function deleteProject(id) {
+  await dbDel('projects', id);
+  const all = await dbRun('projects', 'readonly', o => o.getAll()), keep = new Set();
+  for (const p of all) { for (const x of [...p.data.clips, ...p.data.overlays]) keep.add(x.mid); if (p.data.bgm) keep.add(p.data.bgm.mid); }
+  if (id !== project.id) { for (const m of serialize().medias) keep.add(m.id); if (state.bgm) keep.add(state.bgm.id); }
+  for (const k of await dbRun('media', 'readonly', o => o.getAllKeys())) if (!keep.has(k)) await dbDel('media', k);
+  if (id === project.id) newProject();
+}
+async function renderProjects() {
+  $('projName').value = project.name;
+  $('projStatus').textContent = !storageOk ? 'この画面では保存できません。' : savedAt && project.stored ? '自動保存済み ' + new Date(savedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '動画や文字を追加すると、自動で保存が始まります。';
+  const list = $('projList'); list.textContent = '';
+  let all = [];
+  try { all = await dbRun('projects', 'readonly', o => o.getAll()); } catch (e) {}
+  all.sort((a, b) => b.updated - a.updated);
+  for (const p of all) {
+    const row = document.createElement('div'); row.className = 'proj' + (p.id === project.id ? ' cur' : '');
+    const th = document.createElement('div'); th.className = 'pthumb'; if (p.thumb) th.style.backgroundImage = 'url(' + p.thumb + ')';
+    const info = document.createElement('div'); info.className = 'pinfo';
+    const nm = document.createElement('b'); nm.textContent = p.name;
+    const dt = document.createElement('span'); dt.textContent = (p.id === project.id ? '編集中 / ' : '') + new Date(p.updated).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    info.append(nm, dt);
+    const open = document.createElement('button'); open.textContent = '開く'; open.disabled = p.id === project.id;
+    open.onclick = async () => { await autosave(); $('projOverlay').hidden = true; toast('読み込み中です'); await openProject(p.id); toast('「' + p.name + '」を開きました。'); };
+    const del = document.createElement('button'); del.textContent = '削除'; del.className = 'danger';
+    del.onclick = async () => { if (del.dataset.sure) { await deleteProject(p.id); renderProjects(); } else { del.dataset.sure = 1; del.textContent = '本当に削除'; } };
+    row.append(th, info, open, del); list.appendChild(row);
+  }
+  if (!all.length) { const e = document.createElement('p'); e.textContent = '保存されたプロジェクトはまだありません。'; list.appendChild(e); }
+}
+$('projBtn').onclick = () => { if (state.playing) pause(); renderProjects(); $('projOverlay').hidden = false; };
+$('projClose').onclick = () => $('projOverlay').hidden = true;
+$('projName').oninput = e => { project.name = e.target.value.trim() || '無題のプロジェクト'; };
+$('projNew').onclick = async () => { await autosave(); newProject(); $('projOverlay').hidden = true; toast('新しいプロジェクトを始めました。'); };
+setInterval(autosave, 2000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) autosave(); });
+
 state.clips = [newClip(sampleMedia('サンプル 1', '#2f8f8a', '#1d3f5e')), newClip(sampleMedia('サンプル 2', '#7a6fc4', '#c2577a'))];
 $('playBtn').innerHTML = ICON.play + '再生';
 applyAspect(); renderAll();
-window.__tsunagi = { state, addFiles, addBgm, runExport, get result() { return resultBlob; } };
+(async () => { let last = null; try { last = localStorage.getItem('hanachan.last'); } catch (e) {} if (last && storageOk) { try { await openProject(last); } catch (e) { loading = false; } } })();
+window.__tsunagi = { state, addFiles, addBgm, autosave, runExport, get result() { return resultBlob; } };
 })();
 </script>
 </body>
