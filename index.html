@@ -13,7 +13,7 @@
   --bg:#12171d; --panel:#1a2129; --panel-2:#232c36; --line:#313c48;
   --fg:#e9eef2; --muted:#93a1ae;
   --accent:#f0b03c; --on-accent:#1c1404;
-  --clip-video:#2f8f8a; --clip-image:#7a6fc4; --clip-text:#b0506e; --on-clip:#ffffff;
+  --clip-video:#2f8f8a; --clip-image:#7a6fc4; --clip-text:#b0506e; --clip-bgm:#4d6fa8; --on-clip:#ffffff;
   --danger:#e8705f; --letterbox:#000;
   --ui:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP","Segoe UI",sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
@@ -23,7 +23,7 @@
   --bg:#eef1f3; --panel:#ffffff; --panel-2:#e3e8ec; --line:#c9d1d8;
   --fg:#18212a; --muted:#5b6975;
   --accent:#b97a08; --on-accent:#ffffff;
-  --clip-video:#23807b; --clip-image:#6a5fb8; --clip-text:#a4455f; --on-clip:#ffffff;
+  --clip-video:#23807b; --clip-image:#6a5fb8; --clip-text:#a4455f; --clip-bgm:#3f629c; --on-clip:#ffffff;
   --danger:#c2412f; --letterbox:#000;
 }}
 :root[data-theme="light"]{
@@ -31,7 +31,7 @@
   --bg:#eef1f3; --panel:#ffffff; --panel-2:#e3e8ec; --line:#c9d1d8;
   --fg:#18212a; --muted:#5b6975;
   --accent:#b97a08; --on-accent:#ffffff;
-  --clip-video:#23807b; --clip-image:#6a5fb8; --clip-text:#a4455f; --on-clip:#ffffff;
+  --clip-video:#23807b; --clip-image:#6a5fb8; --clip-text:#a4455f; --clip-bgm:#3f629c; --on-clip:#ffffff;
   --danger:#c2412f; --letterbox:#000;
 }
 html,body{height:100%}
@@ -58,9 +58,9 @@ svg{width:18px;height:18px;fill:currentColor;flex:none}
 .tc b{color:var(--fg);font-weight:600}
 .zoom{min-width:40px;padding:0;font-size:18px}
 
-.tl-scroll{overflow-x:auto;overflow-y:hidden;background:var(--panel);border-block:1px solid var(--line)}
+.tl-scroll{overflow-x:auto;overflow-y:auto;max-height:32%;flex:none;background:var(--panel);border-block:1px solid var(--line)}
 .tl-inner{position:relative;padding:0 16px;min-width:100%}
-.ruler{height:30px;position:relative;touch-action:none;cursor:ew-resize;border-bottom:1px solid var(--line)}
+.ruler{height:30px;position:sticky;top:0;z-index:2;background:var(--panel);touch-action:none;cursor:ew-resize;border-bottom:1px solid var(--line)}
 .ruler span{position:absolute;top:0;height:100%;border-left:1px solid var(--line);padding:6px 0 0 4px;font:11px var(--mono);color:var(--muted);pointer-events:none;user-select:none}
 .track{display:flex;height:64px;padding:6px 0;position:relative}
 .clip{height:100%;flex:none;border:0;border-radius:6px;min-height:0;padding:0;overflow:hidden;position:relative;background-color:var(--clip-video);background-size:auto 100%;background-repeat:repeat-x;color:var(--on-clip);box-shadow:inset 0 0 0 1px var(--panel);justify-content:flex-start;align-items:flex-end}
@@ -95,8 +95,8 @@ input[type=range]{width:100%;accent-color:var(--accent);min-height:28px}
 progress{width:100%;height:10px;accent-color:var(--accent)}
 .toast{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));margin:0 auto;max-width:420px;background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;z-index:20;font-size:13px}
 
-.ttrack{position:relative;height:34px;margin-bottom:6px}
-.titem{position:absolute;top:0;height:100%;min-height:0;border:0;border-radius:6px;background:var(--clip-text);color:var(--on-clip);font-size:11px;padding:0 6px;justify-content:flex-start;overflow:hidden;box-shadow:inset 0 0 0 1px var(--panel)}
+.ttrack{position:relative;height:30px;margin-bottom:6px}
+.titem{position:absolute;top:0;height:30px;min-height:0;border:0;border-radius:6px;background:var(--clip-text);color:var(--on-clip);font-size:11px;padding:0 6px;justify-content:flex-start;overflow:hidden;box-shadow:inset 0 0 0 1px var(--panel)}
 .titem.sel{box-shadow:inset 0 0 0 3px var(--accent)}
 textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-size:16px;color:inherit;resize:none;flex:none}
 .chips{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -104,12 +104,23 @@ textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);borde
 .chips button{min-height:34px;padding:0 10px}
 .chips button.on{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
 .chips button.sw{width:34px;padding:0;border-radius:50%}
+.btrack{height:28px;margin-bottom:6px}
+.bitem{height:100%;min-height:0;border:0;border-radius:6px;background:var(--clip-bgm);color:var(--on-clip);font-size:11px;padding:0 8px;justify-content:flex-start;overflow:hidden}
+.bitem.sel{box-shadow:inset 0 0 0 3px var(--accent)}
+.clip.tr::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--accent)}
+.footer button{padding:0 6px}
+input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px;min-height:42px;font:inherit;font-size:16px;color:inherit}
+.bar button{padding:0 10px}
+@media (max-width:480px){.brand small{display:none}}
+.brand{white-space:nowrap}
+.playhead{z-index:3}
 </style>
 </head>
 <body>
 <div class="app">
   <header class="bar">
     <div class="brand">つなぎ<small>動画エディタ</small></div>
+    <button id="tplBtn">テンプレート</button>
     <select id="aspect" aria-label="画面の比率">
       <option value="9:16">縦 9:16</option>
       <option value="16:9">横 16:9</option>
@@ -132,6 +143,7 @@ textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);borde
       <div class="ruler" id="ruler"></div>
       <div class="track" id="track"></div>
       <div class="ttrack" id="ttrack"></div>
+      <div class="btrack" id="btrack" hidden></div>
       <div class="playhead" id="playhead"></div>
     </div>
   </div>
@@ -141,6 +153,8 @@ textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);borde
   <div class="footer">
     <button id="addBtn">＋ 動画・写真</button>
     <button id="addTextBtn">＋ 文字</button>
+    <button id="addBgmBtn">＋ BGM</button>
+    <input id="bgmInput" type="file" accept="audio/*,.mp3,.m4a,.wav,.aac" hidden>
     <input id="fileInput" type="file" accept="video/*,image/*" multiple hidden>
   </div>
 </div>
@@ -176,6 +190,18 @@ textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);borde
         <div class="row"><button id="exClose">閉じる</button><button id="exShare" hidden>共有</button><button id="exSave" class="primary">保存</button></div>
       </div>
     </div>
+  </div>
+</div>
+<div class="overlay" id="tplOverlay" hidden>
+  <div class="sheet">
+    <h2>テンプレートでまとめて仕上げる</h2>
+    <p>すべてのクリップの切り替え効果と、写真の表示時間をまとめて設定します。あとから個別に直せます。</p>
+    <div class="chips" id="tplChoices"></div>
+    <p id="tplDesc"></p>
+    <label id="tplTitleWrap">タイトル文字(空欄なら入れません)
+      <input id="tplTitle" type="text" maxlength="40" placeholder="例: 北海道旅行 2026">
+    </label>
+    <div class="row"><button id="tplCancel">やめる</button><button id="tplApply" class="primary">適用する</button></div>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -3320,7 +3346,7 @@ const ICON = {
   pause: '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
 };
 // Project data. Kept plain so later modes (templates, multi-track) can share it.
-const state = { aspect: '9:16', clips: [], texts: [], sel: null, t: 0, playing: false, pps: 60 };
+const state = { aspect: '9:16', clips: [], texts: [], bgm: null, sel: null, t: 0, playing: false, pps: 60 };
 let uid = 1;
 
 const canvas = $('preview'), ctx = canvas.getContext('2d');
@@ -3354,10 +3380,42 @@ function draw(c2d, W, H, src, sw, sh, fit) {
   const dw = sw * sc, dh = sh * sc;
   try { c2d.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh); } catch (e) {}
 }
+// Draws one frame of a clip, blending in from the previous clip's last frame while its transition runs.
+const TRANS_DUR = 0.5;
+function composeBase(c2d, W, H, cur, clip, local, prev) {
+  const tr = clip ? clip.trans || 'none' : 'none', D = clip ? Math.min(TRANS_DUR, clip.dur / 2) : 0;
+  if (tr === 'none' || local >= D || !cur) { if (cur) draw(c2d, W, H, ...cur); else draw(c2d, W, H, null); return; }
+  const k = clamp(local / D, 0, 1), p = k * k * (3 - 2 * k);
+  c2d.fillStyle = '#000'; c2d.fillRect(0, 0, W, H);
+  c2d.save();
+  if (tr === 'slide') c2d.translate(-p * W, 0);
+  if (prev) c2d.drawImage(prev, 0, 0, W, H);
+  c2d.restore();
+  c2d.save();
+  if (tr === 'slide') c2d.translate((1 - p) * W, 0);
+  else c2d.globalAlpha = p;
+  if (tr === 'zoom') { const sc = 0.82 + 0.18 * p; c2d.translate(W / 2, H / 2); c2d.scale(sc, sc); c2d.translate(-W / 2, -H / 2); }
+  draw(c2d, W, H, ...cur);
+  c2d.restore();
+}
+const pbase = document.createElement('canvas'), psnap = document.createElement('canvas');
+let pbaseClip = null, psnapClip = null;
 function drawPreview() {
-  const loc = locate(state.t), m = loc && loc.clip.media;
-  if (m) draw(ctx, canvas.width, canvas.height, m.el, m.w, m.h, loc.clip.fit); else draw(ctx, canvas.width, canvas.height, null);
-  drawTexts(ctx, canvas.width, canvas.height, state.t, true);
+  const W = canvas.width, H = canvas.height, loc = locate(state.t);
+  if (!loc) { draw(ctx, W, H, null); drawTexts(ctx, W, H, state.t, true); return; }
+  const c = loc.clip, m = c.media, cur = [m.el, m.w, m.h, c.fit];
+  const prevClip = state.clips[loc.idx - 1], next = state.clips[loc.idx + 1];
+  if (pbaseClip && pbaseClip !== c) { psnap.getContext('2d').drawImage(pbase, 0, 0); psnapClip = pbaseClip; pbaseClip = null; }
+  let prev = null;
+  if ((c.trans || 'none') !== 'none' && loc.local < TRANS_DUR && prevClip) {
+    if (psnapClip !== prevClip && (prevClip.media.kind === 'image' || prevClip.media !== m)) {
+      const pm = prevClip.media; draw(psnap.getContext('2d'), W, H, pm.el, pm.w, pm.h, prevClip.fit); psnapClip = prevClip;
+    }
+    if (psnapClip === prevClip) prev = psnap;
+  }
+  composeBase(ctx, W, H, cur, c, loc.local, prev);
+  if (state.playing && next && (next.trans || 'none') !== 'none') { draw(pbase.getContext('2d'), W, H, ...cur); pbaseClip = c; }
+  drawTexts(ctx, W, H, state.t, true);
 }
 function fitCanvas() {
   const st = $('stage'), cs = getComputedStyle(st);
@@ -3367,7 +3425,11 @@ function fitCanvas() {
   canvas.style.width = Math.floor(canvas.width * sc) + 'px';
   canvas.style.height = Math.floor(canvas.height * sc) + 'px';
 }
-function applyAspect() { [canvas.width, canvas.height] = dims(720); fitCanvas(); drawPreview(); }
+function applyAspect() {
+  [canvas.width, canvas.height] = dims(720);
+  for (const c of [pbase, psnap]) { c.width = canvas.width; c.height = canvas.height; }
+  pbaseClip = psnapClip = null; fitCanvas(); drawPreview();
+}
 
 /* ---------- text overlays ---------- */
 const TEXT_COLORS = ['#ffffff', '#ffe14d', '#ff5a5a', '#4dd9ff', '#ff8ad1', '#111111'];
@@ -3416,7 +3478,9 @@ function drawTexts(c2d, W, H, t, editing) {
 function addText() {
   if (state.playing) pause();
   const tot = total(), start = clamp(state.t, 0, Math.max(0, tot - 0.5));
-  const x = { id: uid++, text: 'テキスト', start, dur: Math.max(0.5, Math.min(3, tot - start)), x: 0.5, y: 0.8, size: 8, color: '#ffffff', style: 'outline', anim: 'fade' };
+  let ny = 0.8;
+  while (ny > 0.15 && state.texts.some(o => Math.abs(o.y - ny) < 0.04 && Math.abs(o.x - 0.5) < 0.1 && o.start < start + 3 && o.start + o.dur > start)) ny -= 0.1;
+  const x = { id: uid++, text: 'テキスト', start, dur: Math.max(0.5, Math.min(3, tot - start)), x: 0.5, y: ny, size: 8, color: '#ffffff', style: 'outline', anim: 'fade' };
   state.texts.push(x); state.sel = x; renderAll(); setTime(start);
   const ta = $('txtBody'); if (ta) { ta.focus(); ta.select(); }
 }
@@ -3547,16 +3611,43 @@ async function addFiles(files) {
 /* ---------- playback ---------- */
 let lastNow = 0, active = null, exporting = false;
 function pauseVideos() { for (const c of state.clips) if (c.media.kind === 'video') c.media.el.pause(); }
+let actx = null, bgmNode = null;
+function decodeAny(ab) {
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, off = new OAC(2, 1, 48000);
+  return new Promise((res, rej) => { const p = off.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
+}
+function startBgm() {
+  const b = state.bgm; if (!b) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume();
+    const d = b.buffer.duration, off = b.loop ? state.t % d : state.t;
+    if (off >= d) return;
+    const src = actx.createBufferSource(), gain = actx.createGain(), now = actx.currentTime, left = total() - state.t;
+    src.buffer = b.buffer; src.loop = b.loop; gain.gain.value = b.vol;
+    if (b.fade && left > 0.1) { const f = Math.min(1.5, left); gain.gain.setValueAtTime(b.vol, now + left - f); gain.gain.linearRampToValueAtTime(0, now + left); }
+    src.connect(gain); gain.connect(actx.destination); src.start(0, off);
+    bgmNode = { src, gain };
+  } catch (e) {}
+}
+function stopBgm() { if (bgmNode) { try { bgmNode.src.stop(); } catch (e) {} bgmNode = null; } }
+async function addBgm(file) {
+  try {
+    const buffer = await decodeAny(await file.arrayBuffer());
+    if (state.playing) pause();
+    state.bgm = { name: file.name, buffer, vol: 0.5, loop: true, fade: true };
+    state.sel = state.bgm; renderAll();
+  } catch (e) { toast('この音楽ファイルは読み込めませんでした。mp3 / m4a / wav などをお試しください。'); }
+}
 function play() {
   if (!state.clips.length || exporting) return;
   if (state.t >= total() - 0.02) state.t = 0;
   // Start every video once inside the tap, so phones allow later clips to start with sound.
   for (const c of state.clips) if (c.media.kind === 'video') { const v = c.media.el; const p = v.play(); if (p) p.then(() => { if (!state.playing || active !== c && active?.media !== c.media) v.pause(); }).catch(() => {}); }
-  state.playing = true; active = null; lastNow = performance.now();
+  state.playing = true; active = null; lastNow = performance.now(); startBgm();
   $('playBtn').innerHTML = ICON.pause + '停止'; requestAnimationFrame(tick);
 }
 function pause() {
-  state.playing = false; active = null; pauseVideos();
+  state.playing = false; active = null; pauseVideos(); stopBgm();
   $('playBtn').innerHTML = ICON.play + '再生'; syncPaused();
 }
 function tick(now) {
@@ -3570,6 +3661,7 @@ function tick(now) {
       if (active && active.media !== c.media && active.media.kind === 'video') active.media.el.pause();
       if (Math.abs(v.currentTime - want) > 0.15) v.currentTime = want;
     } else if (Math.abs(v.currentTime - want) > 0.35 && !v.seeking) v.currentTime = want;
+    v.muted = !!c.mute;
     if (v.paused) v.play().catch(() => {});
   } else if (active && active !== c && active.media.kind === 'video') active.media.el.pause();
   active = c;
@@ -3600,7 +3692,7 @@ function renderTimeline() {
   const track = $('track'); track.textContent = '';
   for (const c of state.clips) {
     const b = document.createElement('button');
-    b.className = 'clip ' + c.media.kind + (c === state.sel ? ' sel' : '');
+    b.className = 'clip ' + c.media.kind + (c === state.sel ? ' sel' : '') + ((c.trans || 'none') !== 'none' ? ' tr' : '');
     b.style.width = Math.max(4, c.dur * pps) + 'px';
     if (c.media.thumb) b.style.backgroundImage = 'url(' + c.media.thumb + ')';
     b.setAttribute('aria-label', c.media.name + ' ' + fmt(c.dur));
@@ -3608,17 +3700,71 @@ function renderTimeline() {
     b.onclick = () => { state.sel = state.sel === c ? null : c; renderAll(); drawPreview(); };
     track.appendChild(b);
   }
+  const bt = $('btrack'); bt.textContent = ''; bt.hidden = !state.bgm;
+  if (state.bgm) {
+    const b = document.createElement('button');
+    b.className = 'bitem' + (state.sel === state.bgm ? ' sel' : '');
+    b.style.width = Math.max(40, tot * pps) + 'px'; b.textContent = '♪ ' + state.bgm.name;
+    b.onclick = () => { state.sel = state.sel === state.bgm ? null : state.bgm; renderAll(); drawPreview(); };
+    bt.appendChild(b);
+  }
   const tt = $('ttrack'); tt.textContent = '';
+  // Overlapping texts go on separate rows so each one stays tappable.
+  const laneEnd = [], lane = new Map();
+  for (const x of [...state.texts].sort((a, b) => a.start - b.start)) {
+    let l = laneEnd.findIndex(e => e <= x.start + 1e-6); if (l < 0) l = laneEnd.length;
+    laneEnd[l] = x.start + Math.max(x.dur, 14 / pps); lane.set(x, l);
+  }
+  tt.style.height = Math.max(1, laneEnd.length) * 34 - 4 + 'px';
   for (const x of state.texts) {
     const b = document.createElement('button');
     b.className = 'titem' + (x === state.sel ? ' sel' : '');
-    b.style.left = x.start * pps + 'px'; b.style.width = Math.max(14, x.dur * pps) + 'px';
+    b.style.top = lane.get(x) * 34 + 'px'; b.style.left = x.start * pps + 'px'; b.style.width = Math.max(14, x.dur * pps) + 'px';
     b.textContent = x.text.replace(/\n/g, ' ') || '(空)';
     b.onclick = () => { state.sel = state.sel === x ? null : x; renderAll(); if (state.sel && !textOn(x, state.t)) setTime(x.start + 0.3); else drawPreview(); };
     tt.appendChild(b);
   }
   updatePlayhead(false);
   $('exportBtn').disabled = !state.clips.length;
+}
+function renderBgmInspector(box, b) {
+  const head = document.createElement('div'); head.className = 'insp-head';
+  const nm = document.createElement('b'); nm.textContent = '♪ ' + b.name;
+  const du = document.createElement('span'); du.textContent = '曲の長さ ' + fmt(b.buffer.duration);
+  head.append(nm, du); box.appendChild(head);
+  box.appendChild(sliderRow('bgmVol', '音量', 0, 100, Math.round(b.vol * 100), v => { b.vol = v / 100; if (bgmNode) bgmNode.gain.gain.value = b.vol; return v; }, ''));
+  box.appendChild(chipRow('くり返し', [[true, 'する'], [false, 'しない']], b.loop, v => { b.loop = v; if (state.playing) pause(); }));
+  box.appendChild(chipRow('終わり', [[true, 'フェードアウト'], [false, 'そのまま']], b.fade, v => { b.fade = v; if (state.playing) pause(); }));
+  const acts = document.createElement('div'); acts.className = 'actions';
+  const del = document.createElement('button'); del.textContent = 'BGMを外す'; del.className = 'danger';
+  del.onclick = () => { if (state.playing) pause(); state.bgm = null; state.sel = null; renderAll(); };
+  acts.appendChild(del); box.appendChild(acts);
+}
+const TEMPLATES = {
+  simple: { name: 'シンプル', desc: 'フェードでつなぐ落ち着いた仕上がり。写真は3秒ずつ表示します。', trans: () => 'fade', img: 3, text: { color: '#ffffff', style: 'outline', anim: 'fade', size: 10 } },
+  pop: { name: 'ポップ', desc: 'スライドとズームでテンポよくつなぎます。写真は2秒ずつ表示します。', trans: i => i % 2 ? 'slide' : 'zoom', img: 2, text: { color: '#ffe14d', style: 'box', anim: 'pop', size: 11 } },
+  calm: { name: 'ゆったり', desc: '思い出の写真向け。ゆっくりフェードし、写真は4.5秒ずつ表示します。', trans: () => 'fade', first: 'fade', img: 4.5, text: { color: '#ffffff', style: 'plain', anim: 'slide', size: 9 } },
+  none: { name: '効果なし', desc: '切り替え効果をすべて外します。写真の長さは変えません。', trans: () => 'none', img: null, text: null },
+};
+let tplPick = 'simple';
+function renderTemplates() {
+  const row = $('tplChoices'); row.textContent = '';
+  for (const [key, T] of Object.entries(TEMPLATES)) {
+    const b = document.createElement('button'); b.textContent = T.name; b.className = key === tplPick ? 'on' : '';
+    b.onclick = () => { tplPick = key; renderTemplates(); };
+    row.appendChild(b);
+  }
+  $('tplDesc').textContent = TEMPLATES[tplPick].desc;
+  $('tplTitleWrap').hidden = !TEMPLATES[tplPick].text;
+}
+function applyTemplate() {
+  const T = TEMPLATES[tplPick], title = $('tplTitle').value.trim();
+  if (state.playing) pause();
+  state.clips.forEach((c, i) => { c.trans = i === 0 ? T.first || 'none' : T.trans(i); if (T.img && c.media.kind === 'image') c.dur = T.img; });
+  state.texts = state.texts.filter(x => !x.tpl);
+  if (T.text && title) state.texts.push({ id: uid++, text: title, start: 0.2, dur: Math.max(0.5, Math.min(3, total() - 0.2)), x: 0.5, y: 0.5, tpl: true, ...T.text });
+  state.sel = null; $('tplOverlay').hidden = true; renderAll(); setTime(0);
+  toast('テンプレート「' + T.name + '」を適用しました。再生して確認してください。');
 }
 function renderAll() { renderTimeline(); renderInspector(); }
 
@@ -3635,6 +3781,7 @@ function renderInspector() {
   const box = $('inspector'); box.textContent = '';
   const c = state.sel;
   if (isText(c)) return renderTextInspector(box, c);
+  if (c && c === state.bgm) return renderBgmInspector(box, c);
   if (!c || !state.clips.includes(c)) {
     state.sel = null;
     const p = document.createElement('div'); p.className = 'hint';
@@ -3657,6 +3804,8 @@ function renderInspector() {
   } else {
     box.appendChild(sliderRow('imgDur', '表示時間', 0.5, 15, c.dur, v => { c.dur = v; changed(clipStart(c)); return v; }));
   }
+  box.appendChild(chipRow('切り替え', [['none', 'なし'], ['fade', 'フェード'], ['slide', 'スライド'], ['zoom', 'ズーム']], c.trans || 'none', v => { c.trans = v; if (state.playing) pause(); renderTimeline(); setTime(clipStart(c) + (v === 'none' ? 0 : 0.2)); }));
+  if (c.media.kind === 'video') box.appendChild(chipRow('音', [[false, 'あり'], [true, '消す']], !!c.mute, v => c.mute = v));
   const acts = document.createElement('div'); acts.className = 'actions';
   const idx = state.clips.indexOf(c);
   const btn = (label, fn, opt = {}) => { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; if (opt.disabled) b.disabled = true; if (opt.cls) b.className = opt.cls; acts.appendChild(b); };
@@ -3666,7 +3815,7 @@ function renderInspector() {
   btn('ここで分割', () => {
     const local = state.t - clipStart(c);
     if (local < MIN_DUR || local > c.dur - MIN_DUR) return toast('再生位置(黄色の線)をこのクリップの途中に合わせてから分割してください。');
-    const b2 = { ...c, id: uid++, in: c.in + local, dur: c.dur - local }; c.dur = local;
+    const b2 = { ...c, id: uid++, in: c.in + local, dur: c.dur - local, trans: 'none' }; c.dur = local;
     state.clips.splice(idx + 1, 0, b2); state.sel = b2; renderAll(); syncPaused();
   });
   btn('複製', () => { const b2 = { ...c, id: uid++ }; state.clips.splice(idx + 1, 0, b2); state.sel = b2; renderAll(); setTime(clipStart(b2)); });
@@ -3717,12 +3866,12 @@ async function decodeAudio(m, off) {
   return m.audio;
 }
 async function buildAudio() {
-  if (!state.clips.some(c => c.media.kind === 'video')) return null;
+  if (!state.bgm && !state.clips.some(c => c.media.kind === 'video' && !c.mute)) return null;
   const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!OAC) return null;
   const sr = 48000, off = new OAC(2, Math.ceil(total() * sr), sr);
   let any = false, start = 0;
   for (const c of state.clips) {
-    if (c.media.kind === 'video') {
+    if (c.media.kind === 'video' && !c.mute) {
       const chunks = await decodeAudio(c.media, off);
       for (const ch of chunks || []) {
         const a = Math.max(ch.ts, c.in), b = Math.min(ch.ts + ch.buffer.duration, c.in + c.dur);
@@ -3732,6 +3881,12 @@ async function buildAudio() {
       }
     }
     start += c.dur;
+  }
+  const b = state.bgm, tot = total();
+  if (b) {
+    const s = off.createBufferSource(), g = off.createGain(); s.buffer = b.buffer; s.loop = b.loop; g.gain.value = b.vol;
+    if (b.fade) { const f = Math.min(1.5, tot); g.gain.setValueAtTime(b.vol, tot - f); g.gain.linearRampToValueAtTime(0, tot); }
+    s.connect(g); g.connect(off.destination); s.start(0); any = true;
   }
   return any ? await off.startRendering() : null;
 }
@@ -3749,7 +3904,7 @@ async function runExport() {
     const vcodec = await MB.getFirstEncodableVideoCodec(['avc', 'hevc', 'vp9', 'av1'], { width: W, height: H, bitrate });
     if (!vcodec) throw new Error('この端末ではこの画質で書き出せません。標準 (720p) でお試しください。');
     status('音声を準備中');
-    const hasVideoClip = state.clips.some(c => c.media.kind === 'video');
+    const hasVideoClip = state.clips.some(c => c.media.kind === 'video' && !c.mute);
     let audio = null;
     try { audio = await buildAudio(); } catch (e) {}
     const ec = document.createElement('canvas'); ec.width = W; ec.height = H;
@@ -3776,9 +3931,12 @@ async function runExport() {
       aPos = end; await as.add(piece);
     };
     let cur = null;
-    const emit = async idx => {
+    const snap = document.createElement('canvas'); snap.width = W; snap.height = H;
+    let hasSnap = false;
+    const emit = async (idx, c, cStart, isLast) => {
       if (abortExport) throw new Error('abort');
-      if (cur) draw(ex, W, H, ...cur); else draw(ex, W, H, null);
+      composeBase(ex, W, H, cur, c, Math.max(0, idx / FPS - cStart), hasSnap ? snap : null);
+      if (isLast) { if (cur) draw(snap.getContext('2d'), W, H, ...cur); else draw(snap.getContext('2d'), W, H, null); hasSnap = true; }
       drawTexts(ex, W, H, idx / FPS, false);
       await vs.add(idx / FPS, 1 / FPS);
       if ((idx + 1) % FPS === 0) await addAudioUntil((idx + 1) / FPS);
@@ -3799,17 +3957,17 @@ async function runExport() {
         let k = 0;
         for await (const wc of sink.canvasesAtTimestamps(times.map(s => s + dec.first))) {
           if (wc) cur = [wc.canvas, wc.canvas.width, wc.canvas.height, c.fit];
-          await emit(i + k); k++;
+          await emit(i + k, c, loc.start, k === times.length - 1); k++;
         }
       } else if (m.kind === 'video') {
         compat++;
         for (let k = 0; k < times.length; k++) {
           await seekFrame(m.el, Math.min(times[k], m.duration - 0.01));
-          cur = [m.el, m.w, m.h, c.fit]; await emit(i + k);
+          cur = [m.el, m.w, m.h, c.fit]; await emit(i + k, c, loc.start, k === times.length - 1);
         }
       } else {
         cur = [m.el, m.w, m.h, c.fit];
-        for (let k = 0; k < times.length; k++) await emit(i + k);
+        for (let k = 0; k < times.length; k++) await emit(i + k, c, loc.start, k === times.length - 1);
       }
       i = j;
     }
@@ -3854,6 +4012,11 @@ $('zoomIn').onclick = () => { state.pps = Math.min(240, state.pps * 1.5); render
 $('zoomOut').onclick = () => { state.pps = Math.max(8, state.pps / 1.5); renderTimeline(); };
 $('addBtn').onclick = () => $('fileInput').click();
 $('addTextBtn').onclick = addText;
+$('tplBtn').onclick = () => { if (!state.clips.length) return toast('先に動画や写真を追加してください。'); if (state.playing) pause(); renderTemplates(); $('tplOverlay').hidden = false; };
+$('tplCancel').onclick = () => $('tplOverlay').hidden = true;
+$('tplApply').onclick = applyTemplate;
+$('addBgmBtn').onclick = () => $('bgmInput').click();
+$('bgmInput').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) addBgm(f); };
 $('fileInput').onchange = e => { const fs = [...e.target.files]; e.target.value = ''; addFiles(fs); };
 $('exportBtn').onclick = () => { if (state.playing) pause(); showStep('exSetup'); $('exportOverlay').hidden = false; };
 $('exCancel').onclick = $('exClose').onclick = () => { $('exVideo').pause(); $('exportOverlay').hidden = true; };
@@ -3872,7 +4035,7 @@ if (window.claude && window.claude.use) window.claude.use('downloads').then(d =>
 state.clips = [newClip(sampleMedia('サンプル 1', '#2f8f8a', '#1d3f5e')), newClip(sampleMedia('サンプル 2', '#7a6fc4', '#c2577a'))];
 $('playBtn').innerHTML = ICON.play + '再生';
 applyAspect(); renderAll();
-window.__tsunagi = { state, addFiles, runExport, get result() { return resultBlob; } };
+window.__tsunagi = { state, addFiles, addBgm, runExport, get result() { return resultBlob; } };
 })();
 </script>
 </body>
