@@ -118,6 +118,7 @@ input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--lin
 .bar{gap:6px}
 .slider label{white-space:nowrap;font-size:13px}
 .slider{grid-template-columns:6em 1fr 3em}
+.clip.tro::after{content:"";position:absolute;right:0;top:0;bottom:0;width:6px;background:var(--accent)}
 </style>
 </head>
 <body>
@@ -3457,11 +3458,14 @@ function frameOf(c, local, src, sw, sh, cap) {
   return [src, sw, sh, c.fit, motionOf(c, local)];
 }
 // Draws one frame of a clip, blending in from the previous clip's last frame while its transition runs.
-const TRANS_DUR = 0.5;
-function composeBase(c2d, W, H, cur, clip, local, prev) {
-  const tr = clip ? clip.trans || 'none' : 'none', D = clip ? Math.min(TRANS_DUR, clip.dur / 2) : 0;
-  if (tr === 'none' || local >= D || !cur) { if (cur) draw(c2d, W, H, ...cur); else draw(c2d, W, H, null); return; }
-  const k = clamp(local / D, 0, 1), p = k * k * (3 - 2 * k);
+const TRANS = [['none', 'なし'], ['fade', 'フェード'], ['slide', 'スライド'], ['zoom', 'ズーム']];
+const inDur = c => (c.trans || 'none') === 'none' ? 0 : Math.min(c.transDur || 0.5, c.dur / 2);
+const outDur = c => (c.transOut || 'none') === 'none' ? 0 : Math.min(c.transOutDur || 0.5, c.dur / 2);
+const ease = k => k * k * (3 - 2 * k);
+function composeIn(c2d, W, H, cur, clip, local, prev) {
+  const D = clip ? inDur(clip) : 0;
+  if (!D || local >= D || !cur) { if (cur) draw(c2d, W, H, ...cur); else draw(c2d, W, H, null); return; }
+  const tr = clip.trans, p = ease(clamp(local / D, 0, 1));
   c2d.fillStyle = '#000'; c2d.fillRect(0, 0, W, H);
   c2d.save();
   if (tr === 'slide') c2d.translate(-p * W, 0);
@@ -3474,6 +3478,19 @@ function composeBase(c2d, W, H, cur, clip, local, prev) {
   draw(c2d, W, H, ...cur);
   c2d.restore();
 }
+// Entry effect blends from the previous clip's last frame; exit effect leaves to black.
+function composeBase(c2d, W, H, cur, clip, local, prev) {
+  const D = clip ? outDur(clip) : 0, left = clip ? clip.dur - local : 0;
+  if (!D || left >= D || !cur) return composeIn(c2d, W, H, cur, clip, local, prev);
+  const tr = clip.transOut, q = ease(clamp(left / D, 0, 1));
+  c2d.fillStyle = '#000'; c2d.fillRect(0, 0, W, H);
+  c2d.save();
+  if (tr === 'slide') c2d.translate(-(1 - q) * W, 0);
+  else c2d.globalAlpha = q;
+  if (tr === 'zoom') { const sc = 0.82 + 0.18 * q; c2d.translate(W / 2, H / 2); c2d.scale(sc, sc); c2d.translate(-W / 2, -H / 2); }
+  draw(c2d, W, H, ...cur);
+  c2d.restore();
+}
 const pbase = document.createElement('canvas'), psnap = document.createElement('canvas');
 let pbaseClip = null, psnapClip = null;
 function drawPreview() {
@@ -3483,15 +3500,17 @@ function drawPreview() {
   const prevClip = state.clips[loc.idx - 1], next = state.clips[loc.idx + 1];
   if (pbaseClip && pbaseClip !== c) { psnap.getContext('2d').drawImage(pbase, 0, 0); psnapClip = pbaseClip; pbaseClip = null; }
   let prev = null;
-  if ((c.trans || 'none') !== 'none' && loc.local < TRANS_DUR && prevClip) {
+  if (loc.local < inDur(c) && prevClip) {
     if (psnapClip !== prevClip && (prevClip.media.kind === 'image' || prevClip.media !== m)) {
-      const pm = prevClip.media; draw(psnap.getContext('2d'), W, H, ...frameOf(prevClip, prevClip.dur, pm.el, pm.w, pm.h, 1280)); psnapClip = prevClip;
+      const pm = prevClip.media, pc = psnap.getContext('2d');
+      if (outDur(prevClip)) draw(pc, W, H, null); else draw(pc, W, H, ...frameOf(prevClip, prevClip.dur, pm.el, pm.w, pm.h, 1280));
+      psnapClip = prevClip;
     }
     if (psnapClip === prevClip) prev = psnap;
   }
   const cur = frameOf(c, loc.local, m.el, m.w, m.h, 1280);
   composeBase(ctx, W, H, cur, c, loc.local, prev);
-  if (state.playing && next && (next.trans || 'none') !== 'none') { draw(pbase.getContext('2d'), W, H, ...cur); pbaseClip = c; }
+  if (state.playing && next && inDur(next)) { pbase.getContext('2d').drawImage(canvas, 0, 0); pbaseClip = c; }
   drawTexts(ctx, W, H, state.t, true);
 }
 function fitCanvas() {
@@ -3769,7 +3788,7 @@ function renderTimeline() {
   const track = $('track'); track.textContent = '';
   for (const c of state.clips) {
     const b = document.createElement('button');
-    b.className = 'clip ' + c.media.kind + (c === state.sel ? ' sel' : '') + ((c.trans || 'none') !== 'none' ? ' tr' : '');
+    b.className = 'clip ' + c.media.kind + (c === state.sel ? ' sel' : '') + (inDur(c) ? ' tr' : '') + (outDur(c) ? ' tro' : '');
     b.style.width = Math.max(4, c.dur * pps) + 'px';
     if (c.media.thumb) b.style.backgroundImage = 'url(' + c.media.thumb + ')';
     b.setAttribute('aria-label', c.media.name + ' ' + fmt(c.dur));
@@ -3818,9 +3837,9 @@ function renderBgmInspector(box, b) {
   acts.appendChild(del); box.appendChild(acts);
 }
 const TEMPLATES = {
-  simple: { name: 'シンプル', desc: 'フェードでつなぐ落ち着いた仕上がり。写真は3秒ずつ表示します。', trans: () => 'fade', img: 3, text: { color: '#ffffff', style: 'outline', anim: 'fade', size: 10 } },
+  simple: { name: 'シンプル', desc: 'フェードでつなぐ落ち着いた仕上がり。写真は3秒ずつ表示します。', trans: () => 'fade', lastOut: 'fade', img: 3, text: { color: '#ffffff', style: 'outline', anim: 'fade', size: 10 } },
   pop: { name: 'ポップ', desc: 'スライドとズームでテンポよくつなぎます。写真は2秒ずつ表示します。', trans: i => i % 2 ? 'slide' : 'zoom', img: 2, text: { color: '#ffe14d', style: 'box', anim: 'pop', size: 11 } },
-  calm: { name: 'ゆったり', desc: '思い出の写真向け。ゆっくりフェードし、写真は4.5秒ずつ、少しずつズームしながら表示します。', trans: () => 'fade', first: 'fade', img: 4.5, motion: i => i % 2 ? 'out' : 'in', text: { color: '#ffffff', style: 'plain', anim: 'slide', size: 9 } },
+  calm: { name: 'ゆったり', desc: '思い出の写真向け。ゆっくりフェードし、写真は4.5秒ずつ、少しずつズームしながら表示します。', trans: () => 'fade', first: 'fade', lastOut: 'fade', dur: 1, img: 4.5, motion: i => i % 2 ? 'out' : 'in', text: { color: '#ffffff', style: 'plain', anim: 'slide', size: 9 } },
   none: { name: '効果なし', desc: '切り替え効果をすべて外します。写真の長さは変えません。', trans: () => 'none', img: null, text: null },
 };
 let tplPick = 'simple';
@@ -3837,7 +3856,7 @@ function renderTemplates() {
 function applyTemplate() {
   const T = TEMPLATES[tplPick], title = $('tplTitle').value.trim();
   if (state.playing) pause();
-  state.clips.forEach((c, i) => { c.trans = i === 0 ? T.first || 'none' : T.trans(i); if (T.img && c.media.kind === 'image') c.dur = T.img; if (c.media.kind === 'image') c.motion = T.motion ? T.motion(i) : 'none'; });
+  state.clips.forEach((c, i) => { c.trans = i === 0 ? T.first || 'none' : T.trans(i); c.transDur = T.dur || 0.5; c.transOut = T.lastOut && i === state.clips.length - 1 ? T.lastOut : 'none'; c.transOutDur = T.dur || 0.5; if (T.img && c.media.kind === 'image') c.dur = T.img; if (c.media.kind === 'image') c.motion = T.motion ? T.motion(i) : 'none'; });
   state.texts = state.texts.filter(x => !x.tpl);
   if (T.text && title) state.texts.push({ id: uid++, text: title, start: 0.2, dur: Math.max(0.5, Math.min(3, total() - 0.2)), x: 0.5, y: 0.5, tpl: true, ...T.text });
   state.sel = null; $('tplOverlay').hidden = true; renderAll(); setTime(0);
@@ -3881,7 +3900,11 @@ function renderInspector() {
   } else {
     box.appendChild(sliderRow('imgDur', '表示時間', 0.5, 15, c.dur, v => { c.dur = v; changed(clipStart(c)); return v; }));
   }
-  box.appendChild(chipRow('切り替え', [['none', 'なし'], ['fade', 'フェード'], ['slide', 'スライド'], ['zoom', 'ズーム']], c.trans || 'none', v => { c.trans = v; if (state.playing) pause(); renderTimeline(); setTime(clipStart(c) + (v === 'none' ? 0 : 0.2)); }));
+  const showAt = t => { if (state.playing) pause(); renderTimeline(); setTime(t); };
+  box.appendChild(chipRow('前の切替', TRANS, c.trans || 'none', v => { c.trans = v; showAt(clipStart(c) + inDur(c) * 0.4); }));
+  if (inDur(c)) box.appendChild(sliderRow('trInDur', '前の長さ', 0.2, 2, c.transDur || 0.5, v => { c.transDur = v; showAt(clipStart(c) + inDur(c) * 0.4); return v; }));
+  box.appendChild(chipRow('後の切替', TRANS, c.transOut || 'none', v => { c.transOut = v; showAt(clipStart(c) + c.dur - outDur(c) * 0.6); }));
+  if (outDur(c)) box.appendChild(sliderRow('trOutDur', '後の長さ', 0.2, 2, c.transOutDur || 0.5, v => { c.transOutDur = v; showAt(clipStart(c) + c.dur - outDur(c) * 0.6); return v; }));
   box.appendChild(chipRow('フィルター', FILTERS, c.filter || 'none', v => c.filter = v));
   box.appendChild(sliderRow('fxBright', '明るさ', -50, 50, c.bright || 0, v => { c.bright = Math.round(v); drawPreview(); return c.bright; }, ''));
   box.appendChild(sliderRow('fxContrast', 'コントラスト', -50, 50, c.contrast || 0, v => { c.contrast = Math.round(v); drawPreview(); return c.contrast; }, ''));
@@ -3896,7 +3919,7 @@ function renderInspector() {
   btn('ここで分割', () => {
     const local = state.t - clipStart(c);
     if (local < MIN_DUR || local > c.dur - MIN_DUR) return toast('再生位置(黄色の線)をこのクリップの途中に合わせてから分割してください。');
-    const b2 = { ...c, id: uid++, in: c.in + local, dur: c.dur - local, trans: 'none' }; c.dur = local;
+    const b2 = { ...c, id: uid++, in: c.in + local, dur: c.dur - local, trans: 'none' }; c.dur = local; c.transOut = 'none';
     state.clips.splice(idx + 1, 0, b2); state.sel = b2; renderAll(); syncPaused();
   });
   btn('複製', () => { const b2 = { ...c, id: uid++ }; state.clips.splice(idx + 1, 0, b2); state.sel = b2; renderAll(); setTime(clipStart(b2)); });
@@ -4018,7 +4041,7 @@ async function runExport() {
       if (abortExport) throw new Error('abort');
       const local = Math.max(0, idx / FPS - cStart), fr = cur && frameOf(c, local, cur[0], cur[1], cur[2], 1920);
       composeBase(ex, W, H, fr, c, local, hasSnap ? snap : null);
-      if (isLast) { if (fr) draw(snap.getContext('2d'), W, H, ...fr); else draw(snap.getContext('2d'), W, H, null); hasSnap = true; }
+      if (isLast) { snap.getContext('2d').drawImage(ec, 0, 0); hasSnap = true; }
       drawTexts(ex, W, H, idx / FPS, false);
       await vs.add(idx / FPS, 1 / FPS);
       if ((idx + 1) % FPS === 0) await addAudioUntil((idx + 1) / FPS);
