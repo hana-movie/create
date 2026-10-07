@@ -56,6 +56,8 @@ label.f{display:inline-flex;align-items:center;gap:4px;color:var(--mute);white-s
 #empty p{margin:6px 0;color:#cbd5e1}
 #empty button{margin-top:16px;height:38px;padding:0 20px;font-size:14px}
 #cropBar{position:absolute;z-index:6;display:flex;gap:4px;padding:5px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 3px 12px rgba(0,0,0,.3)}
+#selMenu{position:absolute;z-index:6;display:flex;flex-direction:column;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 3px 12px rgba(0,0,0,.3)}
+#selMenu .row{display:flex;border-bottom:1px solid var(--line);padding-bottom:3px;margin-bottom:3px}
 #stampPane{width:232px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
 #stampPane h4,.se-right h4{margin:0;padding:8px 10px;font-size:12px;color:var(--mute);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
 #stampGrid{flex:1;min-height:0;grid-auto-rows:max-content;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;align-content:start}
@@ -223,7 +225,7 @@ const IC = {
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13', copy: 'M8 8h12v12H8zM4 16V4h12',
   ocr: 'M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M8 9h8M8 12h8M8 15h5', extract: 'M6 3h9l4 4v14H6zM12 10v7M9 14l3 3 3-3',
   blank: 'M6 3h9l4 4v14H6zM12 11v6M9 14h6', front: 'M8 8h12v12H8zM4 4h8v2H6v6H4z', back: 'M4 4h12v12H4zM18 10h2v10H10v-2h8z',
-  close: 'M6 6l12 12M18 6L6 18',
+  close: 'M6 6l12 12M18 6L6 18', uline: 'M7 4v7a5 5 0 0 0 10 0V4M5 20h14', strike: 'M4 12h16M8 7c0-2 2-3 4-3s4 1 4 3M8 17c0 2 2 3 4 3s4-1 4-3',
 };
 const icon = n => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${IC[n] || ''}"/></svg>`;
 
@@ -725,12 +727,16 @@ class Editor {
       const it = this.get(this.sel[0]), h = it && this.hitHandle(it, p);
       if (h) { this.drag = { kind: h.rot ? 'rotate' : 'resize', h, o0: it, b0: bboxOf(it), p0: p }; return; }
     }
-    const it = this.pick(p);
+    let it = this.pick(p);
+    // 蛍光ペン・下線・取り消し線の上では文字選択を優先 (クリックだけなら蛍光ペン自体が選ばれる)
+    if (it && (it.blend || it.mark) && !this.sel.includes(it.id) && !ev.shiftKey) { const c = this.o.emptyDown?.(p, ev); if (c) { this.sel = []; this.drag = { kind: 'custom', custom: c }; this.selChanged(); this.draw(); return; } }
     if (it) {
       if (ev.shiftKey) this.sel = this.sel.includes(it.id) ? this.sel.filter(i => i !== it.id) : [...this.sel, it.id];
       else if (!this.sel.includes(it.id)) this.sel = [it.id];
       this.drag = { kind: 'move', p0: p, orig: this.selected(), moved: false };
     } else {
+      const c = this.o.emptyDown?.(p, ev);  // 何もない所でのドラッグを利用側が引き取れる (PDF の文字選択)
+      if (c) { this.sel = []; this.drag = { kind: 'custom', custom: c }; this.selChanged(); this.draw(); return; }
       if (!ev.shiftKey) this.sel = [];
       this.drag = { kind: 'marquee', p0: p, p1: p, base: [...this.sel] };
     }
@@ -808,7 +814,7 @@ class Editor {
   hoverCursor(p) {
     let c = 'default';
     if (this.sel.length === 1) { const it = this.get(this.sel[0]), h = it && this.hitHandle(it, p); if (h) c = h.rot ? 'grab' : 'nwse-resize'; }
-    if (c === 'default' && this.pick(p)) c = 'move';
+    if (c === 'default') c = this.pick(p) ? 'move' : (this.o.hoverCursor?.(p) || 'default');
     this.cv.style.cursor = c;
   }
   up(ev) {
@@ -1072,6 +1078,7 @@ class Editor {
       ctx.setLineDash([4, 3]); poly([a, c1, b, c2]); ctx.setLineDash([]);
     }
     this.o.customTools?.[this.tool]?.draw?.(ctx, M);
+    this.o.overlay?.(ctx, M);
   }
 }
 Editor.clip = null;
@@ -1179,7 +1186,7 @@ function layoutStage() {
 }
 async function renderMain() {
   const p = curPage(), t = ++rtoken;
-  layoutStage(); hideCropBar(); ed.draw(); updateUI();
+  layoutStage(); hideCropBar(); ed.draw(); updateUI(); loadTextItems();
   if (!p) return;
   const dpr = window.devicePixelRatio || 1, [vw, vh] = viewSize(p);
   let s = S.scale * dpr; const area = vw * vh * s * s; if (area > 2.4e7) s *= Math.sqrt(2.4e7 / area);
@@ -1234,7 +1241,6 @@ function setCur(i, keepSel) {
   if (!keepSel) S.selp = new Set([curPage().id]);
   markThumbs(); renderMain(); $('#view').scrollTop = 0;
   $$('#thumbs .thumb')[S.cur]?.scrollIntoView({ block: 'nearest' });
-  if (ed.tool === 'edittext') loadTextItems();
 }
 function refreshAll() { refreshThumbs(); renderMain(); }
 
@@ -1383,19 +1389,98 @@ function applyCrop(scope) {
 }
 
 /* ---------- 既存テキストの編集 (白塗り + 上書き) ---------- */
+const textCache = new Map();  // ページ id → PDF 内の文字 (位置つき)
 async function loadTextItems() {
-  const p = curPage(); S.textItems = [];
-  if (!p || !p.src) { ed.draw(); return; }
-  const pg = p.src.doc.pg[p.src.index], tc = await pg.getTextContent();
-  if (p !== curPage()) return;
-  const done = new Set(p.annots.filter(a => a.srcKey).map(a => a.srcKey));
-  S.textItems = tc.items.filter(i => i.str && i.str.trim()).map((i, k) => {
-    const t = i.transform, size = Math.hypot(t[2], t[3]) || i.height || 10, th = -Math.atan2(t[1], t[0]);
-    const ux = Math.cos(th), uy = Math.sin(th), nx = -uy, ny = ux, w = i.width, off = -0.38 * size;
-    const fam = tc.styles[i.fontName]?.fontFamily || '';
-    return { key: `${p.id}:${k}`, str: i.str, size, w, rot: th / RAD, x: t[4] + ux * w / 2 + nx * off, y: -t[5] + uy * w / 2 + ny * off, font: /serif/.test(fam) && !/sans/.test(fam) ? FONTS[1][1] : /mono/.test(fam) ? FONTS[6][1] : FONTS[0][1] };
-  }).filter(i => !done.has(i.key));
+  const p = curPage(); S.textItems = []; S.tsel = null; hideSelMenu();
+  if (!p) return;
+  let raw = textCache.get(p.id);
+  if (!raw) {
+    raw = [];
+    if (p.src) {
+      const tc = await p.src.doc.pg[p.src.index].getTextContent();
+      raw = tc.items.filter(i => i.str && i.str.trim()).map((i, k) => {
+        const t = i.transform, size = Math.hypot(t[2], t[3]) || i.height || 10, th = -Math.atan2(t[1], t[0]);
+        const ux = Math.cos(th), uy = Math.sin(th), nx = -uy, ny = ux, w = i.width, off = -0.38 * size;
+        const fam = tc.styles[i.fontName]?.fontFamily || '';
+        return { key: `${p.id}:${k}`, str: i.str, eol: !!i.hasEOL, size, w, rot: th / RAD, x: t[4] + ux * w / 2 + nx * off, y: -t[5] + uy * w / 2 + ny * off, font: /serif/.test(fam) && !/sans/.test(fam) ? FONTS[1][1] : /mono/.test(fam) ? FONTS[6][1] : FONTS[0][1] };
+      });
+    }
+    textCache.set(p.id, raw);
+  }
+  const q = curPage(); if (!q || q.id !== p.id) return;
+  const done = new Set(q.annots.filter(a => a.srcKey).map(a => a.srcKey));
+  const ocr = (q.ocr?.lines || []).map((l, k) => ({ key: `${q.id}:o${k}`, str: l.text, eol: true, size: l.h * 0.8, w: l.w, rot: l.rot || 0, x: l.x, y: l.y, font: FONTS[0][1] }));
+  S.textItems = [...raw, ...ocr].filter(i => !done.has(i.key));
   ed.draw();
+}
+
+/* ---------- 文字の選択 (選択ツールで文字の上をドラッグ) ---------- */
+const itemAt = p => (S.textItems || []).findIndex(i => { const b = tiBox(i), [lx, ly] = toLocal(b, p.x, p.y); return Math.abs(lx) <= b.w / 2 + 1 && Math.abs(ly) <= b.h / 2; });
+function charEdges(i) {  // 各文字の境界位置 (ローカル x)。字幅は標準フォントで按分する
+  if (i._e) return i._e;
+  mctx.font = '10px sans-serif';
+  const ch = [...i.str], ws = ch.map(c => mctx.measureText(c).width || 1), tot = ws.reduce((a, b) => a + b, 0) || 1, e = [-i.w / 2]; let acc = 0, n = 0; const idx = [0];
+  ch.forEach((c, k) => { acc += ws[k]; n += c.length; e.push(-i.w / 2 + acc / tot * i.w); idx.push(n); });
+  return (i._e = { e, idx });
+}
+function locate(p, loose) {
+  const its = S.textItems || []; let n = itemAt(p);
+  if (n < 0) {
+    if (!loose) return null;
+    let best = Infinity;
+    its.forEach((i, k) => { const b = tiBox(i), [lx, ly] = toLocal(b, p.x, p.y), dx = Math.max(0, Math.abs(lx) - b.w / 2), dy = Math.max(0, Math.abs(ly) - b.h / 2), d = dx + dy * 3; if (d < best) { best = d; n = k; } });
+    if (n < 0) return null;
+  }
+  const i = its[n], [lx] = toLocal(tiBox(i), p.x, p.y), { e } = charEdges(i); let k = 0;
+  for (let j = 1; j < e.length; j++) if (Math.abs(e[j] - lx) < Math.abs(e[k] - lx)) k = j;
+  return { n, k };
+}
+function selSegs() {
+  const t = S.tsel; if (!t) return [];
+  let a = t.a, b = t.b; if (a.n > b.n || (a.n === b.n && a.k > b.k)) [a, b] = [b, a];
+  const out = [];
+  for (let n = a.n; n <= b.n; n++) {
+    const i = S.textItems[n]; if (!i) continue;
+    const { e, idx } = charEdges(i), k0 = n === a.n ? a.k : 0, k1 = n === b.n ? b.k : e.length - 1;
+    if (k1 <= k0) continue;
+    const mid = (e[k0] + e[k1]) / 2, c = Math.cos(i.rot * RAD), s = Math.sin(i.rot * RAD);
+    out.push({ i, x0: e[k0], x1: e[k1], text: i.str.slice(idx[k0], idx[k1]), whole: k0 === 0 && k1 === e.length - 1, box: { cx: i.x + mid * c, cy: i.y + mid * s, w: e[k1] - e[k0], h: i.size * 1.2, rot: i.rot } });
+  }
+  return out;
+}
+const selText = () => selSegs().map((s, k, all) => { const n = all[k + 1]; if (!n) return s.text; const [, dy] = toLocal(tiBox(s.i), n.i.x, n.i.y); return s.text + (s.i.eol || Math.abs(dy) > s.i.size * 0.6 ? '\n' : ''); }).join('');
+const textSelDrag = {
+  move(p, ev, dragging) { if (dragging && S.tsel) { const h = locate(p, true); if (h) S.tsel.b = h; } },
+  up(p) { if (selSegs().length) return showSelMenu(p); S.tsel = null; const it = ed.pick(p); if (it) ed.select([it.id]); },
+};
+function hideSelMenu() { $('#selMenu')?.remove(); }
+function showSelMenu(p) {
+  hideSelMenu();
+  const segs = selSegs(), one = segs.length === 1;
+  const b = (ic, label, f) => el('button', { html: icon(ic) + `<span>${label}</span>`, onclick: f });
+  const m = el('div', { id: 'selMenu' },
+    el('div', { class: 'row' }, b('highlight', 'ハイライト', () => markSel('hl')), b('uline', '下線', () => markSel('ul')), b('strike', '取り消し線', () => markSel('st'))),
+    b('copy', 'テキストをコピー', copySel),
+    one ? b('edittext', 'テキストを編集', () => { const i = segs[0].i; S.tsel = null; hideSelMenu(); editTextTool.edit(i); }) : null);
+  m.style.left = Math.max(0, p.sx - MG) + 'px'; m.style.top = p.sy - MG + 14 + 'px';
+  $('#stage').append(m);
+}
+function copySel() {
+  const t = selText(); if (!t) return;
+  const done = () => toast('コピーしました');
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(t).then(done, () => toast('コピーできませんでした'));
+  else { const ta = el('textarea', { value: t, style: 'position:fixed;opacity:0' }); document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
+  hideSelMenu();
+}
+function markSel(kind) {
+  const col = ed.style.stroke || '#e11d48', add = selSegs().map(s => {
+    const { box: b, i } = s;
+    if (kind === 'hl') return { id: uid(), type: 'rect', x: b.cx, y: b.cy, w: b.w, h: i.size * 1.15, rot: b.rot, stroke: null, fill: '#ffe600', sw: 0, opacity: 0.4, blend: 'multiply' };
+    const off = i.size * (kind === 'ul' ? 0.5 : 0.12), c = Math.cos(b.rot * RAD), sn = Math.sin(b.rot * RAD), P = lx => N(b.cx + lx * c - off * sn, b.cy + lx * sn + off * c);
+    return { id: uid(), type: 'path', nodes: [P(-b.w / 2), P(b.w / 2)], closed: false, stroke: col, fill: null, sw: Math.max(0.75, i.size * 0.06), opacity: 1, mark: true };
+  });
+  S.tsel = null; hideSelMenu();
+  if (add.length) ed.set([...ed.items, ...add], true);
 }
 const tiBox = i => ({ cx: i.x, cy: i.y, w: i.w, h: i.size * 1.2, rot: i.rot });
 function sampleColors(b) {  // 文字のまわりの背景色と文字色を、表示中の画像から推定
@@ -1416,16 +1501,16 @@ function sampleColors(b) {  // 文字のまわりの背景色と文字色を、�
 }
 const editTextTool = {
   cursor: 'text', hot: null,
-  find(p) { return (S.textItems || []).find(i => { const b = tiBox(i), [lx, ly] = toLocal(b, p.x, p.y); return Math.abs(lx) <= b.w / 2 + 1 && Math.abs(ly) <= b.h / 2; }); },
+  find(p) { return (S.textItems || [])[itemAt(p)]; },
   move(p) { const h = this.find(p); if (h !== this.hot) { this.hot = h; ed.draw(); } },
-  down(p) {
-    const i = this.find(p); if (!i) return;
+  down(p) { const i = this.find(p); if (i) this.edit(i); },
+  edit(i) {
     const col = sampleColors(tiBox(i));
     const o0 = { id: uid(), type: 'text', text: '', x: i.x, y: i.y, rot: i.rot, size: i.size, font: i.font, bold: false, fill: col.fg, stroke: null, sw: 0, bg: col.bg, minW: i.w, align: 'left', mode: 'h', ls: 0, sx: 1, sy: 1, opacity: 1, srcKey: i.key };
     mctx.font = fontStr(o0); const nat = mctx.measureText(i.str).width;
     if (nat > i.w && i.w > 0) o0.sx = clamp(i.w / nat, 0.6, 1);  // 元の幅に収まるよう少し長体をかける
     const o = retext(o0, { text: i.str });
-    S.textItems = S.textItems.filter(t => t !== i); this.hot = null;
+    S.textItems = S.textItems.filter(t => t !== i); this.hot = null; S.tsel = null;
     ed.o.setItems([...ed.items, o]); ed.o.commit(); ed.drag = null;
     ed.setTool('select'); ed.sel = [o.id]; ed.selChanged(); ed.startEdit(o);
   },
@@ -1452,7 +1537,7 @@ async function insertImage() {
 
 /* ---------- UI ---------- */
 const TOOLS = [
-  ['select', '選択', '選択・移動・拡大縮小・回転 (V)'], ['text', 'テキスト', 'クリックした位置に文字を追加 (T)'],
+  ['select', '選択', '注釈の選択・移動・変形 / 文字の上をドラッグで文字を選択 (V)'], ['text', 'テキスト', 'クリックした位置に文字を追加 (T)'],
   ['edittext', '文字修正', '既存の文字をクリックして書き換える'], ['ink', '手書き', 'フリーハンドで描く'],
   ['highlight', '蛍光ペン', 'ドラッグした範囲をマーカー'], ['whiteout', '白塗り', 'ドラッグした範囲を白く塗りつぶす'],
   ['rect', '四角', ''], ['ellipse', '楕円', ''], ['line', '線', ''], ['arrow', '矢印', ''],
@@ -1466,7 +1551,7 @@ function chooseTool(t) {
   if (t === 'sign') return signatureDialog();
   if (t === 'stamp') { $('#stampPane').hidden = !$('#stampPane').hidden; if (!$('#stampPane').hidden) renderStampGrid(); renderMain(); syncToolUI(); return; }
   ed.setTool(t);
-  if (t === 'edittext') { loadTextItems(); setStatus('書き換えたい文字をクリック (元の文字を白く塗って上書きします)'); }
+  if (t === 'edittext') { setStatus('書き換えたい文字をクリック (元の文字を白く塗って上書きします)'); }
   else if (t === 'crop') setStatus('残したい範囲をドラッグ');
   else setStatus('準備完了');
 }
@@ -1542,6 +1627,8 @@ function initUI() {
     if (mod && k === 'o') { e.preventDefault(); ACT.open(); return; }
     if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? ACT.redo() : ACT.undo(); return; }
     if (mod && k === 'y') { e.preventDefault(); ACT.redo(); return; }
+    if (mod && k === 'c' && S.tsel) { e.preventDefault(); copySel(); return; }
+    if (k === 'escape' && S.tsel) { S.tsel = null; hideSelMenu(); ed.draw(); return; }
     if (ed.key(e)) { e.preventDefault(); return; }
     if (k === 'pageup') { e.preventDefault(); ACT.prev(); } else if (k === 'pagedown') { e.preventDefault(); ACT.next(); }
     else if (!mod && k === 'v') chooseTool('select'); else if (!mod && k === 't') chooseTool('text');
@@ -1552,7 +1639,15 @@ function initEditor() {
     mode: 'pdf',
     getItems: () => curPage()?.annots || [],
     setItems: items => { const p = curPage(); if (p) S.pages = S.pages.map(q => (q === p ? { ...p, annots: items } : q)); },
-    commit, matrix: screenM, onSel: syncStyleUI, onTool: syncToolUI,
+    commit, matrix: screenM, onSel: syncStyleUI, onTool: t => { S.tsel = null; hideSelMenu(); syncToolUI(t); },
+    emptyDown(p, ev) { hideSelMenu(); S.tsel = null; const h = locate(p, false); if (!h) return null; S.tsel = { a: h, b: h }; return textSelDrag; },
+    hoverCursor: p => (itemAt(p) >= 0 ? 'text' : null),
+    overlay(ctx, M) {
+      if (!S.tsel || ed.tool !== 'select') return;
+      ctx.save(); ctx.fillStyle = 'rgba(37,99,235,.3)';
+      for (const s of selSegs()) { const cs = bboxCorners(s.box).map(c => Mx.pt(M, c[0], c[1])); ctx.beginPath(); cs.forEach((c, k) => (k ? ctx.lineTo(c[0], c[1]) : ctx.moveTo(c[0], c[1]))); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+    },
     customTools: { crop: cropTool, edittext: editTextTool },
   });
   redrawAll = () => { ed.draw(); if (SE.open) SE.ed.draw(); };
