@@ -247,6 +247,8 @@ button.brand{background:none;border:0;padding:0 4px 0 0;margin-right:auto;min-he
       <input id="projName" type="text" maxlength="40">
     </label>
     <p id="projStatus"></p>
+    <p>名前を変えても、同じ1つのプロジェクトのままです。別のプロジェクトとして残したいときは「複製を作る」を押してください。</p>
+    <div class="row"><button id="projCopy">複製を作る</button></div>
     <div id="projList"></div>
     <p>保存先はこの端末のこのブラウザの中です。ブラウザのデータを消すと、プロジェクトも消えます。</p>
     <div class="row"><button id="projClose">閉じる</button><button id="projNew" class="primary">新しく作る</button></div>
@@ -4536,6 +4538,14 @@ async function renderProjects() {
 $('projBtn').onclick = () => { if (state.playing) pause(); renderProjects(); $('projOverlay').hidden = false; };
 $('projClose').onclick = () => $('projOverlay').hidden = true;
 $('projName').oninput = e => { project.name = e.target.value.trim() || '無題のプロジェクト'; };
+$('projCopy').onclick = async () => {
+  if (!storageOk) return toast('この画面では保存できません。');
+  await autosave();
+  if (!project.stored) return toast('動画や文字を追加してから複製してください。');
+  project = { id: rid(), name: project.name + ' のコピー', stored: false }; lastSaved = '';
+  await autosave(); renderProjects();
+  toast('複製しました。いま開いているのは「' + project.name + '」です。');
+};
 $('projNew').onclick = async () => { await autosave(); newProject(); $('projOverlay').hidden = true; toast('新しいプロジェクトを始めました。'); };
 setInterval(autosave, 2000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) autosave(); });
