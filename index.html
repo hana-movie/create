@@ -124,6 +124,9 @@ input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--lin
 .footer{gap:6px}
 .footer button{font-size:13px;padding:0 2px}
 .slider{grid-template-columns:7.2em 1fr 3em}
+.nums{display:flex;gap:8px}
+.nums label{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
+.nums input{width:100%;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:40px;font:16px var(--mono);color:var(--fg)}
 </style>
 </head>
 <body>
@@ -3559,7 +3562,9 @@ function drawOverlays(c2d, W, H, t, frameFor, editing, cap = 1280) {
     const fi = o.fadeIn ?? 0.2, fo = o.fadeOut ?? 0.2;
     const alpha = (o.opacity ?? 1) * clamp(Math.min(fi ? (t - o.start) / fi : 1, fo ? (o.start + o.dur - t) / fo : 1), 0, 1);
     let x, y, w, h;
-    c2d.save();
+    const rot = (o.rot || 0) * Math.PI / 180, pivot = o.full ? [W / 2, H / 2] : [o.x * W, o.y * H];
+    const spin = () => { if (rot) { c2d.translate(pivot[0], pivot[1]); c2d.rotate(rot); c2d.translate(-pivot[0], -pivot[1]); } };
+    c2d.save(); spin();
     c2d.globalAlpha = alpha; c2d.globalCompositeOperation = o.blend || 'source-over';
     if (o.full) {
       const sc = o.fit === 'cover' ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh);
@@ -3578,7 +3583,7 @@ function drawOverlays(c2d, W, H, t, frameFor, editing, cap = 1280) {
     c2d.restore();
     if (editing) {
       o._box = [Math.max(0, x), Math.max(0, y), Math.min(W, w), Math.min(H, h)];
-      if (o === state.sel && !state.playing) { const [bx, by, bw, bh] = o._box, d = o.full ? -4 : 8; c2d.save(); c2d.strokeStyle = '#f0b03c'; c2d.lineWidth = 3; c2d.setLineDash([10, 8]); c2d.strokeRect(bx - d, by - d, bw + d * 2, bh + d * 2); c2d.restore(); }
+      if (o === state.sel && !state.playing) { const [bx, by, bw, bh] = o.full ? o._box : [x, y, w, h], d = o.full ? -4 : 8; c2d.save(); spin(); c2d.strokeStyle = '#f0b03c'; c2d.lineWidth = 3; c2d.setLineDash([10, 8]); c2d.strokeRect(bx - d, by - d, bw + d * 2, bh + d * 2); c2d.restore(); }
     }
   }
 }
@@ -3610,10 +3615,17 @@ function renderOvInspector(box, o) {
   } else box.appendChild(sliderRow('ovDur', '表示時間', 0.5, Math.max(30, tot), o.dur, v => { o.dur = v; moved(); return v; }));
   if (o.full) box.appendChild(chipRow('合わせ方', [['contain', '全体を表示'], ['cover', '画面いっぱい']], o.fit || 'contain', v => o.fit = v));
   else {
-    box.appendChild(sliderRow('ovSize', '大きさ', 10, 100, Math.round(o.size * 100), v => { o.size = v / 100; drawPreview(); return v; }, ''));
+    box.appendChild(numRow([
+      ['ovW', '幅 %', 5, 300, o.size * 100, v => o.size = v / 100],
+      ['ovX', '横位置 %', -50, 150, o.x * 100, v => o.x = v / 100],
+      ['ovY', '縦位置 %', -50, 150, o.y * 100, v => o.y = v / 100],
+    ]));
+    box.appendChild(note('位置は映像の中心で指定します。横0が左端、100が右端。縦0が上端、100が下端です。'));
     box.appendChild(chipRow('形', [['rect', '四角'], ['round', '角丸'], ['circle', '丸']], o.shape, v => o.shape = v));
     box.appendChild(chipRow('白い枠', [[true, 'あり'], [false, 'なし']], o.border, v => o.border = v));
   }
+  box.appendChild(sliderRow('ovRot', '回転', -180, 180, o.rot || 0, v => { o.rot = Math.round(v); const n = $('ovRotN'); if (n) n.value = o.rot; drawPreview(); return o.rot; }, '°'));
+  box.appendChild(numRow([['ovRotN', '回転 (度)', -360, 360, o.rot || 0, v => { o.rot = v; const r = $('ovRot'); if (r) { r.value = v; r.nextElementSibling.textContent = Math.round(v) + '°'; } }]]));
   box.appendChild(sliderRow('ovOpacity', '不透明度', 10, 100, Math.round((o.opacity ?? 1) * 100), v => { o.opacity = v / 100; drawPreview(); return v; }, ''));
   box.appendChild(chipRow('合成', BLENDS, o.blend || 'source-over', v => o.blend = v));
   box.appendChild(sliderRow('ovFadeIn', 'フェードイン', 0, 2, o.fadeIn ?? 0.2, v => { o.fadeIn = v; if (state.playing) pause(); setTime(o.start + v * 0.5); return v; }));
@@ -3760,6 +3772,7 @@ canvas.addEventListener('pointermove', e => {
   if (Math.abs(nx - 0.5) < 0.02) nx = 0.5;
   if (textDrag.x.full) return;
   textDrag.x.x = nx; textDrag.x.y = ny; drawPreview();
+  if ($('ovX') && isOv(textDrag.x)) { $('ovX').value = Math.round(nx * 1000) / 10; $('ovY').value = Math.round(ny * 1000) / 10; }
 });
 canvas.addEventListener('pointerup', () => textDrag = null);
 canvas.addEventListener('pointercancel', () => textDrag = null);
@@ -4006,13 +4019,26 @@ function applyTemplate() {
 function renderAll() { renderTimeline(); renderInspector(); }
 
 /* ---------- inspector ---------- */
+// A row of labelled number boxes: [id, label, min, max, value, onChange].
+function numRow(fields) {
+  const row = document.createElement('div'); row.className = 'nums';
+  for (const [id, label, min, max, val, on] of fields) {
+    const lab = document.createElement('label'); lab.textContent = label;
+    const inp = document.createElement('input'); inp.type = 'number'; inp.id = id; inp.min = min; inp.max = max; inp.step = 'any'; inp.inputMode = 'decimal';
+    inp.value = Math.round(val * 10) / 10;
+    inp.oninput = () => { const v = parseFloat(inp.value); if (!isFinite(v)) return; on(clamp(v, min, max)); drawPreview(); };
+    inp.onchange = () => { const v = parseFloat(inp.value); inp.value = isFinite(v) ? clamp(v, min, max) : Math.round(val * 10) / 10; };
+    lab.appendChild(inp); row.appendChild(lab);
+  }
+  return row;
+}
 function note(text) { const p = document.createElement('div'); p.className = 'note'; p.textContent = text; return p; }
 function sliderRow(id, label, min, max, val, onInput, unit = '秒') {
   const row = document.createElement('div'); row.className = 'slider';
   const lab = document.createElement('label'); lab.htmlFor = id; lab.textContent = label;
   const inp = document.createElement('input'); inp.type = 'range'; inp.id = id; inp.min = min; inp.max = max; inp.step = 0.05; inp.value = val;
-  const out = document.createElement('output'); out.textContent = (+val).toFixed(unit ? 2 : 1) + unit;
-  inp.oninput = () => { const v = onInput(+inp.value); inp.value = v; out.textContent = v.toFixed(unit ? 2 : 1) + unit; };
+  const out = document.createElement('output'); out.textContent = (+val).toFixed(unit === '秒' ? 2 : unit ? 0 : 1) + unit;
+  inp.oninput = () => { const v = onInput(+inp.value); inp.value = v; out.textContent = v.toFixed(unit === '秒' ? 2 : unit ? 0 : 1) + unit; };
   row.append(lab, inp, out); return row;
 }
 function renderInspector() {
