@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>つなぎ 動画エディタ</title>
+<title>花チャン動画エディタ</title>
 <style>
 :root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);box-sizing:border-box;height:100%}
 [hidden]{display:none!important}
@@ -48,7 +48,7 @@ svg{width:18px;height:18px;fill:currentColor;flex:none}
 
 .app{height:100%;display:flex;flex-direction:column;max-width:1100px;margin:0 auto}
 .bar{display:flex;align-items:center;gap:8px;padding:8px 16px}
-.brand{font-weight:800;font-size:18px;letter-spacing:.08em;margin-right:auto}
+.brand{font-weight:800;font-size:17px;letter-spacing:.04em;margin-right:auto}
 .brand small{font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.04em;margin-left:6px}
 .stage{flex:1;min-height:120px;display:flex;align-items:center;justify-content:center;padding:4px 16px;overflow:hidden}
 #preview{touch-action:none;background:var(--letterbox);border-radius:6px;display:block}
@@ -75,7 +75,7 @@ svg{width:18px;height:18px;fill:currentColor;flex:none}
 .insp-head{display:flex;gap:8px;align-items:baseline}
 .insp-head b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .insp-head span{color:var(--muted);font:12px var(--mono);font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap}
-.slider{display:grid;grid-template-columns:4.5em 1fr 4em;align-items:center;gap:8px}
+.slider{display:grid;grid-template-columns:5.5em 1fr 3.5em;align-items:center;gap:8px}
 .slider output{font:12px var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--muted)}
 input[type=range]{width:100%;accent-color:var(--accent);min-height:28px}
 .actions{display:flex;flex-wrap:wrap;gap:6px}
@@ -100,7 +100,7 @@ progress{width:100%;height:10px;accent-color:var(--accent)}
 .titem.sel{box-shadow:inset 0 0 0 3px var(--accent)}
 textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-size:16px;color:inherit;resize:none;flex:none}
 .chips{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.chips>span{width:4.5em;flex:none}
+.chips>span{width:5.5em;flex:none}
 .chips button{min-height:34px;padding:0 10px}
 .chips button.on{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
 .chips button.sw{width:34px;padding:0;border-radius:50%}
@@ -114,12 +114,16 @@ input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--lin
 @media (max-width:480px){.brand small{display:none}}
 .brand{white-space:nowrap}
 .playhead{z-index:3}
+#aspect{width:86px;min-width:0;padding:0 4px}
+.bar{gap:6px}
+.slider label{white-space:nowrap;font-size:13px}
+.slider{grid-template-columns:6em 1fr 3em}
 </style>
 </head>
 <body>
 <div class="app">
   <header class="bar">
-    <div class="brand">つなぎ<small>動画エディタ</small></div>
+    <div class="brand">花チャン<small>動画エディタ</small></div>
     <button id="tplBtn">テンプレート</button>
     <select id="aspect" aria-label="画面の比率">
       <option value="9:16">縦 9:16</option>
@@ -3373,12 +3377,84 @@ let toastTimer;
 function toast(msg) { const el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 4000); }
 
 /* ---------- drawing ---------- */
-function draw(c2d, W, H, src, sw, sh, fit) {
+function draw(c2d, W, H, src, sw, sh, fit, mo) {
   c2d.fillStyle = '#000'; c2d.fillRect(0, 0, W, H);
   if (!src) return;
   const sc = fit === 'cover' ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh);
   const dw = sw * sc, dh = sh * sc;
-  try { c2d.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh); } catch (e) {}
+  try {
+    if (mo) { c2d.save(); c2d.translate(W / 2 + mo.tx * W, H / 2); c2d.scale(mo.s, mo.s); c2d.drawImage(src, -dw / 2, -dh / 2, dw, dh); c2d.restore(); }
+    else c2d.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  } catch (e) {}
+}
+/* ---------- colour filters (GPU) and camera motion ---------- */
+const FILTERS = [['none', 'なし'], ['mono', 'モノクロ'], ['sepia', 'セピア'], ['vivid', 'あざやか'], ['soft', 'やわらか'], ['warm', '暖色'], ['cool', '寒色']];
+const MOTIONS = [['none', 'なし'], ['in', 'ズームイン'], ['out', 'ズームアウト'], ['left', '左へ'], ['right', '右へ']];
+const mul3 = (A, B) => { const R = []; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) R[i * 3 + j] = A[i * 3] * B[j] + A[i * 3 + 1] * B[3 + j] + A[i * 3 + 2] * B[6 + j]; return R; };
+const satM = s => { const r = 0.2126 * (1 - s), g = 0.7152 * (1 - s), b = 0.0722 * (1 - s); return [r + s, g, b, r, g + s, b, r, g, b + s]; };
+// Returns { m: 3x3 row-major, o: offset } for a clip, or null when nothing changes the colours.
+function fxMatrix(c) {
+  const f = c.filter || 'none', br = (c.bright || 0) / 100, ct = (c.contrast || 0) / 100;
+  if (f === 'none' && !br && !ct) return null;
+  let m = [1, 0, 0, 0, 1, 0, 0, 0, 1], k = 1 + ct, lift = 0;
+  if (f === 'mono') m = satM(0);
+  if (f === 'sepia') m = [0.393, 0.769, 0.189, 0.349, 0.686, 0.168, 0.272, 0.534, 0.131];
+  if (f === 'vivid') { m = satM(1.45); k *= 1.08; }
+  if (f === 'soft') { m = satM(0.85); k *= 0.82; lift = 0.04; }
+  if (f === 'warm') m = mul3([1.1, 0, 0, 0, 1.02, 0, 0, 0, 0.86], m);
+  if (f === 'cool') m = mul3([0.88, 0, 0, 0, 1, 0, 0, 0, 1.12], m);
+  const g = k * (1 + br), o = (0.5 * (1 - k) + lift) * (1 + br) + br * 0.08;
+  return { m: m.map(v => v * g), o: [o, o, o] };
+}
+const fx = { ok: null, c: null, gl: null, um: null, uo: null };
+function fxInit() {
+  if (fx.ok !== null) return fx.ok;
+  fx.ok = false;
+  try {
+    const c = fx.c = document.createElement('canvas'), gl = fx.gl = c.getContext('webgl', { alpha: false, premultipliedAlpha: false });
+    if (!gl) return false;
+    const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error('shader'); return x; };
+    const pr = gl.createProgram();
+    gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 p;varying vec2 uv;void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}'));
+    gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, 'precision mediump float;uniform sampler2D t;uniform mat3 m;uniform vec3 o;varying vec2 uv;void main(){vec3 c=texture2D(t,uv).rgb;gl_FragColor=vec4(clamp(m*c+o,0.,1.),1.);}'));
+    gl.linkProgram(pr); if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error('link');
+    gl.useProgram(pr);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+    for (const [k, v] of [[gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE], [gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    fx.um = gl.getUniformLocation(pr, 'm'); fx.uo = gl.getUniformLocation(pr, 'o');
+    fx.ok = true;
+  } catch (e) {}
+  return fx.ok;
+}
+function fxApply(src, sw, sh, M, cap) {
+  if (!fxInit() || fx.gl.isContextLost()) return null;
+  try {
+    const gl = fx.gl, sc = Math.min(1, cap / Math.max(sw, sh)), w = Math.max(2, Math.round(sw * sc)), h = Math.max(2, Math.round(sh * sc));
+    if (fx.c.width !== w || fx.c.height !== h) { fx.c.width = w; fx.c.height = h; }
+    gl.viewport(0, 0, w, h);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+    const m = M.m; gl.uniformMatrix3fv(fx.um, false, [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]); gl.uniform3fv(fx.uo, M.o);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    return fx.c;
+  } catch (e) { return null; }
+}
+function motionOf(c, local) {
+  const p = clamp(local / c.dur, 0, 1), mo = c.motion || 'none';
+  if (mo === 'in') return { s: 1 + 0.18 * p, tx: 0 };
+  if (mo === 'out') return { s: 1.18 - 0.18 * p, tx: 0 };
+  if (mo === 'left') return { s: 1.15, tx: 0.06 - 0.12 * p };
+  if (mo === 'right') return { s: 1.15, tx: -0.06 + 0.12 * p };
+  return undefined;
+}
+// The drawable for one clip frame: source with its filter applied, plus fit and motion.
+function frameOf(c, local, src, sw, sh, cap) {
+  const M = fxMatrix(c), g = M && fxApply(src, sw, sh, M, cap);
+  if (g) { src = g; sw = g.width; sh = g.height; }
+  return [src, sw, sh, c.fit, motionOf(c, local)];
 }
 // Draws one frame of a clip, blending in from the previous clip's last frame while its transition runs.
 const TRANS_DUR = 0.5;
@@ -3403,16 +3479,17 @@ let pbaseClip = null, psnapClip = null;
 function drawPreview() {
   const W = canvas.width, H = canvas.height, loc = locate(state.t);
   if (!loc) { draw(ctx, W, H, null); drawTexts(ctx, W, H, state.t, true); return; }
-  const c = loc.clip, m = c.media, cur = [m.el, m.w, m.h, c.fit];
+  const c = loc.clip, m = c.media;
   const prevClip = state.clips[loc.idx - 1], next = state.clips[loc.idx + 1];
   if (pbaseClip && pbaseClip !== c) { psnap.getContext('2d').drawImage(pbase, 0, 0); psnapClip = pbaseClip; pbaseClip = null; }
   let prev = null;
   if ((c.trans || 'none') !== 'none' && loc.local < TRANS_DUR && prevClip) {
     if (psnapClip !== prevClip && (prevClip.media.kind === 'image' || prevClip.media !== m)) {
-      const pm = prevClip.media; draw(psnap.getContext('2d'), W, H, pm.el, pm.w, pm.h, prevClip.fit); psnapClip = prevClip;
+      const pm = prevClip.media; draw(psnap.getContext('2d'), W, H, ...frameOf(prevClip, prevClip.dur, pm.el, pm.w, pm.h, 1280)); psnapClip = prevClip;
     }
     if (psnapClip === prevClip) prev = psnap;
   }
+  const cur = frameOf(c, loc.local, m.el, m.w, m.h, 1280);
   composeBase(ctx, W, H, cur, c, loc.local, prev);
   if (state.playing && next && (next.trans || 'none') !== 'none') { draw(pbase.getContext('2d'), W, H, ...cur); pbaseClip = c; }
   drawTexts(ctx, W, H, state.t, true);
@@ -3743,7 +3820,7 @@ function renderBgmInspector(box, b) {
 const TEMPLATES = {
   simple: { name: 'シンプル', desc: 'フェードでつなぐ落ち着いた仕上がり。写真は3秒ずつ表示します。', trans: () => 'fade', img: 3, text: { color: '#ffffff', style: 'outline', anim: 'fade', size: 10 } },
   pop: { name: 'ポップ', desc: 'スライドとズームでテンポよくつなぎます。写真は2秒ずつ表示します。', trans: i => i % 2 ? 'slide' : 'zoom', img: 2, text: { color: '#ffe14d', style: 'box', anim: 'pop', size: 11 } },
-  calm: { name: 'ゆったり', desc: '思い出の写真向け。ゆっくりフェードし、写真は4.5秒ずつ表示します。', trans: () => 'fade', first: 'fade', img: 4.5, text: { color: '#ffffff', style: 'plain', anim: 'slide', size: 9 } },
+  calm: { name: 'ゆったり', desc: '思い出の写真向け。ゆっくりフェードし、写真は4.5秒ずつ、少しずつズームしながら表示します。', trans: () => 'fade', first: 'fade', img: 4.5, motion: i => i % 2 ? 'out' : 'in', text: { color: '#ffffff', style: 'plain', anim: 'slide', size: 9 } },
   none: { name: '効果なし', desc: '切り替え効果をすべて外します。写真の長さは変えません。', trans: () => 'none', img: null, text: null },
 };
 let tplPick = 'simple';
@@ -3760,7 +3837,7 @@ function renderTemplates() {
 function applyTemplate() {
   const T = TEMPLATES[tplPick], title = $('tplTitle').value.trim();
   if (state.playing) pause();
-  state.clips.forEach((c, i) => { c.trans = i === 0 ? T.first || 'none' : T.trans(i); if (T.img && c.media.kind === 'image') c.dur = T.img; });
+  state.clips.forEach((c, i) => { c.trans = i === 0 ? T.first || 'none' : T.trans(i); if (T.img && c.media.kind === 'image') c.dur = T.img; if (c.media.kind === 'image') c.motion = T.motion ? T.motion(i) : 'none'; });
   state.texts = state.texts.filter(x => !x.tpl);
   if (T.text && title) state.texts.push({ id: uid++, text: title, start: 0.2, dur: Math.max(0.5, Math.min(3, total() - 0.2)), x: 0.5, y: 0.5, tpl: true, ...T.text });
   state.sel = null; $('tplOverlay').hidden = true; renderAll(); setTime(0);
@@ -3805,6 +3882,10 @@ function renderInspector() {
     box.appendChild(sliderRow('imgDur', '表示時間', 0.5, 15, c.dur, v => { c.dur = v; changed(clipStart(c)); return v; }));
   }
   box.appendChild(chipRow('切り替え', [['none', 'なし'], ['fade', 'フェード'], ['slide', 'スライド'], ['zoom', 'ズーム']], c.trans || 'none', v => { c.trans = v; if (state.playing) pause(); renderTimeline(); setTime(clipStart(c) + (v === 'none' ? 0 : 0.2)); }));
+  box.appendChild(chipRow('フィルター', FILTERS, c.filter || 'none', v => c.filter = v));
+  box.appendChild(sliderRow('fxBright', '明るさ', -50, 50, c.bright || 0, v => { c.bright = Math.round(v); drawPreview(); return c.bright; }, ''));
+  box.appendChild(sliderRow('fxContrast', 'コントラスト', -50, 50, c.contrast || 0, v => { c.contrast = Math.round(v); drawPreview(); return c.contrast; }, ''));
+  box.appendChild(chipRow('動き', MOTIONS, c.motion || 'none', v => { c.motion = v; if (state.playing) pause(); setTime(clipStart(c)); }));
   if (c.media.kind === 'video') box.appendChild(chipRow('音', [[false, 'あり'], [true, '消す']], !!c.mute, v => c.mute = v));
   const acts = document.createElement('div'); acts.className = 'actions';
   const idx = state.clips.indexOf(c);
@@ -3935,8 +4016,9 @@ async function runExport() {
     let hasSnap = false;
     const emit = async (idx, c, cStart, isLast) => {
       if (abortExport) throw new Error('abort');
-      composeBase(ex, W, H, cur, c, Math.max(0, idx / FPS - cStart), hasSnap ? snap : null);
-      if (isLast) { if (cur) draw(snap.getContext('2d'), W, H, ...cur); else draw(snap.getContext('2d'), W, H, null); hasSnap = true; }
+      const local = Math.max(0, idx / FPS - cStart), fr = cur && frameOf(c, local, cur[0], cur[1], cur[2], 1920);
+      composeBase(ex, W, H, fr, c, local, hasSnap ? snap : null);
+      if (isLast) { if (fr) draw(snap.getContext('2d'), W, H, ...fr); else draw(snap.getContext('2d'), W, H, null); hasSnap = true; }
       drawTexts(ex, W, H, idx / FPS, false);
       await vs.add(idx / FPS, 1 / FPS);
       if ((idx + 1) % FPS === 0) await addAudioUntil((idx + 1) / FPS);
@@ -3977,7 +4059,7 @@ async function runExport() {
     if (compat) notes.push('一部の動画は互換モードで読み取り');
     resultBlob = new Blob([output.target.buffer], { type: 'video/mp4' });
     const d = new Date(), p = n => String(n).padStart(2, '0');
-    resultName = 'tsunagi-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + '.mp4';
+    resultName = 'hanachan-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + '.mp4';
     const v = $('exVideo'); if (v.src) URL.revokeObjectURL(v.src); v.src = URL.createObjectURL(resultBlob);
     if (vcodec !== 'avc') notes.push('映像形式 ' + vcodec.toUpperCase());
     $('exInfo').textContent = [W + '×' + H, fmt(tot), (resultBlob.size / 1048576).toFixed(1) + 'MB', ...notes].join(' / ');
