@@ -13,7 +13,7 @@
   --bg:#12171d; --panel:#1a2129; --panel-2:#232c36; --line:#313c48;
   --fg:#e9eef2; --muted:#93a1ae;
   --accent:#f0b03c; --on-accent:#1c1404;
-  --clip-video:#2f8f8a; --clip-image:#7a6fc4; --on-clip:#ffffff;
+  --clip-video:#2f8f8a; --clip-image:#7a6fc4; --clip-text:#b0506e; --on-clip:#ffffff;
   --danger:#e8705f; --letterbox:#000;
   --ui:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP","Segoe UI",sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
@@ -23,7 +23,7 @@
   --bg:#eef1f3; --panel:#ffffff; --panel-2:#e3e8ec; --line:#c9d1d8;
   --fg:#18212a; --muted:#5b6975;
   --accent:#b97a08; --on-accent:#ffffff;
-  --clip-video:#23807b; --clip-image:#6a5fb8; --on-clip:#ffffff;
+  --clip-video:#23807b; --clip-image:#6a5fb8; --clip-text:#a4455f; --on-clip:#ffffff;
   --danger:#c2412f; --letterbox:#000;
 }}
 :root[data-theme="light"]{
@@ -31,7 +31,7 @@
   --bg:#eef1f3; --panel:#ffffff; --panel-2:#e3e8ec; --line:#c9d1d8;
   --fg:#18212a; --muted:#5b6975;
   --accent:#b97a08; --on-accent:#ffffff;
-  --clip-video:#23807b; --clip-image:#6a5fb8; --on-clip:#ffffff;
+  --clip-video:#23807b; --clip-image:#6a5fb8; --clip-text:#a4455f; --on-clip:#ffffff;
   --danger:#c2412f; --letterbox:#000;
 }
 html,body{height:100%}
@@ -51,7 +51,7 @@ svg{width:18px;height:18px;fill:currentColor;flex:none}
 .brand{font-weight:800;font-size:18px;letter-spacing:.08em;margin-right:auto}
 .brand small{font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.04em;margin-left:6px}
 .stage{flex:1;min-height:120px;display:flex;align-items:center;justify-content:center;padding:4px 16px;overflow:hidden}
-#preview{background:var(--letterbox);border-radius:6px;display:block}
+#preview{touch-action:none;background:var(--letterbox);border-radius:6px;display:block}
 .transport{display:flex;align-items:center;gap:8px;padding:8px 16px}
 #playBtn{min-width:92px}
 .tc{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;margin-right:auto}
@@ -70,7 +70,7 @@ svg{width:18px;height:18px;fill:currentColor;flex:none}
 .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);pointer-events:none;margin-left:-1px}
 .playhead::before{content:"";position:absolute;top:0;left:-5px;border:6px solid transparent;border-top:8px solid var(--accent)}
 
-.inspector{padding:10px 16px;min-height:150px;display:flex;flex-direction:column;gap:8px}
+.inspector{padding:10px 16px;min-height:150px;max-height:30%;overflow-y:auto;flex:none;display:flex;flex-direction:column;gap:8px}
 .inspector .hint{color:var(--muted);margin:auto 0}
 .insp-head{display:flex;gap:8px;align-items:baseline}
 .insp-head b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -81,7 +81,8 @@ input[type=range]{width:100%;accent-color:var(--accent);min-height:28px}
 .actions{display:flex;flex-wrap:wrap;gap:6px}
 .actions button{flex:1 1 auto;padding:0 10px}
 .footer{padding:4px 16px 12px}
-.footer button{width:100%;min-height:46px;font-weight:700}
+.footer{display:flex;gap:8px}
+.footer button{flex:1;min-height:46px;font-weight:700}
 
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
 .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(420px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px}
@@ -93,6 +94,16 @@ input[type=range]{width:100%;accent-color:var(--accent);min-height:28px}
 .sheet video{width:100%;max-height:45vh;background:var(--letterbox);border-radius:8px}
 progress{width:100%;height:10px;accent-color:var(--accent)}
 .toast{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));margin:0 auto;max-width:420px;background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;z-index:20;font-size:13px}
+
+.ttrack{position:relative;height:34px;margin-bottom:6px}
+.titem{position:absolute;top:0;height:100%;min-height:0;border:0;border-radius:6px;background:var(--clip-text);color:var(--on-clip);font-size:11px;padding:0 6px;justify-content:flex-start;overflow:hidden;box-shadow:inset 0 0 0 1px var(--panel)}
+.titem.sel{box-shadow:inset 0 0 0 3px var(--accent)}
+textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-size:16px;color:inherit;resize:none;flex:none}
+.chips{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.chips>span{width:4.5em;flex:none}
+.chips button{min-height:34px;padding:0 10px}
+.chips button.on{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.chips button.sw{width:34px;padding:0;border-radius:50%}
 </style>
 </head>
 <body>
@@ -120,6 +131,7 @@ progress{width:100%;height:10px;accent-color:var(--accent)}
     <div class="tl-inner" id="tlInner">
       <div class="ruler" id="ruler"></div>
       <div class="track" id="track"></div>
+      <div class="ttrack" id="ttrack"></div>
       <div class="playhead" id="playhead"></div>
     </div>
   </div>
@@ -127,7 +139,8 @@ progress{width:100%;height:10px;accent-color:var(--accent)}
   <div class="inspector" id="inspector"></div>
 
   <div class="footer">
-    <button id="addBtn">＋ 動画・写真を追加</button>
+    <button id="addBtn">＋ 動画・写真</button>
+    <button id="addTextBtn">＋ 文字</button>
     <input id="fileInput" type="file" accept="video/*,image/*" multiple hidden>
   </div>
 </div>
@@ -3307,7 +3320,7 @@ const ICON = {
   pause: '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
 };
 // Project data. Kept plain so later modes (templates, multi-track) can share it.
-const state = { aspect: '9:16', clips: [], sel: null, t: 0, playing: false, pps: 60 };
+const state = { aspect: '9:16', clips: [], texts: [], sel: null, t: 0, playing: false, pps: 60 };
 let uid = 1;
 
 const canvas = $('preview'), ctx = canvas.getContext('2d');
@@ -3344,6 +3357,7 @@ function draw(c2d, W, H, src, sw, sh, fit) {
 function drawPreview() {
   const loc = locate(state.t), m = loc && loc.clip.media;
   if (m) draw(ctx, canvas.width, canvas.height, m.el, m.w, m.h, loc.clip.fit); else draw(ctx, canvas.width, canvas.height, null);
+  drawTexts(ctx, canvas.width, canvas.height, state.t, true);
 }
 function fitCanvas() {
   const st = $('stage'), cs = getComputedStyle(st);
@@ -3354,6 +3368,115 @@ function fitCanvas() {
   canvas.style.height = Math.floor(canvas.height * sc) + 'px';
 }
 function applyAspect() { [canvas.width, canvas.height] = dims(720); fitCanvas(); drawPreview(); }
+
+/* ---------- text overlays ---------- */
+const TEXT_COLORS = ['#ffffff', '#ffe14d', '#ff5a5a', '#4dd9ff', '#ff8ad1', '#111111'];
+const TEXT_FONT = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif';
+const isText = x => state.texts.includes(x);
+const textOn = (x, t) => t >= x.start && t < x.start + x.dur;
+function layoutText(x, W, H, c2d) {
+  const px = x.size / 100 * Math.min(W, H);
+  c2d.font = '700 ' + px + 'px ' + TEXT_FONT;
+  const lines = x.text.split('\n'), lh = px * 1.3;
+  const w = Math.max(1, ...lines.map(l => c2d.measureText(l).width));
+  return { px, lines, lh, w, h: lines.length * lh, cx: x.x * W, cy: x.y * H };
+}
+function drawTexts(c2d, W, H, t, editing) {
+  for (const x of state.texts) {
+    if (!textOn(x, t) && !(editing && x === state.sel && !state.playing && t >= total() && t <= x.start + x.dur)) { continue; }
+    const L = layoutText(x, W, H, c2d), p = t - x.start, q = x.start + x.dur - t, k = clamp(p / 0.35, 0, 1);
+    let alpha = 1, sc = 1, dy = 0;
+    if (x.anim !== 'none') alpha = clamp(Math.min(p / 0.25, q / 0.25), 0, 1);
+    if (x.anim === 'pop') sc = 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2);
+    if (x.anim === 'slide') dy = Math.pow(1 - k, 3) * L.px * 0.9;
+    c2d.save();
+    c2d.globalAlpha = alpha; c2d.translate(L.cx, L.cy + dy); c2d.scale(sc, sc);
+    c2d.textAlign = 'center'; c2d.textBaseline = 'middle';
+    if (x.style === 'box') {
+      const pad = L.px * 0.35; c2d.fillStyle = 'rgba(0,0,0,.62)'; c2d.beginPath();
+      if (c2d.roundRect) c2d.roundRect(-L.w / 2 - pad, -L.h / 2 - pad * 0.5, L.w + pad * 2, L.h + pad, L.px * 0.25); else c2d.rect(-L.w / 2 - pad, -L.h / 2 - pad * 0.5, L.w + pad * 2, L.h + pad);
+      c2d.fill();
+    }
+    L.lines.forEach((line, i) => {
+      const y = -L.h / 2 + L.lh * (i + 0.5);
+      if (x.style === 'outline') { c2d.lineJoin = 'round'; c2d.lineWidth = L.px * 0.18; c2d.strokeStyle = x.color === '#111111' ? '#fff' : '#000'; c2d.strokeText(line, 0, y); }
+      if (x.style === 'plain') { c2d.shadowColor = 'rgba(0,0,0,.55)'; c2d.shadowBlur = L.px * 0.15; }
+      c2d.fillStyle = x.color; c2d.fillText(line, 0, y);
+    });
+    c2d.restore();
+    if (editing) {
+      x._box = [L.cx - L.w / 2, L.cy - L.h / 2, L.w, L.h];
+      if (x === state.sel && !state.playing) {
+        c2d.save(); c2d.strokeStyle = '#f0b03c'; c2d.lineWidth = 3; c2d.setLineDash([10, 8]);
+        c2d.strokeRect(x._box[0] - 12, x._box[1] - 8, L.w + 24, L.h + 16); c2d.restore();
+      }
+    }
+  }
+}
+function addText() {
+  if (state.playing) pause();
+  const tot = total(), start = clamp(state.t, 0, Math.max(0, tot - 0.5));
+  const x = { id: uid++, text: 'テキスト', start, dur: Math.max(0.5, Math.min(3, tot - start)), x: 0.5, y: 0.8, size: 8, color: '#ffffff', style: 'outline', anim: 'fade' };
+  state.texts.push(x); state.sel = x; renderAll(); setTime(start);
+  const ta = $('txtBody'); if (ta) { ta.focus(); ta.select(); }
+}
+function chipRow(label, opts, cur, pick, swatch) {
+  const row = document.createElement('div'); row.className = 'chips';
+  const s = document.createElement('span'); s.textContent = label; row.appendChild(s);
+  for (const [val, name] of opts) {
+    const b = document.createElement('button'); b.className = (swatch ? 'sw' : '') + (val === cur ? ' on' : '');
+    if (swatch) { b.style.background = val; b.setAttribute('aria-label', name); } else b.textContent = name;
+    b.onclick = () => { pick(val); renderInspector(); drawPreview(); };
+    row.appendChild(b);
+  }
+  return row;
+}
+function renderTextInspector(box, x) {
+  const tot = total();
+  const head = document.createElement('div'); head.className = 'insp-head';
+  const nm = document.createElement('b'); nm.textContent = '文字';
+  const du = document.createElement('span'); du.textContent = 'プレビュー上でドラッグして移動';
+  head.append(nm, du); box.appendChild(head);
+  const ta = document.createElement('textarea'); ta.id = 'txtBody'; ta.rows = 2; ta.value = x.text; ta.setAttribute('aria-label', '文字の内容');
+  ta.oninput = () => { x.text = ta.value; renderTimeline(); drawPreview(); };
+  box.appendChild(ta);
+  const moved = () => { if (state.playing) pause(); renderTimeline(); setTime(clamp(state.t, x.start, x.start + x.dur - 0.05)); };
+  box.appendChild(sliderRow('txtStart', '出る時間', 0, Math.max(0.1, tot - 0.1), x.start, v => { x.start = v; moved(); return v; }));
+  box.appendChild(sliderRow('txtDur', '表示時間', 0.3, Math.max(1, tot), x.dur, v => { x.dur = v; moved(); return v; }));
+  box.appendChild(sliderRow('txtSize', '大きさ', 3, 24, x.size, v => { x.size = v; drawPreview(); return v; }, ''));
+  box.appendChild(chipRow('色', TEXT_COLORS.map(c => [c, c]), x.color, v => x.color = v, true));
+  box.appendChild(chipRow('飾り', [['outline', '縁取り'], ['box', '帯'], ['plain', '影のみ']], x.style, v => x.style = v));
+  box.appendChild(chipRow('動き', [['none', 'なし'], ['fade', 'フェード'], ['pop', 'ポップ'], ['slide', 'スライド']], x.anim, v => { x.anim = v; setTime(x.start + 0.12); }));
+  const acts = document.createElement('div'); acts.className = 'actions';
+  const btn = (label, fn, cls) => { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; if (cls) b.className = cls; acts.appendChild(b); };
+  btn('複製', () => { const y = { ...x, id: uid++, y: clamp(x.y - 0.1, 0.05, 0.95) }; delete y._box; state.texts.push(y); state.sel = y; renderAll(); drawPreview(); });
+  btn('削除', () => { state.texts.splice(state.texts.indexOf(x), 1); state.sel = null; renderAll(); drawPreview(); }, 'danger');
+  box.appendChild(acts);
+}
+let textDrag = null;
+const canvasPoint = e => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * canvas.width, (e.clientY - r.top) / r.height * canvas.height]; };
+canvas.addEventListener('pointerdown', e => {
+  const [px, py] = canvasPoint(e); let hit = null;
+  for (const x of state.texts) {
+    if (!x._box || !(textOn(x, state.t) || x === state.sel)) continue;
+    const [bx, by, bw, bh] = x._box, m = 24;
+    if (px >= bx - m && px <= bx + bw + m && py >= by - m && py <= by + bh + m) hit = x;
+  }
+  if (!hit) return;
+  if (state.playing) pause();
+  if (state.sel !== hit) { state.sel = hit; renderAll(); }
+  canvas.setPointerCapture(e.pointerId);
+  textDrag = { x: hit, ox: hit.x - px / canvas.width, oy: hit.y - py / canvas.height }; drawPreview();
+});
+canvas.addEventListener('pointermove', e => {
+  if (!textDrag) return;
+  const [px, py] = canvasPoint(e);
+  let nx = clamp(px / canvas.width + textDrag.ox, 0.02, 0.98), ny = clamp(py / canvas.height + textDrag.oy, 0.02, 0.98);
+  if (Math.abs(nx - 0.5) < 0.02) nx = 0.5;
+  textDrag.x.x = nx; textDrag.x.y = ny; drawPreview();
+});
+canvas.addEventListener('pointerup', () => textDrag = null);
+canvas.addEventListener('pointercancel', () => textDrag = null);
 
 /* ---------- media ---------- */
 function seek(v, time, timeout = 3000) {
@@ -3482,8 +3605,17 @@ function renderTimeline() {
     if (c.media.thumb) b.style.backgroundImage = 'url(' + c.media.thumb + ')';
     b.setAttribute('aria-label', c.media.name + ' ' + fmt(c.dur));
     const s = document.createElement('span'); s.textContent = c.media.name; b.appendChild(s);
-    b.onclick = () => { state.sel = state.sel === c ? null : c; renderTimeline(); renderInspector(); };
+    b.onclick = () => { state.sel = state.sel === c ? null : c; renderAll(); drawPreview(); };
     track.appendChild(b);
+  }
+  const tt = $('ttrack'); tt.textContent = '';
+  for (const x of state.texts) {
+    const b = document.createElement('button');
+    b.className = 'titem' + (x === state.sel ? ' sel' : '');
+    b.style.left = x.start * pps + 'px'; b.style.width = Math.max(14, x.dur * pps) + 'px';
+    b.textContent = x.text.replace(/\n/g, ' ') || '(空)';
+    b.onclick = () => { state.sel = state.sel === x ? null : x; renderAll(); if (state.sel && !textOn(x, state.t)) setTime(x.start + 0.3); else drawPreview(); };
+    tt.appendChild(b);
   }
   updatePlayhead(false);
   $('exportBtn').disabled = !state.clips.length;
@@ -3491,17 +3623,18 @@ function renderTimeline() {
 function renderAll() { renderTimeline(); renderInspector(); }
 
 /* ---------- inspector ---------- */
-function sliderRow(id, label, min, max, val, onInput) {
+function sliderRow(id, label, min, max, val, onInput, unit = '秒') {
   const row = document.createElement('div'); row.className = 'slider';
   const lab = document.createElement('label'); lab.htmlFor = id; lab.textContent = label;
   const inp = document.createElement('input'); inp.type = 'range'; inp.id = id; inp.min = min; inp.max = max; inp.step = 0.05; inp.value = val;
-  const out = document.createElement('output'); out.textContent = (+val).toFixed(2) + '秒';
-  inp.oninput = () => { const v = onInput(+inp.value); inp.value = v; out.textContent = v.toFixed(2) + '秒'; };
+  const out = document.createElement('output'); out.textContent = (+val).toFixed(unit ? 2 : 1) + unit;
+  inp.oninput = () => { const v = onInput(+inp.value); inp.value = v; out.textContent = v.toFixed(unit ? 2 : 1) + unit; };
   row.append(lab, inp, out); return row;
 }
 function renderInspector() {
   const box = $('inspector'); box.textContent = '';
   const c = state.sel;
+  if (isText(c)) return renderTextInspector(box, c);
   if (!c || !state.clips.includes(c)) {
     state.sel = null;
     const p = document.createElement('div'); p.className = 'hint';
@@ -3642,8 +3775,11 @@ async function runExport() {
       for (let ch = 0; ch < audio.numberOfChannels; ch++) piece.copyToChannel(audio.getChannelData(ch).subarray(aPos, end), ch);
       aPos = end; await as.add(piece);
     };
+    let cur = null;
     const emit = async idx => {
       if (abortExport) throw new Error('abort');
+      if (cur) draw(ex, W, H, ...cur); else draw(ex, W, H, null);
+      drawTexts(ex, W, H, idx / FPS, false);
       await vs.add(idx / FPS, 1 / FPS);
       if ((idx + 1) % FPS === 0) await addAudioUntil((idx + 1) / FPS);
       if (idx % 5 === 0) { bar.value = idx / N; status('書き出し中 ' + Math.round(idx / N * 100) + '%'); await sleep(0); }
@@ -3655,24 +3791,24 @@ async function runExport() {
       let j = i;
       while (j < N && (last || j / FPS < loc.start + c.dur - 1e-6)) { times.push(c.in + clamp(j / FPS - loc.start, 0, c.dur)); j++; }
       if (!times.length) { times.push(c.in); j = i + 1; }
-      ex.fillStyle = '#000'; ex.fillRect(0, 0, W, H);
+      cur = null;
       const dec = m.kind === 'video' ? await openDecoder(m) : null;
       if (dec) {
         fast++;
         const sink = new MB.CanvasSink(dec.vt, { poolSize: 2 });
         let k = 0;
         for await (const wc of sink.canvasesAtTimestamps(times.map(s => s + dec.first))) {
-          if (wc) draw(ex, W, H, wc.canvas, wc.canvas.width, wc.canvas.height, c.fit);
+          if (wc) cur = [wc.canvas, wc.canvas.width, wc.canvas.height, c.fit];
           await emit(i + k); k++;
         }
       } else if (m.kind === 'video') {
         compat++;
         for (let k = 0; k < times.length; k++) {
           await seekFrame(m.el, Math.min(times[k], m.duration - 0.01));
-          draw(ex, W, H, m.el, m.w, m.h, c.fit); await emit(i + k);
+          cur = [m.el, m.w, m.h, c.fit]; await emit(i + k);
         }
       } else {
-        draw(ex, W, H, m.el, m.w, m.h, c.fit);
+        cur = [m.el, m.w, m.h, c.fit];
         for (let k = 0; k < times.length; k++) await emit(i + k);
       }
       i = j;
@@ -3717,6 +3853,7 @@ $('aspect').onchange = e => { state.aspect = e.target.value; applyAspect(); };
 $('zoomIn').onclick = () => { state.pps = Math.min(240, state.pps * 1.5); renderTimeline(); };
 $('zoomOut').onclick = () => { state.pps = Math.max(8, state.pps / 1.5); renderTimeline(); };
 $('addBtn').onclick = () => $('fileInput').click();
+$('addTextBtn').onclick = addText;
 $('fileInput').onchange = e => { const fs = [...e.target.files]; e.target.value = ''; addFiles(fs); };
 $('exportBtn').onclick = () => { if (state.playing) pause(); showStep('exSetup'); $('exportOverlay').hidden = false; };
 $('exCancel').onclick = $('exClose').onclick = () => { $('exVideo').pause(); $('exportOverlay').hidden = true; };
