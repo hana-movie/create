@@ -58,6 +58,18 @@ label.f{display:inline-flex;align-items:center;gap:4px;color:var(--mute);white-s
 #cropBar{position:absolute;z-index:6;display:flex;gap:4px;padding:5px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 3px 12px rgba(0,0,0,.3)}
 #selMenu{position:absolute;z-index:6;display:flex;flex-direction:column;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 3px 12px rgba(0,0,0,.3)}
 #selMenu .row{display:flex;border-bottom:1px solid var(--line);padding-bottom:3px;margin-bottom:3px}
+#cmPane{width:280px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
+#cmPane h4{margin:0;padding:6px 10px;font-size:13px;color:var(--ink);border-bottom:1px solid var(--line);display:flex;align-items:center}
+#cmList{flex:1;min-height:0;overflow-y:auto}
+.cm-pg{padding:8px 12px 4px;font-weight:600;font-size:12px;display:flex;border-top:1px solid var(--line)}
+.cm-pg:first-child{border-top:0}
+.cm{display:flex;gap:10px;padding:8px 12px;cursor:pointer;border-left:3px solid transparent}
+.cm:hover{background:#f3f4f6}
+.cm.on{background:#eef2f7;border-left-color:var(--acc)}
+.cm .av{flex:none;width:30px;height:30px;border-radius:50%;background:#b6bac2;color:#333;display:flex;align-items:center;justify-content:center;font:bold 15px serif}
+.cm .who{font-weight:600}
+.cm .when{font-size:11px;color:var(--mute)}
+.cm .body{white-space:pre-wrap;word-break:break-all;user-select:text;margin-top:2px}
 #stampPane{width:232px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
 #stampPane h4,.se-right h4{margin:0;padding:8px 10px;font-size:12px;color:var(--mute);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
 #stampGrid{flex:1;min-height:0;grid-auto-rows:max-content;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;align-content:start}
@@ -126,6 +138,7 @@ label.f{display:inline-flex;align-items:center;gap:4px;color:var(--mute);white-s
     <span class="sep"></span>
     <button data-act="ocr" title="スキャン PDF を文字認識して検索可能にする"><i data-ic="ocr"></i>OCR</button>
     <button data-act="extractText" title="ページの文字を取り出す"><i data-ic="text"></i>テキスト抽出</button>
+    <button data-act="comments" title="コメントの一覧を表示"><i data-ic="comment"></i>コメント</button>
     <span class="grow"></span>
     <input id="docName" type="text" style="width:200px" title="保存するファイル名" placeholder="ファイル名">
   </div>
@@ -166,6 +179,11 @@ label.f{display:inline-flex;align-items:center;gap:4px;color:var(--mute);white-s
         <p style="font-size:12px">ページ整理・結合・トリミング・注釈・テキスト編集・OCR・スタンプ<br>ファイルはブラウザの中だけで処理され、どこにも送信されません</p>
         <button class="primary" data-act="open">ファイルを開く</button>
       </div></div>
+    </div>
+    <div id="cmPane" hidden>
+      <h4><span id="cmCount">コメント</span><span class="grow"></span><button data-act="comments" title="閉じる"><i data-ic="close"></i></button></h4>
+      <div style="padding:6px 8px;border-bottom:1px solid var(--line)"><input id="cmFind" type="text" placeholder="コメントを検索" style="width:100%"></div>
+      <div id="cmList"></div>
     </div>
     <div id="stampPane" hidden>
       <h4>スタンプ<span class="grow"></span><button class="bd" data-act="newStamp" title="スタンプ作成ツールを開く"><i data-ic="plus"></i>作成</button></h4>
@@ -225,7 +243,7 @@ const IC = {
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13', copy: 'M8 8h12v12H8zM4 16V4h12',
   ocr: 'M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M8 9h8M8 12h8M8 15h5', extract: 'M6 3h9l4 4v14H6zM12 10v7M9 14l3 3 3-3',
   blank: 'M6 3h9l4 4v14H6zM12 11v6M9 14h6', front: 'M8 8h12v12H8zM4 4h8v2H6v6H4z', back: 'M4 4h12v12H4zM18 10h2v10H10v-2h8z',
-  close: 'M6 6l12 12M18 6L6 18', uline: 'M7 4v7a5 5 0 0 0 10 0V4M5 20h14', strike: 'M4 12h16M8 7c0-2 2-3 4-3s4 1 4 3M8 17c0 2 2 3 4 3s4-1 4-3',
+  close: 'M6 6l12 12M18 6L6 18', comment: 'M4 5h16v11H10l-5 4v-4H4z', uline: 'M7 4v7a5 5 0 0 0 10 0V4M5 20h14', strike: 'M4 12h16M8 7c0-2 2-3 4-3s4 1 4 3M8 17c0 2 2 3 4 3s4-1 4-3',
 };
 const icon = n => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${IC[n] || ''}"/></svg>`;
 
@@ -1181,6 +1199,32 @@ async function importComments(doc, pg) {
   return out;
 }
 
+/* ---------- コメント一覧 ---------- */
+function renderComments() {
+  const pane = $('#cmPane'); if (!pane || pane.hidden) return;
+  const q = $('#cmFind').value.trim().toLowerCase(), rows = []; let total = 0;
+  const day = s => { const d = s && pdfjsLib.PDFDateString.toDateObject(s); return d ? `${d.getMonth() + 1}月${d.getDate()}日` : ''; };
+  S.pages.forEach((p, pi) => {
+    const cs = p.annots.filter(a => a.cm); total += cs.length;
+    const hit = cs.filter(a => !q || (a.text + ' ' + (a.cm.author || '')).toLowerCase().includes(q)); if (!hit.length) return;
+    rows.push(el('div', { class: 'cm-pg' }, `ページ ${pi + 1}`, el('span', { class: 'grow' }), String(hit.length)));
+    for (const a of hit) rows.push(el('div', { class: 'cm' + (pi === S.cur && ed.sel.includes(a.id) ? ' on' : ''), title: 'クリックで移動 / ダブルクリックで編集 / 右クリックでプロパティ',
+      onclick: () => gotoComment(pi, a.id), ondblclick: () => { gotoComment(pi, a.id); const it = ed.get(a.id); if (it) ed.startEdit(it); },
+      oncontextmenu: e => { e.preventDefault(); gotoComment(pi, a.id); commentProps(a); } },
+      el('div', { class: 'av' }, 'T'), el('div', { style: 'min-width:0' }, el('div', { class: 'who' }, a.cm.author || '(作成者なし)'),
+        el('div', { class: 'when' }, a.text !== a.cm.orig ? '編集済み' : day(a.cm.modified || a.cm.created)), el('div', { class: 'body', style: `color:${a.fill || '#000'}` }, a.text))));
+  });
+  $('#cmCount').textContent = `${total} 件のコメント`;
+  if (!rows.length) rows.push(el('p', { class: 'note', style: 'padding:4px 12px' }, total ? '一致するコメントがありません。' : 'この文書にはテキストコメントがありません。'));
+  const list = $('#cmList'), top = list.scrollTop; list.replaceChildren(...rows); list.scrollTop = top;
+}
+function gotoComment(pi, id) {
+  if (pi !== S.cur) setCur(pi);
+  if (ed.tool !== 'select') ed.setTool('select');
+  ed.select([id]);
+  const a = ed.get(id), v = $('#view'); if (!a) return;
+  const y = Mx.pt(screenM(), a.x, a.y)[1]; if (y < v.scrollTop + 40 || y > v.scrollTop + v.clientHeight - 40) v.scrollTop = Math.max(0, y - v.clientHeight / 2);
+}
 function commentProps(o) {
   const fmt = s => { const d = s && pdfjsLib.PDFDateString.toDateObject(s); return d ? d.toLocaleString('ja-JP') : '—'; };
   const au = el('input', { type: 'text', value: o.cm.author || '' }), sj = el('input', { type: 'text', value: o.cm.subject || '' });
@@ -1592,9 +1636,10 @@ function chooseTool(t) {
 }
 function syncToolUI() {
   $$('#toolBtns button').forEach(b => b.classList.toggle('on', b.dataset.tool === ed.tool || (b.dataset.tool === 'stamp' && !$('#stampPane').hidden)));
+  $('#row1 [data-act=comments]').classList.toggle('on', !$('#cmPane').hidden);
 }
 function syncStyleUI() {
-  const it = ed.selected()[0], st = ed.style;
+  const it = ed.selected()[0], st = ed.style; renderComments();
   if (it?.cm && ed.sel.length === 1) setStatus(`コメント (作成者: ${it.cm.author || '不明'}) — ダブルクリックで編集 / 右クリックでプロパティ`);
   const isT = it?.type === 'text', fillOnly = it && !it.stroke && it.fill && !isT;
   const color = it ? (isT || fillOnly ? it.fill : it.stroke) : st.stroke;
@@ -1607,7 +1652,7 @@ function syncStyleUI() {
   else { $('#stSize').value = st.size; $('#stFont').value = st.font; $('#stBold').classList.toggle('on', !!st.bold); }
 }
 function updateUI() {
-  const n = S.pages.length;
+  const n = S.pages.length; renderComments();
   $('#pageNo').value = n ? S.cur + 1 : 0; $('#pageNo').max = n; $('#pageTotal').textContent = `/ ${n}`;
   $('[data-act=undo]').disabled = S.hi <= 0; $('[data-act=redo]').disabled = S.hi >= S.hist.length - 1;
   const z = $('#zoomSel'), pct = Math.round(S.scale / PT * 100);
@@ -1627,6 +1672,7 @@ const ACT = {
   front: () => ed.order(true), back: () => ed.order(false), delObj: () => ed.del(),
   rotl: () => rotatePages(-90), rotr: () => rotatePages(90), dupPage: dupPages, delPage: deletePages, blank: addBlank, extract: extractDialog, uncrop,
   newStamp: () => openStampEditor(null),
+  comments: () => { $('#cmPane').hidden = !$('#cmPane').hidden; renderComments(); renderMain(); syncToolUI(); },
 };
 function initUI() {
   $$('[data-ic]').forEach(i => { i.outerHTML = icon(i.dataset.ic); });
@@ -1648,6 +1694,7 @@ function initUI() {
   $('#stBold').onclick = () => { const b = !$('#stBold').classList.contains('on'); $('#stBold').classList.toggle('on', b); ed.applyStyle({ bold: b }); };
   $('#stOp').oninput = e => ed.applyStyle({ opacity: +e.target.value }, false);
   $('#stOp').onchange = e => ed.applyStyle({ opacity: +e.target.value });
+  $('#cmFind').oninput = renderComments;
   initThumbEvents();
   const view = $('#view');
   view.addEventListener('wheel', e => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); setZoom(S.scale * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); } }, { passive: false });
