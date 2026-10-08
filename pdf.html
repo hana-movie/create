@@ -1153,7 +1153,7 @@ async function addFiles(files, at) {
         for (let i = 0; i < pdf.numPages; i++) {
           const pg = await pdf.getPage(i + 1); doc.pg.push(pg);
           const rot = ((pg.rotate % 360) + 360) % 360, box = pg.view.slice();
-          added.push({ id: uid(), src: { doc, index: i }, box, box0: box, rot, rot0: rot, annots: await importComments(doc, pg), ocr: null });
+          added.push({ id: uid(), src: { doc, index: i }, box, box0: box, rot, rot0: rot, ...(await importComments(doc, pg)), ocr: null });
         }
       } else if (/^image\//.test(f.type)) {
         const src = await readDataURL(f), im = await loadImg(src);
@@ -1178,13 +1178,19 @@ async function addFiles(files, at) {
 /* 既存のテキスト注釈 (Acrobat の「テキストボックス」コメント) を編集できるオブジェクトとして取り込む。
    取り込んだものは pdf.js 側の描画から隠し、保存時に元の注釈と差し替える。 */
 async function importComments(doc, pg) {
-  const out = []; let anns = [];
-  try { anns = await pg.getAnnotations(); } catch (e) { return out; }
+  const out = [], ext = []; let anns = [];
+  try { anns = await pg.getAnnotations(); } catch (e) { return { annots: out, ext }; }
+  // 取り込めない種類 (スタンプ・ノート・既存ハイライトなど) も、一覧には出せるよう控えておく
+  const note = a => { if (EXT_TYPES[a.subtype] && a.rect && !a.inReplyTo) ext.push({ id: a.id, subtype: a.subtype, author: a.titleObj?.str || '', text: (a.contentsObj?.str || '').trim(), modified: a.modificationDate || a.creationDate || '', rect: a.rect.slice() }); };
   const hex = c => (c ? '#' + [...c].slice(0, 3).map(v => Math.round(v).toString(16).padStart(2, '0')).join('') : null);
   for (const a of anns) {
-    if (a.subtype !== 'FreeText' || !/^\d+R\d*$/.test(a.id) || !a.rect) continue;
+    if (a.subtype === 'Stamp' && /^\d+R\d*$/.test(a.id) && a.rect && a.hasAppearance) {
+      const o = await importStamp(doc, a).catch(e => { console.warn(e); return null; });
+      if (o) { out.push(o); doc.pdf.annotationStorage.setValue(a.id, { noView: true }); doc.imported.add(a.id); continue; }
+    }
+    if (a.subtype !== 'FreeText' || !/^\d+R\d*$/.test(a.id) || !a.rect) { note(a); continue; }
     const lines = a.textContent?.length ? a.textContent : (a.contentsObj?.str || '').split(/\r\n?|\n/), text = lines.join('\n').replace(/\s+$/, '');
-    if (!text.trim()) continue;
+    if (!text.trim()) { note(a); continue; }
     // 件名 (Acrobat の「タイトル」) などは pdf.js では取れないので、pdf-lib で注釈辞書を直接読む
     doc.libP ||= PDFLib.PDFDocument.load(doc.bytes, { ignoreEncryption: true, updateMetadata: false }).catch(() => null);
     const lib = await doc.libP, m = a.id.match(/^(\d+)R(\d*)$/); let dict = null;
@@ -1196,8 +1202,31 @@ async function importComments(doc, pg) {
     out.push(retext(o0, { text }));
     doc.pdf.annotationStorage.setValue(a.id, { noView: true }); doc.imported.add(a.id);
   }
-  return out;
+  return { annots: out, ext };
 }
+/* 既存のスタンプ注釈を、移動・コピーできる画像オブジェクトとして取り込む。
+   その注釈だけを載せた 1 ページの PDF を作り、透明な背景に描いて見た目を取り出す。 */
+async function importStamp(doc, a) {
+  const L = PDFLib;
+  doc.libP ||= L.PDFDocument.load(doc.bytes, { ignoreEncryption: true, updateMetadata: false }).catch(() => null);
+  const lib = await doc.libP, m = a.id.match(/^(\d+)R(\d*)$/), src = lib?.context.lookup(L.PDFRef.of(+m[1], +(m[2] || 0)));
+  if (!src?.get) return null;
+  const get = k => { try { const v = src.get(L.PDFName.of(k)); return v ? (v.decodeText ? v.decodeText() : String(v.asString?.() ?? '')) : ''; } catch (e) { return ''; } };
+  const [x1, y1, x2, y2] = a.rect, w = x2 - x1, h = y2 - y1; if (!(w > 1 && h > 1)) return null;
+  const clone = src.clone(lib.context); for (const k of ['P', 'Popup', 'IRT', 'Parent', 'StructParent']) clone.delete(L.PDFName.of(k));
+  const tmp = await L.PDFDocument.create(), pg = tmp.addPage([w, h]);
+  pg.setMediaBox(x1, y1, w, h); pg.node.addAnnot(tmp.context.register(L.PDFObjectCopier.for(lib.context, tmp.context).copy(clone)));
+  const pdf = await pdfjsLib.getDocument({ data: await tmp.save(), cMapUrl: CDN.cmaps, cMapPacked: true, standardFontDataUrl: CDN.stdFonts }).promise;
+  try {
+    const p = await pdf.getPage(1), k = Math.min(4, 1600 / Math.max(w, h)), vp = p.getViewport({ scale: k }), c = document.createElement('canvas');
+    c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+    await p.render({ canvasContext: c.getContext('2d'), viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
+    const url = c.toDataURL('image/png'); await loadImg(url);
+    return { id: uid(), type: 'image', x: (x1 + x2) / 2, y: -(y1 + y2) / 2, w, h, rot: 0, src: url, opacity: 1,
+      cm: { kind: 'Stamp', author: a.titleObj?.str || '', subject: get('Subj'), text: (a.contentsObj?.str || '').trim(), name: get('Name').replace(/^\//, ''), modified: a.modificationDate || '', created: a.creationDate || '' } };
+  } finally { pdf.destroy(); }
+}
+const EXT_TYPES = { Stamp: 'スタンプ', Text: 'ノート', FreeText: 'テキスト', Highlight: 'ハイライト', Underline: '下線', StrikeOut: '取り消し線', Squiggly: '波線', Square: '長方形', Circle: '楕円', Line: '線', Ink: '手書き', Polygon: '多角形', PolyLine: '折れ線', Caret: '挿入', FileAttachment: '添付ファイル' };
 
 /* ---------- コメント一覧 ---------- */
 function renderComments() {
@@ -1205,20 +1234,34 @@ function renderComments() {
   const q = $('#cmFind').value.trim().toLowerCase(), rows = []; let total = 0;
   const day = s => { const d = s && pdfjsLib.PDFDateString.toDateObject(s); return d ? `${d.getMonth() + 1}月${d.getDate()}日` : ''; };
   S.pages.forEach((p, pi) => {
-    const cs = p.annots.filter(a => a.cm); total += cs.length;
-    const hit = cs.filter(a => !q || (a.text + ' ' + (a.cm.author || '')).toLowerCase().includes(q)); if (!hit.length) return;
+    // Acrobat と同じく、ページ上の位置 (上から下、左から右) の順に並べる
+    const M = pageMatrix(p, 1), V = Mx.view(p.box, p.rot, 1), tl = pts => { const q2 = pts.map(c => Mx.pt(c[2] ? V : M, c[0], c[1])); return [Math.min(...q2.map(c => c[1])), Math.min(...q2.map(c => c[0]))]; };
+    const cs = [...p.annots.filter(a => a.cm).map(a => ({ a, pos: tl(bboxCorners(bboxOf(a))) })), ...(p.ext || []).map(x => ({ x, pos: tl([[x.rect[0], x.rect[1], 1], [x.rect[2], x.rect[3], 1]]) }))];
+    cs.sort((u, v) => (Math.abs(u.pos[0] - v.pos[0]) > 3 ? u.pos[0] - v.pos[0] : u.pos[1] - v.pos[1])); total += cs.length;
+    const hit = cs.filter(c => !q || ((c.a ? (c.a.text || c.a.cm.text || 'スタンプ') + ' ' + (c.a.cm.author || '') : c.x.text + ' ' + c.x.author + ' ' + EXT_TYPES[c.x.subtype])).toLowerCase().includes(q)); if (!hit.length) return;
     rows.push(el('div', { class: 'cm-pg' }, `ページ ${pi + 1}`, el('span', { class: 'grow' }), String(hit.length)));
-    for (const a of hit) rows.push(el('div', { class: 'cm' + (pi === S.cur && ed.sel.includes(a.id) ? ' on' : ''), title: 'クリックで移動 / ダブルクリックで編集 / 右クリックでプロパティ',
-      onclick: () => gotoComment(pi, a.id), ondblclick: () => { gotoComment(pi, a.id); const it = ed.get(a.id); if (it) ed.startEdit(it); },
+    for (const { a, x } of hit) if (x) rows.push(el('div', { class: 'cm' + (S.flash && S.flash.x === x ? ' on' : ''), title: 'クリックでその場所へ移動 (この種類は表示のみで、編集はできません)', onclick: () => gotoExt(pi, x) },
+      el('div', { class: 'av', html: x.subtype === 'Stamp' ? icon('stamp') : x.subtype === 'Text' ? icon('comment') : icon('highlight') }), el('div', { style: 'min-width:0' }, el('div', { class: 'who' }, x.author || '(作成者なし)'),
+        el('div', { class: 'when' }, day(x.modified)), el('div', { class: 'body', style: x.text ? '' : 'color:var(--mute)' }, x.text || (x.subtype === 'Stamp' ? 'スタンプを適用' : EXT_TYPES[x.subtype])))));
+    else rows.push(el('div', { class: 'cm' + (pi === S.cur && ed.sel.includes(a.id) ? ' on' : ''), title: 'クリックで移動 / ダブルクリックで編集 / 右クリックでプロパティ',
+      onclick: () => gotoComment(pi, a.id), ondblclick: () => { gotoComment(pi, a.id); const it = ed.get(a.id); if (it && it.type === 'text') ed.startEdit(it); },
       oncontextmenu: e => { e.preventDefault(); gotoComment(pi, a.id); commentProps(a); } },
-      el('div', { class: 'av' }, 'T'), el('div', { style: 'min-width:0' }, el('div', { class: 'who' }, a.cm.author || '(作成者なし)'),
-        el('div', { class: 'when' }, a.text !== a.cm.orig ? '編集済み' : day(a.cm.modified || a.cm.created)), el('div', { class: 'body', style: `color:${a.fill || '#000'}` }, a.text))));
+      a.type === 'text' ? el('div', { class: 'av' }, 'T') : el('div', { class: 'av', html: icon('stamp') }), el('div', { style: 'min-width:0' }, el('div', { class: 'who' }, a.cm.author || '(作成者なし)'),
+        el('div', { class: 'when' }, a.type === 'text' && a.text !== a.cm.orig ? '編集済み' : day(a.cm.modified || a.cm.created)),
+        a.type === 'text' ? el('div', { class: 'body', style: `color:${a.fill || '#000'}` }, a.text) : el('div', { class: 'body' }, a.cm.text || 'スタンプを適用'))));
   });
   $('#cmCount').textContent = `${total} 件のコメント`;
   if (!rows.length) rows.push(el('p', { class: 'note', style: 'padding:4px 12px' }, total ? '一致するコメントがありません。' : 'この文書にはテキストコメントがありません。'));
   const list = $('#cmList'), top = list.scrollTop; list.replaceChildren(...rows); list.scrollTop = top;
 }
+function gotoExt(pi, x) {
+  if (pi !== S.cur) setCur(pi);
+  ed.select([]); S.flash = { x }; renderComments(); ed.draw();
+  const v = $('#view'), y = Mx.pt(Mx.mul([1, 0, 0, 1, MG, MG], Mx.view(curPage().box, curPage().rot, S.scale)), x.rect[0], x.rect[3])[1];
+  if (y < v.scrollTop + 40 || y > v.scrollTop + v.clientHeight - 40) v.scrollTop = Math.max(0, y - v.clientHeight / 2);
+}
 function gotoComment(pi, id) {
+  S.flash = null;
   if (pi !== S.cur) setCur(pi);
   if (ed.tool !== 'select') ed.setTool('select');
   ed.select([id]);
@@ -1228,10 +1271,10 @@ function gotoComment(pi, id) {
 function commentProps(o) {
   const fmt = s => { const d = s && pdfjsLib.PDFDateString.toDateObject(s); return d ? d.toLocaleString('ja-JP') : '—'; };
   const au = el('input', { type: 'text', value: o.cm.author || '' }), sj = el('input', { type: 'text', value: o.cm.subject || '' });
-  const edited = o.text !== o.cm.orig;
+  const edited = o.type === 'text' && o.text !== o.cm.orig;
   openDialog('コメントのプロパティ', el('div', { class: 'form', style: 'min-width:340px' }, el('span', null, '作成者'), au, el('span', null, 'タイトル'), sj,
     el('span', null, '更新日'), el('span', null, edited ? '(編集済み — 保存時の日時になります)' : fmt(o.cm.modified)), el('span', null, '作成日'), el('span', null, fmt(o.cm.created)),
-    el('span', null, '種類'), el('span', null, o.cm.it === 'FreeTextTypewriter' ? 'タイプライター' : o.cm.it === 'FreeTextCallout' ? '引き出し線付きテキスト' : 'テキストボックス')), [
+    el('span', null, '種類'), el('span', null, o.cm.kind === 'Stamp' ? 'スタンプ' : o.cm.it === 'FreeTextTypewriter' ? 'タイプライター' : o.cm.it === 'FreeTextCallout' ? '引き出し線付きテキスト' : 'テキストボックス')), [
     { label: 'キャンセル' },
     { label: 'OK', primary: true, on: () => { if (au.value !== (o.cm.author || '') || sj.value !== (o.cm.subject || '')) ed.replace({ ...o, cm: { ...o.cm, author: au.value.trim(), subject: sj.value.trim() } }, true); } }]);
 }
@@ -1640,7 +1683,7 @@ function syncToolUI() {
 }
 function syncStyleUI() {
   const it = ed.selected()[0], st = ed.style; renderComments();
-  if (it?.cm && ed.sel.length === 1) setStatus(`コメント (作成者: ${it.cm.author || '不明'}) — ダブルクリックで編集 / 右クリックでプロパティ`);
+  if (it?.cm && ed.sel.length === 1) setStatus(it.type === 'text' ? `コメント (作成者: ${it.cm.author || '不明'}) — ダブルクリックで編集 / 右クリックでプロパティ` : `スタンプ (作成者: ${it.cm.author || '不明'}) — ドラッグで移動 / Ctrl+C・Ctrl+V で複製 / 右クリックでプロパティ`);
   const isT = it?.type === 'text', fillOnly = it && !it.stroke && it.fill && !isT;
   const color = it ? (isT || fillOnly ? it.fill : it.stroke) : st.stroke;
   if (color) $('#stColor').value = color;
@@ -1723,9 +1766,13 @@ function initEditor() {
     getItems: () => curPage()?.annots || [],
     setItems: items => { const p = curPage(); if (p) S.pages = S.pages.map(q => (q === p ? { ...p, annots: items } : q)); },
     commit, matrix: screenM, onSel: syncStyleUI, onTool: t => { S.tsel = null; hideSelMenu(); syncToolUI(t); },
-    emptyDown(p, ev) { hideSelMenu(); S.tsel = null; const h = locate(p, false); if (!h) return null; S.tsel = { a: h, b: h }; return textSelDrag; },
+    emptyDown(p, ev) { hideSelMenu(); S.tsel = null; if (S.flash) { S.flash = null; renderComments(); } const h = locate(p, false); if (!h) return null; S.tsel = { a: h, b: h }; return textSelDrag; },
     hoverCursor: p => (itemAt(p) >= 0 ? 'text' : null),
     overlay(ctx, M) {
+      if (S.flash && (curPage()?.ext || []).includes(S.flash.x)) {  // 一覧で選んだ「表示のみ」の注釈を枠で示す
+        const r = S.flash.x.rect, V = Mx.mul([1, 0, 0, 1, MG, MG], Mx.view(curPage().box, curPage().rot, S.scale)), a = Mx.pt(V, r[0], r[1]), b = Mx.pt(V, r[2], r[3]);
+        ctx.save(); ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2; ctx.setLineDash([5, 3]); ctx.strokeRect(Math.min(a[0], b[0]) - 3, Math.min(a[1], b[1]) - 3, Math.abs(a[0] - b[0]) + 6, Math.abs(a[1] - b[1]) + 6); ctx.restore();
+      }
       if (!S.tsel || ed.tool !== 'select') return;
       ctx.save(); ctx.fillStyle = 'rgba(37,99,235,.3)';
       for (const s of selSegs()) { const cs = bboxCorners(s.box).map(c => Mx.pt(M, c[0], c[1])); ctx.beginPath(); cs.forEach((c, k) => (k ? ctx.lineTo(c[0], c[1]) : ctx.moveTo(c[0], c[1]))); ctx.closePath(); ctx.fill(); }
@@ -1847,6 +1894,18 @@ async function drawOverlay(out, pg, p, font, imgs) {
     if (o.type === 'path') {
       paint(o, o.nodes, o.closed, true);
       if (o.arrow && o.stroke && o.nodes.length > 1) { const t = arrowHead(o); ops.push(L.setFillingRgbColor(...hexRgb(o.stroke)), L.moveTo(...t[0]), L.lineTo(...t[1]), L.lineTo(...t[2]), L.closePath(), L.fill()); }
+    } else if (o.type === 'image' && o.cm) {  // 取り込んだスタンプは、スタンプ注釈のまま書き戻す (回転は外観の中で表現)
+      const C = out.context, im = await embed(o.src), bb = aabbOf(o), W = bb.x1 - bb.x0, H = bb.y1 - bb.y0, c = Math.cos((o.rot || 0) * RAD), s = Math.sin((o.rot || 0) * RAD);
+      const form = C.register(C.formXObject([L.pushGraphicsState(), L.concatTransformationMatrix(1, 0, 0, 1, W / 2, H / 2), L.concatTransformationMatrix(c, -s, s, c, 0, 0), L.concatTransformationMatrix(o.w, 0, 0, o.h, -o.w / 2, -o.h / 2), L.drawObject('Im0'), L.popGraphicsState()],
+        { BBox: [0, 0, W, H], Resources: { XObject: { Im0: im.ref } } }));
+      const dict = { Type: 'Annot', Subtype: 'Stamp', Rect: [bb.x0, -bb.y1, bb.x1, -bb.y0], F: 4, M: o.cm.modified ? L.PDFString.of(o.cm.modified) : L.PDFString.fromDate(new Date()), AP: { N: form } };
+      if (o.cm.name) dict.Name = L.PDFName.of(o.cm.name);
+      if (o.cm.author) dict.T = L.PDFHexString.fromText(o.cm.author);
+      if (o.cm.subject) dict.Subj = L.PDFHexString.fromText(o.cm.subject);
+      if (o.cm.text) dict.Contents = L.PDFHexString.fromText(o.cm.text);
+      if (o.cm.created) dict.CreationDate = L.PDFString.of(o.cm.created);
+      if ((o.opacity ?? 1) < 1) dict.CA = o.opacity;
+      pg.node.addAnnot(C.register(C.obj(dict)));
     } else if (o.type === 'image') {
       frame(o.x, o.y, o.rot || 0); image(await embed(o.src), o.w, o.h);
     } else if (o.type === 'text') {
