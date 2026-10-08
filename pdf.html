@@ -1211,10 +1211,59 @@ async function importComments(doc, pg) {
     const d = a.defaultAppearanceData || {}, size = d.fontSize || 10, [x1, , , y2] = a.rect, pad = Math.max(1, a.borderStyle?.width || 0) + 1;
     const o0 = { id: uid(), type: 'text', text: '', x: x1 + pad, y: -y2 + pad + size * 0.6, rot: -(a.rotation || 0), size, font: FONTS[0][1], bold: false, fill: hex(d.fontColor) || '#000000', stroke: null, sw: 0,
       bg: hex(a.backgroundColor) || undefined, align: 'left', mode: 'h', ls: 0, sx: 1, sy: 1, opacity: 1, cm: { author: a.titleObj?.str || '', subject: get('Subj'), it: get('IT').replace(/^\//, ''), modified: a.modificationDate || '', created: a.creationDate || '', orig: text } };
-    out.push(retext(o0, { text }));
+    let o;
+    const lay = !a.rotation && dict ? await apTextLayout(lib, dict, a).catch(e => { console.warn(e); return null; }) : null;
+    if (lay) {  // 元の外観どおりのベースライン位置・行送り・文字サイズ・書体に合わせる
+      const s = lay.size, e0 = { ...o0, size: s, lh: lay.lh, font: lay.font, x: lay.x, y: -lay.y - ((lay.lh - 1) / 2 + 0.88) * s + lay.lh * s / 2, cm: { ...o0.cm, orig: lay.text } };
+      o = retext(e0, { text: lay.text });
+      const nat = layoutText(o).w; if (lay.w > 0 && nat > 0) { const k = clamp(lay.w / nat, 0.7, 1.4); if (Math.abs(k - 1) > 0.015) o = retext(o, { sx: k }); }
+    } else {
+      o = retext(o0, { text });
+      try { const st = JSON.parse(get('PEdStyle') || 'null'); if (st) o = retext(o, st); } catch (e) { /* ignore */ }  // このツールで保存したコメントは書式を復元
+    }
+    out.push(o);
     doc.pdf.annotationStorage.setValue(a.id, { noView: true }); doc.imported.add(a.id);
   }
   return { annots: out, ext };
+}
+function fontFromBase(n) {
+  n = (n || '').replace(/^\/?([A-Z]{6}\+)?/, '');
+  if (/gothic|ｺﾞｼｯｸ|ゴシック|kaku|heisei.*go|meiryo|yugo/i.test(n)) return /^ms-?gothic|^ＭＳ ?ゴシック/i.test(n) ? '"MS Gothic","ＭＳ ゴシック","Noto Sans Mono CJK JP",' + FONTS[0][1] : FONTS[0][1];
+  if (/mincho|明朝|ming|koz.*min|ryumin/i.test(n)) return /^ms-?mincho|^ＭＳ ?明朝/i.test(n) ? '"MS Mincho","ＭＳ 明朝",' + FONTS[1][1] : FONTS[1][1];
+  if (/courier|mono|consol/i.test(n)) return FONTS[6][1];
+  if (/times|serif|roman/i.test(n) && !/sans/i.test(n)) return FONTS[5][1];
+  if (/helv|arial/i.test(n)) return FONTS[4][1];
+  return FONTS[0][1];
+}
+/* テキスト注釈の外観 (AP) だけを 1 ページの PDF に描き、pdf.js で文字の正確な位置を読む */
+async function apTextLayout(lib, src, a) {
+  const L = PDFLib, nm = k => L.PDFName.of(k), ap = src.lookup(nm('AP')), n = ap?.lookup?.(nm('N'));
+  if (!n || !n.dict || !n.getContents) return null;
+  const nums = v => (v?.asArray ? v.asArray().map(x => x.asNumber()) : null);
+  const bb = nums(n.dict.lookup(nm('BBox'))); if (!bb) return null;
+  const M = nums(n.dict.lookup(nm('Matrix'))) || [1, 0, 0, 1, 0, 0], [x1, y1, x2, y2] = a.rect;
+  const cs = [[bb[0], bb[1]], [bb[2], bb[1]], [bb[2], bb[3]], [bb[0], bb[3]]].map(c => Mx.pt(M, c[0], c[1])), tx0 = Math.min(...cs.map(c => c[0])), tx1 = Math.max(...cs.map(c => c[0])), ty0 = Math.min(...cs.map(c => c[1])), ty1 = Math.max(...cs.map(c => c[1]));
+  if (!(tx1 > tx0) || !(ty1 > ty0)) return null;
+  const sx = (x2 - x1) / (tx1 - tx0), sy = (y2 - y1) / (ty1 - ty0), A = Mx.mul([sx, 0, 0, sy, x1 - tx0 * sx, y1 - ty0 * sy], M);
+  let base = '';
+  try { const fd = n.dict.lookup(nm('Resources'))?.lookup(nm('Font')); for (const [, v] of fd?.entries?.() || []) { const f = fd.context.lookup(v); base = String(f?.lookup?.(nm('BaseFont'))?.asString?.() || ''); if (base) break; } } catch (e) { /* ignore */ }
+  const tmp = await L.PDFDocument.create(), pg = tmp.addPage([x2 - x1, y2 - y1]); pg.setMediaBox(x1, y1, x2 - x1, y2 - y1);
+  const name = pg.node.newXObject('Fm', tmp.context.register(L.PDFObjectCopier.for(lib.context, tmp.context).copy(n)));
+  pg.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(...A), L.drawObject(name), L.popGraphicsState());
+  const pdf = await pdfjsLib.getDocument({ data: await tmp.save(), cMapUrl: CDN.cmaps, cMapPacked: true, standardFontDataUrl: CDN.stdFonts }).promise;
+  try {
+    const tc = await (await pdf.getPage(1)).getTextContent(), its = tc.items.filter(i => i.str && i.str.trim());
+    if (!its.length || its.some(i => Math.abs(i.transform[1]) > 0.01 || i.transform[0] <= 0)) return null;
+    const size = Math.max(...its.map(i => Math.hypot(i.transform[2], i.transform[3]))), rows = [];
+    for (const i of tc.items.filter(i => i.str)) { const y = i.transform[5]; let r = rows.find(q => Math.abs(q.y - y) < size * 0.4); if (!r) rows.push(r = { y, its: [] }); r.its.push(i); }
+    rows.sort((p, q) => q.y - p.y);
+    const lines = rows.map(r => { r.its.sort((p, q) => p.transform[4] - q.transform[4]); const x0 = r.its[0].transform[4], last = r.its[r.its.length - 1]; return { s: r.its.map(i => i.str).join('').replace(/\s+$/, ''), x: x0, w: last.transform[4] + last.width - x0, y: r.y }; }).filter(l => l.s.trim());
+    if (!lines.length) return null;
+    const lh = lines.length > 1 ? clamp((lines[0].y - lines[lines.length - 1].y) / (lines.length - 1) / size, 0.8, 3) : 1.2;
+    if (!base) { const fam = tc.styles[its[0].fontName]?.fontFamily || ''; base = /mono/.test(fam) ? 'Courier' : /serif/.test(fam) && !/sans/.test(fam) ? 'Times' : ''; }
+    const wide = lines.reduce((p, q) => (q.w > p.w ? q : p));
+    return { text: lines.map(l => l.s).join('\n'), size, lh, x: Math.min(...lines.map(l => l.x)), y: lines[0].y, w: wide.w, font: fontFromBase(base) };
+  } finally { pdf.destroy(); }
 }
 /* 既存のスタンプ注釈を、移動・コピーできる画像オブジェクトとして取り込む。
    その注釈だけを載せた 1 ページの PDF を作り、透明な背景に描いて見た目を取り出す。 */
@@ -1958,6 +2007,7 @@ async function drawOverlay(out, pg, p, font, imgs) {
             DA: L.PDFString.of(`${round2(r)} ${round2(g)} ${round2(bl)} rg /Helv ${round2(o.size * sy)} Tf`), F: 4, Border: [0, 0, 0], M: o.cm.modified && o.text === o.cm.orig ? L.PDFString.of(o.cm.modified) : L.PDFString.fromDate(new Date()), AP: { N: form } };
           if (o.cm.subject) dict.Subj = L.PDFHexString.fromText(o.cm.subject);
           if (o.cm.it) dict.IT = L.PDFName.of(o.cm.it);
+          dict.PEdStyle = L.PDFHexString.fromText(JSON.stringify({ font: o.font, lh: o.lh || 1.2, sx, sy, bold: !!o.bold }));  // 開き直したときに書式を復元するための控え
           if (o.cm.created) dict.CreationDate = L.PDFString.of(o.cm.created);
           if (o.cm.author) dict.T = L.PDFHexString.fromText(o.cm.author);
           if ((o.opacity ?? 1) < 1) dict.CA = o.opacity;
