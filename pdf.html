@@ -124,6 +124,7 @@ label.f{display:inline-flex;align-items:center;gap:4px;color:var(--mute);white-s
     <button data-act="open" title="PDF・画像を開く (Ctrl+O)"><i data-ic="open"></i>開く</button>
     <button data-act="add" title="別の PDF や画像を末尾に追加して結合"><i data-ic="plus"></i>結合・追加</button>
     <button data-act="save" class="primary" title="編集結果を PDF として保存 (Ctrl+S)"><i data-ic="save"></i>保存</button>
+    <button data-act="print" title="編集結果を印刷 (Ctrl+P)"><i data-ic="print"></i>印刷</button>
     <span class="sep"></span>
     <button data-act="undo" title="元に戻す (Ctrl+Z)"><i data-ic="undo"></i></button>
     <button data-act="redo" title="やり直す (Ctrl+Y)"><i data-ic="redo"></i></button>
@@ -243,7 +244,7 @@ const IC = {
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13', copy: 'M8 8h12v12H8zM4 16V4h12',
   ocr: 'M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M8 9h8M8 12h8M8 15h5', extract: 'M6 3h9l4 4v14H6zM12 10v7M9 14l3 3 3-3',
   blank: 'M6 3h9l4 4v14H6zM12 11v6M9 14h6', front: 'M8 8h12v12H8zM4 4h8v2H6v6H4z', back: 'M4 4h12v12H4zM18 10h2v10H10v-2h8z',
-  close: 'M6 6l12 12M18 6L6 18', comment: 'M4 5h16v11H10l-5 4v-4H4z', uline: 'M7 4v7a5 5 0 0 0 10 0V4M5 20h14', strike: 'M4 12h16M8 7c0-2 2-3 4-3s4 1 4 3M8 17c0 2 2 3 4 3s4-1 4-3',
+  close: 'M6 6l12 12M18 6L6 18', print: 'M7 9V4h10v5M7 17H4v-7h16v7h-3M7 14h10v6H7z', comment: 'M4 5h16v11H10l-5 4v-4H4z', uline: 'M7 4v7a5 5 0 0 0 10 0V4M5 20h14', strike: 'M4 12h16M8 7c0-2 2-3 4-3s4 1 4 3M8 17c0 2 2 3 4 3s4-1 4-3',
 };
 const icon = n => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${IC[n] || ''}"/></svg>`;
 
@@ -1553,6 +1554,21 @@ async function savePdf(pages, name) {
   finally { busy(null); }
 }
 
+/* 印刷: 保存と同じ内容の PDF を作り、見えない枠に読み込んでブラウザの印刷画面を出す */
+async function printPdf() {
+  if (!S.pages.length) { toast('先に PDF を開いてください'); return; }
+  ed.commitText(); busy('印刷の準備中…');
+  try {
+    const bytes = await buildPdf(S.pages, (i, n) => busy(`印刷の準備中… ${i}/${n}`, i / n)), url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    $('#printFrame')?.remove();
+    const fr = el('iframe', { id: 'printFrame', style: 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0' });
+    let done = false; const fallback = () => { if (done) return; done = true; window.open(url, '_blank') || toast('印刷画面を開けませんでした。「保存」した PDF を印刷してください', 6000); };
+    fr.onload = () => setTimeout(() => { if (done) return; try { fr.contentWindow.focus(); fr.contentWindow.print(); done = true; } catch (e) { fallback(); } }, 400);
+    fr.src = url; document.body.append(fr); setTimeout(fallback, 8000);
+  } catch (e) { console.error(e); toast('印刷の準備に失敗しました: ' + (e.message || e), 6000); }
+  finally { busy(null); }
+}
+
 /* ---------- トリミング ---------- */
 const cropTool = {
   cursor: 'crosshair',
@@ -1793,6 +1809,7 @@ const ACT = {
   open: async () => { if (S.dirty && S.pages.length && !confirm('編集中の内容を閉じて新しく開きますか？\n(「結合・追加」なら今の文書に追加できます)')) return; const fs = await pickFiles('application/pdf,image/*', true); if (!fs.length) return; S.pages = []; S.hist = []; S.hi = -1; S.cur = 0; thumbCache.clear(); await addFiles(fs); },
   add: async () => addFiles(await pickFiles('application/pdf,image/*', true)),
   save: () => savePdf(S.pages, docName() + (S.hist.length > 1 ? '_edited' : '') + '.pdf').then(ok => { if (ok) S.dirty = false; }),
+  print: printPdf,
   undo: () => restore(S.hi - 1), redo: () => restore(S.hi + 1),
   zoomin: () => setZoom(S.scale * 1.2), zoomout: () => setZoom(S.scale / 1.2),
   prev: () => setCur(S.cur - 1), next: () => setCur(S.cur + 1),
@@ -1847,6 +1864,7 @@ function initUI() {
     if (SE.open) { if (seKey(e)) e.preventDefault(); return; }
     if (mod && k === 's') { e.preventDefault(); ACT.save(); return; }
     if (mod && k === 'o') { e.preventDefault(); ACT.open(); return; }
+    if (mod && k === 'p') { e.preventDefault(); printPdf(); return; }
     if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? ACT.redo() : ACT.undo(); return; }
     if (mod && k === 'y') { e.preventDefault(); ACT.redo(); return; }
     if (mod && k === 'c' && S.tsel) { e.preventDefault(); copySel(); return; }
