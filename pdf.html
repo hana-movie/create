@@ -1261,7 +1261,7 @@ async function apTextLayout(lib, src, a) {
   const M = nums(n.dict.lookup(nm('Matrix'))) || [1, 0, 0, 1, 0, 0], [x1, y1, x2, y2] = a.rect;
   const cs = [[bb[0], bb[1]], [bb[2], bb[1]], [bb[2], bb[3]], [bb[0], bb[3]]].map(c => Mx.pt(M, c[0], c[1])), tx0 = Math.min(...cs.map(c => c[0])), tx1 = Math.max(...cs.map(c => c[0])), ty0 = Math.min(...cs.map(c => c[1])), ty1 = Math.max(...cs.map(c => c[1]));
   if (!(tx1 > tx0) || !(ty1 > ty0)) return null;
-  const sx = (x2 - x1) / (tx1 - tx0), sy = (y2 - y1) / (ty1 - ty0), A = Mx.mul([sx, 0, 0, sy, x1 - tx0 * sx, y1 - ty0 * sy], M);
+  const sx = (x2 - x1) / (tx1 - tx0), sy = (y2 - y1) / (ty1 - ty0), A = [sx, 0, 0, sy, x1 - tx0 * sx, y1 - ty0 * sy];  // フォーム自身の Matrix は Do のときに自動で掛かる
   let base = '';
   let fixed = false;
   try { const fd = n.dict.lookup(nm('Resources'))?.lookup(nm('Font')); for (const [, v] of fd?.entries?.() || []) {
