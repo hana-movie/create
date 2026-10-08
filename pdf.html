@@ -1752,7 +1752,18 @@ function initUI() {
   $('#cmFind').oninput = renderComments;
   initThumbEvents();
   const view = $('#view');
-  view.addEventListener('wheel', e => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); setZoom(S.scale * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); } }, { passive: false });
+  let wheelAt = 0;
+  view.addEventListener('wheel', e => {
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); setZoom(S.scale * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); return; }
+    // ページの端まで来てさらに回したら、次 / 前のページへ (Acrobat と同じ)
+    if (!S.pages.length || e.shiftKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX) || ed.editing || ed.drag) return;
+    const down = e.deltaY > 0, atEnd = down ? view.scrollTop + view.clientHeight >= view.scrollHeight - 1 : view.scrollTop <= 0;
+    if (!atEnd) { wheelAt = Date.now(); return; }  // スクロール中の勢いでページが飛ばないよう、端に着いてから少し待つ
+    e.preventDefault();
+    if (Date.now() - wheelAt < 280) return;
+    const to = S.cur + (down ? 1 : -1); if (to < 0 || to >= S.pages.length) return;
+    wheelAt = Date.now(); setCur(to); view.scrollTop = down ? 0 : view.scrollHeight;
+  }, { passive: false });
   new ResizeObserver(() => { if (S.fit && curPage()) renderMain(); else ed.draw(); }).observe(view);
   window.addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
   window.addEventListener('drop', e => { if (e.dataTransfer.files.length) { e.preventDefault(); if (!SE.open) addFiles([...e.dataTransfer.files]); } });
