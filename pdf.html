@@ -1131,11 +1131,11 @@ async function addFiles(files, at) {
         let pdf;
         try { pdf = await pdfjsLib.getDocument({ data: bytes.slice(), cMapUrl: CDN.cmaps, cMapPacked: true, standardFontDataUrl: CDN.stdFonts }).promise; }
         catch (e) { toast(e && e.name === 'PasswordException' ? `${f.name}: パスワード付き PDF は開けません` : `${f.name}: PDF を読み込めません`); continue; }
-        const doc = { bytes, pdf, name: f.name, pg: [] };
+        const doc = { bytes, pdf, name: f.name, pg: [], imported: new Set() };
         for (let i = 0; i < pdf.numPages; i++) {
           const pg = await pdf.getPage(i + 1); doc.pg.push(pg);
           const rot = ((pg.rotate % 360) + 360) % 360, box = pg.view.slice();
-          added.push({ id: uid(), src: { doc, index: i }, box, box0: box, rot, rot0: rot, annots: [], ocr: null });
+          added.push({ id: uid(), src: { doc, index: i }, box, box0: box, rot, rot0: rot, annots: await importComments(doc, pg), ocr: null });
         }
       } else if (/^image\//.test(f.type)) {
         const src = await readDataURL(f), im = await loadImg(src);
@@ -1157,6 +1157,25 @@ async function addFiles(files, at) {
   toast(`${added.length} ページを${first ? '読み込みました' : '追加しました'}`);
 }
 
+/* 既存のテキスト注釈 (Acrobat の「テキストボックス」コメント) を編集できるオブジェクトとして取り込む。
+   取り込んだものは pdf.js 側の描画から隠し、保存時に元の注釈と差し替える。 */
+async function importComments(doc, pg) {
+  const out = []; let anns = [];
+  try { anns = await pg.getAnnotations(); } catch (e) { return out; }
+  const hex = c => (c ? '#' + [...c].slice(0, 3).map(v => Math.round(v).toString(16).padStart(2, '0')).join('') : null);
+  for (const a of anns) {
+    if (a.subtype !== 'FreeText' || !/^\d+R\d*$/.test(a.id) || !a.rect) continue;
+    const lines = a.textContent?.length ? a.textContent : (a.contentsObj?.str || '').split(/\r\n?|\n/), text = lines.join('\n').replace(/\s+$/, '');
+    if (!text.trim()) continue;
+    const d = a.defaultAppearanceData || {}, size = d.fontSize || 10, [x1, , , y2] = a.rect, pad = Math.max(1, a.borderStyle?.width || 0) + 1;
+    const o0 = { id: uid(), type: 'text', text: '', x: x1 + pad, y: -y2 + pad + size * 0.6, rot: -(a.rotation || 0), size, font: FONTS[0][1], bold: false, fill: hex(d.fontColor) || '#000000', stroke: null, sw: 0,
+      bg: hex(a.backgroundColor) || undefined, align: 'left', mode: 'h', ls: 0, sx: 1, sy: 1, opacity: 1, cm: { author: a.titleObj?.str || '' } };
+    out.push(retext(o0, { text }));
+    doc.pdf.annotationStorage.setValue(a.id, { noView: true }); doc.imported.add(a.id);
+  }
+  return out;
+}
+
 /* ---------- レンダリング ---------- */
 async function renderPage(p, s) {
   const [vw, vh] = viewSize(p), c = document.createElement('canvas');
@@ -1165,7 +1184,7 @@ async function renderPage(p, s) {
   if (p.src) {
     const pg = p.src.doc.pg[p.src.index], base = pg.getViewport({ scale: 1 });
     const vp = new base.constructor({ viewBox: p.box, scale: s, rotation: p.rot, offsetX: 0, offsetY: 0 });
-    await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+    await pg.render({ canvasContext: ctx, viewport: vp, annotationMode: 3 /* ENABLE_STORAGE: 取り込み済みコメントを隠す */ }).promise;
   }
   return c;
 }
@@ -1686,6 +1705,10 @@ async function buildPdf(pages, onProg) {
   for (const [doc, at] of byDoc) {
     const lib = await L.PDFDocument.load(doc.bytes, { ignoreEncryption: true, updateMetadata: false });
     if (lib.isEncrypted) throw new Error(`${doc.name} は暗号化されているため保存できません`);
+    if (doc.imported?.size) for (const idx of new Set(at.map(i => pages[i].src.index))) {  // 取り込んだコメントの元の注釈を外す
+      const arr = lib.getPage(idx).node.Annots(); if (!arr) continue;
+      for (let k = arr.size() - 1; k >= 0; k--) { const r = arr.get(k); if (r instanceof L.PDFRef && doc.imported.has(`${r.objectNumber}R${r.generationNumber || ''}`)) arr.remove(k); }
+    }
     let rest = at;
     while (rest.length) {
       const seen = new Set(), now = [], later = [];
@@ -1765,7 +1788,20 @@ async function drawOverlay(out, pg, p, font, imgs) {
         c.width = Math.max(1, Math.ceil(b.w * k)); c.height = Math.max(1, Math.ceil(b.h * k));
         const ctx = c.getContext('2d'); ctx.scale(c.width / b.w, c.height / b.h); ctx.translate(b.w / 2, b.h / 2);
         drawItem(ctx, { ...o, x: 0, y: 0, rot: 0, opacity: 1 });
-        const sx = o.sx || 1, sy = o.sy || 1; frame(o.x, o.y, o.rot || 0);
+        const sx = o.sx || 1, sy = o.sy || 1;
+        if (o.cm && !(((o.rot || 0) % 360 + 360) % 360)) {  // 取り込んだコメントは、コメント (FreeText 注釈) のまま書き戻す
+          const C = out.context, im = await out.embedPng(c.toDataURL('image/png')), [r, g, bl] = hexRgb(o.fill || '#000000');
+          const helv = C.obj({ Type: 'Font', Subtype: 'Type1', BaseFont: 'Helvetica', Encoding: 'WinAnsiEncoding' });
+          const form = C.register(C.formXObject([L.pushGraphicsState(), L.concatTransformationMatrix(b.w, 0, 0, b.h, 0, 0), L.drawObject('Im0'), L.popGraphicsState(),
+            L.beginText(), L.setFontAndSize('Helv', round2(o.size * sy)), L.setFillingRgbColor(r, g, bl), L.endText()], { BBox: [-2, -2, b.w + 2, b.h + 2], Resources: { XObject: { Im0: im.ref }, Font: { Helv: helv } } }));
+          const dict = { Type: 'Annot', Subtype: 'FreeText', Rect: [b.cx - b.w / 2 - 2, -(b.cy + b.h / 2) - 2, b.cx + b.w / 2 + 2, -(b.cy - b.h / 2) + 2], Contents: L.PDFHexString.fromText(expandTokens(o.text)),
+            DA: L.PDFString.of(`${round2(r)} ${round2(g)} ${round2(bl)} rg /Helv ${round2(o.size * sy)} Tf`), F: 4, Border: [0, 0, 0], M: L.PDFString.fromDate(new Date()), AP: { N: form } };
+          if (o.cm.author) dict.T = L.PDFHexString.fromText(o.cm.author);
+          if ((o.opacity ?? 1) < 1) dict.CA = o.opacity;
+          pg.node.addAnnot(C.register(C.obj(dict)));
+          ops.push(L.popGraphicsState()); continue;
+        }
+        frame(o.x, o.y, o.rot || 0);
         if (o.bg) { const pd = o.size * 0.12; ops.push(L.setFillingRgbColor(...hexRgb(o.bg)), L.rectangle(-b.w / 2 - pd / 2 * sx, -b.h / 2 - pd * sy, b.w + pd * sx, b.h + pd * 2 * sy), L.fill()); }
         image(await out.embedPng(c.toDataURL('image/png')), b.w, b.h);
         if (lay.lines.length) for (const ln of lay.lines) hidden(expandTokens(ln.s), ln.x * sx, ln.y * sy, o.size * sy, ln.w * sx);
