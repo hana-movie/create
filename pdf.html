@@ -1167,13 +1167,29 @@ async function importComments(doc, pg) {
     if (a.subtype !== 'FreeText' || !/^\d+R\d*$/.test(a.id) || !a.rect) continue;
     const lines = a.textContent?.length ? a.textContent : (a.contentsObj?.str || '').split(/\r\n?|\n/), text = lines.join('\n').replace(/\s+$/, '');
     if (!text.trim()) continue;
+    // 件名 (Acrobat の「タイトル」) などは pdf.js では取れないので、pdf-lib で注釈辞書を直接読む
+    doc.libP ||= PDFLib.PDFDocument.load(doc.bytes, { ignoreEncryption: true, updateMetadata: false }).catch(() => null);
+    const lib = await doc.libP, m = a.id.match(/^(\d+)R(\d*)$/); let dict = null;
+    try { dict = lib?.context.lookup(PDFLib.PDFRef.of(+m[1], +(m[2] || 0))); } catch (e) { /* ignore */ }
+    const get = k => { try { const v = dict?.get?.(PDFLib.PDFName.of(k)); return v ? (v.decodeText ? v.decodeText() : String(v.asString?.() ?? '')) : ''; } catch (e) { return ''; } };
     const d = a.defaultAppearanceData || {}, size = d.fontSize || 10, [x1, , , y2] = a.rect, pad = Math.max(1, a.borderStyle?.width || 0) + 1;
     const o0 = { id: uid(), type: 'text', text: '', x: x1 + pad, y: -y2 + pad + size * 0.6, rot: -(a.rotation || 0), size, font: FONTS[0][1], bold: false, fill: hex(d.fontColor) || '#000000', stroke: null, sw: 0,
-      bg: hex(a.backgroundColor) || undefined, align: 'left', mode: 'h', ls: 0, sx: 1, sy: 1, opacity: 1, cm: { author: a.titleObj?.str || '' } };
+      bg: hex(a.backgroundColor) || undefined, align: 'left', mode: 'h', ls: 0, sx: 1, sy: 1, opacity: 1, cm: { author: a.titleObj?.str || '', subject: get('Subj'), it: get('IT').replace(/^\//, ''), modified: a.modificationDate || '', created: a.creationDate || '', orig: text } };
     out.push(retext(o0, { text }));
     doc.pdf.annotationStorage.setValue(a.id, { noView: true }); doc.imported.add(a.id);
   }
   return out;
+}
+
+function commentProps(o) {
+  const fmt = s => { const d = s && pdfjsLib.PDFDateString.toDateObject(s); return d ? d.toLocaleString('ja-JP') : '—'; };
+  const au = el('input', { type: 'text', value: o.cm.author || '' }), sj = el('input', { type: 'text', value: o.cm.subject || '' });
+  const edited = o.text !== o.cm.orig;
+  openDialog('コメントのプロパティ', el('div', { class: 'form', style: 'min-width:340px' }, el('span', null, '作成者'), au, el('span', null, 'タイトル'), sj,
+    el('span', null, '更新日'), el('span', null, edited ? '(編集済み — 保存時の日時になります)' : fmt(o.cm.modified)), el('span', null, '作成日'), el('span', null, fmt(o.cm.created)),
+    el('span', null, '種類'), el('span', null, o.cm.it === 'FreeTextTypewriter' ? 'タイプライター' : o.cm.it === 'FreeTextCallout' ? '引き出し線付きテキスト' : 'テキストボックス')), [
+    { label: 'キャンセル' },
+    { label: 'OK', primary: true, on: () => { if (au.value !== (o.cm.author || '') || sj.value !== (o.cm.subject || '')) ed.replace({ ...o, cm: { ...o.cm, author: au.value.trim(), subject: sj.value.trim() } }, true); } }]);
 }
 
 /* ---------- レンダリング ---------- */
@@ -1579,6 +1595,7 @@ function syncToolUI() {
 }
 function syncStyleUI() {
   const it = ed.selected()[0], st = ed.style;
+  if (it?.cm && ed.sel.length === 1) setStatus(`コメント (作成者: ${it.cm.author || '不明'}) — ダブルクリックで編集 / 右クリックでプロパティ`);
   const isT = it?.type === 'text', fillOnly = it && !it.stroke && it.fill && !isT;
   const color = it ? (isT || fillOnly ? it.fill : it.stroke) : st.stroke;
   if (color) $('#stColor').value = color;
@@ -1668,6 +1685,10 @@ function initEditor() {
       ctx.restore();
     },
     customTools: { crop: cropTool, edittext: editTextTool },
+  });
+  $('#ovc').addEventListener('contextmenu', e => {
+    const it = ed.pick(ed.pos(e)); if (!it?.cm) return;
+    e.preventDefault(); ed.select([it.id]); commentProps(it);
   });
   redrawAll = () => { ed.draw(); if (SE.open) SE.ed.draw(); };
 }
@@ -1795,7 +1816,10 @@ async function drawOverlay(out, pg, p, font, imgs) {
           const form = C.register(C.formXObject([L.pushGraphicsState(), L.concatTransformationMatrix(b.w, 0, 0, b.h, 0, 0), L.drawObject('Im0'), L.popGraphicsState(),
             L.beginText(), L.setFontAndSize('Helv', round2(o.size * sy)), L.setFillingRgbColor(r, g, bl), L.endText()], { BBox: [-2, -2, b.w + 2, b.h + 2], Resources: { XObject: { Im0: im.ref }, Font: { Helv: helv } } }));
           const dict = { Type: 'Annot', Subtype: 'FreeText', Rect: [b.cx - b.w / 2 - 2, -(b.cy + b.h / 2) - 2, b.cx + b.w / 2 + 2, -(b.cy - b.h / 2) + 2], Contents: L.PDFHexString.fromText(expandTokens(o.text)),
-            DA: L.PDFString.of(`${round2(r)} ${round2(g)} ${round2(bl)} rg /Helv ${round2(o.size * sy)} Tf`), F: 4, Border: [0, 0, 0], M: L.PDFString.fromDate(new Date()), AP: { N: form } };
+            DA: L.PDFString.of(`${round2(r)} ${round2(g)} ${round2(bl)} rg /Helv ${round2(o.size * sy)} Tf`), F: 4, Border: [0, 0, 0], M: o.cm.modified && o.text === o.cm.orig ? L.PDFString.of(o.cm.modified) : L.PDFString.fromDate(new Date()), AP: { N: form } };
+          if (o.cm.subject) dict.Subj = L.PDFHexString.fromText(o.cm.subject);
+          if (o.cm.it) dict.IT = L.PDFName.of(o.cm.it);
+          if (o.cm.created) dict.CreationDate = L.PDFString.of(o.cm.created);
           if (o.cm.author) dict.T = L.PDFHexString.fromText(o.cm.author);
           if ((o.opacity ?? 1) < 1) dict.CA = o.opacity;
           pg.node.addAnnot(C.register(C.obj(dict)));
