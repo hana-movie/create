@@ -1214,7 +1214,7 @@ async function importComments(doc, pg) {
     let o;
     const lay = !a.rotation && dict ? await apTextLayout(lib, dict, a).catch(e => { console.warn(e); return null; }) : null;
     if (lay) {  // 元の外観どおりのベースライン位置・行送り・文字サイズ・書体に合わせる
-      const s = lay.size, e0 = { ...o0, size: s, lh: lay.lh, font: lay.font, x: lay.x, y: -lay.y - ((lay.lh - 1) / 2 + 0.88) * s + lay.lh * s / 2, cm: { ...o0.cm, orig: lay.text } };
+      const s = lay.size, e0 = { ...o0, size: s, lh: lay.lh, font: lay.font, x: lay.x, y: -lay.y - ((lay.lh - 1) / 2 + 0.88) * s + lay.lh * s / 2, cm: { ...o0.cm, orig: lay.text, font0: lay.fontName } };
       o = retext(e0, { text: lay.text });
       const nat = layoutText(o).w; if (lay.w > 0 && nat > 0) { const k = clamp(lay.w / nat, 0.7, 1.4); if (Math.abs(k - 1) > 0.015) o = retext(o, { sx: k }); }
     } else {
@@ -1226,14 +1226,31 @@ async function importComments(doc, pg) {
   }
   return { annots: out, ext };
 }
-function fontFromBase(n) {
-  n = (n || '').replace(/^\/?([A-Z]{6}\+)?/, '');
-  if (/gothic|ｺﾞｼｯｸ|ゴシック|kaku|heisei.*go|meiryo|yugo/i.test(n)) return /^ms-?gothic|^ＭＳ ?ゴシック/i.test(n) ? '"MS Gothic","ＭＳ ゴシック","Noto Sans Mono CJK JP",' + FONTS[0][1] : FONTS[0][1];
-  if (/mincho|明朝|ming|koz.*min|ryumin/i.test(n)) return /^ms-?mincho|^ＭＳ ?明朝/i.test(n) ? '"MS Mincho","ＭＳ 明朝",' + FONTS[1][1] : FONTS[1][1];
-  if (/courier|mono|consol/i.test(n)) return FONTS[6][1];
-  if (/times|serif|roman/i.test(n) && !/sans/i.test(n)) return FONTS[5][1];
-  if (/helv|arial/i.test(n)) return FONTS[4][1];
-  return FONTS[0][1];
+/* PDF 内のフォント名 → 画面で使う書体。日本語の PDF では名前が Shift-JIS のバイト列 (#82l#82r…) で入っていることがある */
+function pdfFontName(raw) {
+  let n = String(raw || '').replace(/^\//, '');
+  if (/#[0-9a-f]{2}/i.test(n) || /[\x80-\xff]/.test(n)) {
+    const bytes = []; for (let i = 0; i < n.length; i++) { if (n[i] === '#' && /^[0-9a-f]{2}$/i.test(n.substr(i + 1, 2))) { bytes.push(parseInt(n.substr(i + 1, 2), 16)); i += 2; } else bytes.push(n.charCodeAt(i) & 255); }
+    const u = new Uint8Array(bytes);
+    try { n = new TextDecoder('utf-8', { fatal: true }).decode(u); } catch (e) { try { n = new TextDecoder('shift_jis').decode(u); } catch (e2) { /* そのまま */ } }
+  }
+  return n.replace(/^[A-Z]{6}\+/, '');
+}
+function fontFromBase(raw, mono) {
+  const n = pdfFontName(raw).normalize('NFKC').toLowerCase().replace(/[\s\-_,]/g, '');
+  const G = FONTS[0][1], Mi = FONTS[1][1];
+  if (/msp(gothic|ゴシック)/.test(n)) return '"MS PGothic","ＭＳ Ｐゴシック",' + G;
+  if (/msui(gothic)/.test(n)) return '"MS UI Gothic",' + G;
+  if (/ms(gothic|ゴシック)/.test(n)) return '"MS Gothic","ＭＳ ゴシック","Noto Sans Mono CJK JP",' + G;
+  if (/msp(mincho|明朝)/.test(n)) return '"MS PMincho","ＭＳ Ｐ明朝",' + Mi;
+  if (/ms(mincho|明朝)/.test(n)) return '"MS Mincho","ＭＳ 明朝",' + Mi;
+  if (/meiryo|メイリオ/.test(n)) return 'Meiryo,' + G;
+  if (/mincho|明朝|ming|kozmin|ryumin|song/.test(n)) return Mi;
+  if (/gothic|ゴシック|kaku|kozgo|heiseikakugo|yugo/.test(n)) return mono ? '"MS Gothic","ＭＳ ゴシック",' + G : G;
+  if (/courier|mono|consol/.test(n)) return FONTS[6][1];
+  if (/times|roman/.test(n) || (/serif/.test(n) && !/sans/.test(n))) return FONTS[5][1];
+  if (/helv|arial/.test(n)) return FONTS[4][1];
+  return mono ? '"MS Gothic","ＭＳ ゴシック",' + FONTS[6][1] : G;
 }
 /* テキスト注釈の外観 (AP) だけを 1 ページの PDF に描き、pdf.js で文字の正確な位置を読む */
 async function apTextLayout(lib, src, a) {
@@ -1246,7 +1263,12 @@ async function apTextLayout(lib, src, a) {
   if (!(tx1 > tx0) || !(ty1 > ty0)) return null;
   const sx = (x2 - x1) / (tx1 - tx0), sy = (y2 - y1) / (ty1 - ty0), A = Mx.mul([sx, 0, 0, sy, x1 - tx0 * sx, y1 - ty0 * sy], M);
   let base = '';
-  try { const fd = n.dict.lookup(nm('Resources'))?.lookup(nm('Font')); for (const [, v] of fd?.entries?.() || []) { const f = fd.context.lookup(v); base = String(f?.lookup?.(nm('BaseFont'))?.asString?.() || ''); if (base) break; } } catch (e) { /* ignore */ }
+  let fixed = false;
+  try { const fd = n.dict.lookup(nm('Resources'))?.lookup(nm('Font')); for (const [, v] of fd?.entries?.() || []) {
+    const f = fd.context.lookup(v); base = String(f?.lookup?.(nm('BaseFont'))?.asString?.() || ''); if (!base) continue;
+    let de = f; const df = f.lookup(nm('DescendantFonts')); if (df?.lookup) de = df.lookup(0) || f;   // 等幅かどうかは FontDescriptor の Flags (bit 1) で分かる
+    const fl = de.lookup?.(nm('FontDescriptor'))?.lookup?.(nm('Flags')); if (fl?.asNumber) fixed = !!(fl.asNumber() & 1);
+    break; } } catch (e) { /* ignore */ }
   const tmp = await L.PDFDocument.create(), pg = tmp.addPage([x2 - x1, y2 - y1]); pg.setMediaBox(x1, y1, x2 - x1, y2 - y1);
   const name = pg.node.newXObject('Fm', tmp.context.register(L.PDFObjectCopier.for(lib.context, tmp.context).copy(n)));
   pg.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(...A), L.drawObject(name), L.popGraphicsState());
@@ -1260,9 +1282,10 @@ async function apTextLayout(lib, src, a) {
     const lines = rows.map(r => { r.its.sort((p, q) => p.transform[4] - q.transform[4]); const x0 = r.its[0].transform[4], last = r.its[r.its.length - 1]; return { s: r.its.map(i => i.str).join('').replace(/\s+$/, ''), x: x0, w: last.transform[4] + last.width - x0, y: r.y }; }).filter(l => l.s.trim());
     if (!lines.length) return null;
     const lh = lines.length > 1 ? clamp((lines[0].y - lines[lines.length - 1].y) / (lines.length - 1) / size, 0.8, 3) : 1.2;
-    if (!base) { const fam = tc.styles[its[0].fontName]?.fontFamily || ''; base = /mono/.test(fam) ? 'Courier' : /serif/.test(fam) && !/sans/.test(fam) ? 'Times' : ''; }
+    const fam = tc.styles[its[0].fontName]?.fontFamily || ''; if (/mono/.test(fam)) fixed = true;
+    if (!base) base = /serif/.test(fam) && !/sans/.test(fam) ? 'Times' : '';
     const wide = lines.reduce((p, q) => (q.w > p.w ? q : p));
-    return { text: lines.map(l => l.s).join('\n'), size, lh, x: Math.min(...lines.map(l => l.x)), y: lines[0].y, w: wide.w, font: fontFromBase(base) };
+    return { text: lines.map(l => l.s).join('\n'), size, lh, x: Math.min(...lines.map(l => l.x)), y: lines[0].y, w: wide.w, font: fontFromBase(base, fixed), fontName: pdfFontName(base) + (fixed ? ' (等幅)' : '') };
   } finally { pdf.destroy(); }
 }
 /* 既存のスタンプ注釈を、移動・コピーできる画像オブジェクトとして取り込む。
@@ -1335,6 +1358,7 @@ function commentProps(o) {
   const edited = o.type === 'text' && o.text !== o.cm.orig;
   openDialog('コメントのプロパティ', el('div', { class: 'form', style: 'min-width:340px' }, el('span', null, '作成者'), au, el('span', null, 'タイトル'), sj,
     el('span', null, '更新日'), el('span', null, edited ? '(編集済み — 保存時の日時になります)' : fmt(o.cm.modified)), el('span', null, '作成日'), el('span', null, fmt(o.cm.created)),
+    o.cm.font0 ? el('span', null, '元の書体') : null, o.cm.font0 ? el('span', null, o.cm.font0) : null,
     el('span', null, '種類'), el('span', null, o.cm.kind === 'Stamp' ? 'スタンプ' : o.cm.it === 'FreeTextTypewriter' ? 'タイプライター' : o.cm.it === 'FreeTextCallout' ? '引き出し線付きテキスト' : 'テキストボックス')), [
     { label: 'キャンセル' },
     { label: 'OK', primary: true, on: () => { if (au.value !== (o.cm.author || '') || sj.value !== (o.cm.subject || '')) ed.replace({ ...o, cm: { ...o.cm, author: au.value.trim(), subject: sj.value.trim() } }, true); } }]);
