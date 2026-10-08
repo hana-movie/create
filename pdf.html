@@ -1019,12 +1019,22 @@ class Editor {
     const a = this.items.filter(i => this.sel.includes(i.id)), b = this.items.filter(i => !this.sel.includes(i.id));
     this.set(front ? [...b, ...a] : [...a, ...b], true);
   }
-  copy() { if (this.sel.length) Editor.clip = this.selected(); }
+  copy() { if (this.sel.length) { Editor.clip = this.selected(); Editor.clipCtx = this.o.clipCtx?.() || null; Editor.clipLast = Editor.clipCtx?.id; Editor.clipN = 0; } }
   paste(off = 10) {
     if (!Editor.clip?.length) return;
-    const d = off / this.scale(), ns = Editor.clip.map(o => ({ ...translateItem(o, d, d), id: uid() }));
-    Editor.clip = ns; this.sel = ns.map(n => n.id); this.set([...this.items, ...ns], true); this.selChanged();
+    // 別のページへ貼るときは、コピー元と同じ見た目の位置にそのまま置く。同じ場所に重ねて貼るときだけ少しずつずらす
+    const from = Editor.clipCtx, to = this.o.clipCtx?.() || null;
+    Editor.clipN = to?.id === Editor.clipLast ? Editor.clipN + 1 : 0; Editor.clipLast = to?.id;
+    const T = from && to ? Mx.mul(Mx.inv(to.m), from.m) : [1, 0, 0, 1, 0, 0], ident = T.every((v, i) => Math.abs(v - [1, 0, 0, 1, 0, 0][i]) < 1e-6), dr = Math.atan2(T[1], T[0]) / RAD;
+    const d = Editor.clipN * off / this.scale(), sh = this.axisVec(d, d);
+    const ns = Editor.clip.map(o => {
+      let n = o;
+      if (!ident) { if (o.type === 'path') n = { ...o, nodes: mapNodes(o.nodes, (x, y) => Mx.pt(T, x, y)) }; else { const [x, y] = Mx.pt(T, o.x, o.y); n = { ...o, x, y, rot: (o.rot || 0) + dr }; } }
+      return { ...translateItem(n, sh[0], sh[1]), id: uid() };
+    });
+    this.sel = ns.map(n => n.id); this.set([...this.items, ...ns], true); this.selChanged();
   }
+  axisVec(dx, dy) { const m = this.M(), k = this.scale(); return Mx.pt(Mx.inv([m[0] / k, m[1] / k, m[2] / k, m[3] / k, 0, 0]), dx, dy); }  // 画面上の向きでのずらし量 → アイテム座標
   nudge(dx, dy) {
     if (!this.sel.length) return;
     const m = this.M(), v = Mx.pt(Mx.inv([m[0], m[1], m[2], m[3], 0, 0]), dx, dy);
@@ -1768,6 +1778,7 @@ function initEditor() {
     getItems: () => curPage()?.annots || [],
     setItems: items => { const p = curPage(); if (p) S.pages = S.pages.map(q => (q === p ? { ...p, annots: items } : q)); },
     commit, matrix: screenM, onSel: syncStyleUI, onTool: t => { S.tsel = null; S.pimg = null; hideSelMenu(); syncToolUI(t); },
+    clipCtx: () => { const p = curPage(); return p ? { id: p.id, m: pageMatrix(p, 1) } : null; },
     emptyClick(p) { const it = pimgAt(p); if (it) pimgMenu(p, it); },
     imageDbl: o => editImageObject(o),
     emptyDown(p, ev) { hideSelMenu(); S.tsel = null; S.pimg = null; if (S.flash) { S.flash = null; renderComments(); } const h = locate(p, false); if (!h) return null; S.tsel = { a: h, b: h }; return textSelDrag; },
