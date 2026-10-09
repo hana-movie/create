@@ -1282,6 +1282,17 @@ async function apTextLayout(lib, src, a) {
     rows.sort((p, q) => q.y - p.y);
     const lines = rows.map(r => { r.its.sort((p, q) => p.transform[4] - q.transform[4]); const x0 = r.its[0].transform[4], last = r.its[r.its.length - 1]; return { s: r.its.map(i => i.str).join('').replace(/\s+$/, ''), x: x0, w: last.transform[4] + last.width - x0, y: r.y }; }).filter(l => l.s.trim());
     if (!lines.length) return null;
+    // pdf.js は連続した空白を 1 つにまとめてしまう。コメント本文 (Contents) と空白以外が一致するなら、本文側の空白をそのまま使う
+    const body = (a.contentsObj?.str || '').replace(/\r\n?/g, '\n'), sq = t => t.replace(/\s+/g, '');
+    if (sq(body) && sq(body) === sq(lines.map(l => l.s).join(''))) {
+      let k = 0;
+      for (const l of lines) {
+        const need = sq(l.s).length; let got = 0, t = '';
+        while (k < body.length && /\s/.test(body[k])) k++;
+        while (k < body.length && got < need) { const ch = body[k++]; if (!/\s/.test(ch)) got++; t += ch === '\n' ? ' ' : ch; }
+        l.s = t;
+      }
+    }
     const lh = lines.length > 1 ? clamp((lines[0].y - lines[lines.length - 1].y) / (lines.length - 1) / size, 0.8, 3) : 1.2;
     const fam = tc.styles[its[0].fontName]?.fontFamily || ''; if (/mono/.test(fam)) fixed = true;
     if (!base) base = /serif/.test(fam) && !/sans/.test(fam) ? 'Times' : '';
