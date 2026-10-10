@@ -42,7 +42,7 @@
     touch-action: manipulation; cursor: pointer;
   }
   #boardWrap { position: relative; min-height: 0; }
-  #board { position: absolute; inset: 0; display: block; }
+  #board { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
 
   #ctrl { display: flex; justify-content: space-between; align-items: flex-end; }
   .btn {
@@ -745,6 +745,7 @@
     const w = Math.max(1, wrap.clientWidth), h = Math.max(1, wrap.clientHeight);
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
     view.w = w; view.h = h; view.dpr = dpr;
     view.s = Math.min(w / VW, h / VH);
   }

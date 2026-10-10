@@ -100,6 +100,7 @@
   }
   .carbtn:active { transform: scale(.94); }
   .carbtn canvas { display: block; margin: 0 auto; width: 100%; height: auto; }
+  .carbtn .carname { display: block; margin-top: 4px; font-family: inherit; font-weight: bold; font-size: clamp(13px, 1.9vw, 18px); color: #3d3355; white-space: nowrap; }
   .bigbtn {
     display: block; width: 100%; margin: 14px 0 0; padding: 18px 10px;
     border: none; border-radius: 26px; color: #fff; cursor: pointer;
@@ -155,9 +156,9 @@
       <span><b style="background:#38c172">▲</b>すすむ</span>
       <span><b style="background:#ff9f43">◀</b><b style="background:#ff9f43">▶</b>まがる</span>
       <span><b style="background:#3d8bff">⤒</b>ジャンプ（もういちど → くるん！）</span>
-      <span><b style="background:#ff5a6e">🔥</b>ブースト</span>
+      <span><b style="background:#ff5a6e">🔥</b>ブースト（サイレンが なるよ）</span>
     </div>
-    <p><b>くるまを えらんでね</b></p>
+    <p><b>のりたい くるまを えらんでね</b></p>
     <div class="cars" id="carPick"></div>
     <p class="hint">ボールが みえない ときは がめんの はしの ⚽ が ばしょを おしえてくれるよ</p>
     <a class="selbtn" href="../gameselect.html">🏠 ゲームを えらびなおす</a>
@@ -207,12 +208,6 @@
   const BOOST_ACC = 26, BOOST_MAX = 32;
   const TURN = 2.1, JUMP = 11, FLIP = 14, DETACH = 5;
 
-  const CAR_COLORS = [
-    { body: '#ff5a5f', dark: '#c73a40' },
-    { body: '#3d8bff', dark: '#2563c7' },
-    { body: '#38c172', dark: '#23894f' },
-    { body: '#ffc93c', dark: '#d19a00' },
-  ];
   const GOAL_COL = { '-1': 0x3d8bff, '1': 0xff9f43 };
 
   // ===== じょうたい =====
@@ -261,7 +256,33 @@
     goal:   () => { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, i === 5 ? 0.45 : 0.14, 'square', 0.07, null, i * 0.12)); },
     start:  () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.15, 'triangle', 0.1, null, i * 0.09)); },
   };
+  // サイレン（ブーストの あいだ なる）
+  let siren = null, hornWas = false;
+  function updateSiren() {
+    if (!actx) return;
+    if (!siren) {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'triangle'; o.frequency.value = 800; g.gain.value = 0;
+      o.connect(g).connect(actx.destination); o.start();
+      siren = { o, g };
+    }
+    const t = actx.currentTime;
+    const on = soundOn && state === 'play' && inp.boost;
+    if (VEH.key === 'bus') {
+      siren.g.gain.setTargetAtTime(0, t, 0.03);
+      if (on && !hornWas) { tone(440, 0.14, 'square', 0.08); tone(440, 0.4, 'square', 0.08, null, 0.2); tone(554, 0.14, 'square', 0.05); tone(554, 0.4, 'square', 0.05, null, 0.2); }
+      hornWas = on;
+      return;
+    }
+    let f;
+    if (VEH.key === 'ambulance') f = (Math.floor(t / 0.6) % 2) ? 770 : 960;
+    else if (VEH.key === 'police') { const ph = (t % 2) / 2; f = 650 + 650 * (ph < 0.5 ? ph * 2 : 2 - ph * 2); }
+    else { const ph = (t % 3) / 3; f = 550 + 500 * Math.sin(ph * Math.PI); }
+    siren.o.frequency.setTargetAtTime(f, t, VEH.key === 'ambulance' ? 0.01 : 0.05);
+    siren.g.gain.setTargetAtTime(on ? 0.05 : 0, t, 0.05);
+  }
   function updateEngine() {
+    updateSiren();
     if (!eng) return;
     const t = actx.currentTime;
     const playing = soundOn && state === 'play';
@@ -426,46 +447,109 @@
   scene.add(marker);
   let markerT = 0;
 
-  // --- くるま ---
-  let carGroup = null, wheels = [], flameMesh = null;
-  function buildCar(ci) {
-    if (carGroup) scene.remove(carGroup);
-    const col = CAR_COLORS[ci];
-    const g = new THREE.Group();
-    const mBody = new THREE.MeshLambertMaterial({ color: col.body });
-    const mDark = new THREE.MeshLambertMaterial({ color: col.dark });
-    const mGlass = new THREE.MeshLambertMaterial({ color: 0xbfe6ff });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.8, 4.2), mBody);
-    body.position.y = 0.05; g.add(body);
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.75, 2.0), [mGlass, mGlass, mBody, mBody, mGlass, mGlass]);
-    cabin.position.set(0, 0.82, -0.25); g.add(cabin);
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.32, 0.14, 3.0), new THREE.MeshLambertMaterial({ color: 0xffffff }));
-    stripe.position.set(0, 0.1, 0.1); g.add(stripe);
-    const spoiler = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.14, 0.6), mDark);
-    spoiler.position.set(0, 0.95, -1.9); g.add(spoiler);
-    for (const x of [-0.7, 0.7]) {
-      const st = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.5, 0.14), mDark);
-      st.position.set(x, 0.65, -1.9); g.add(st);
-    }
-    const mLight = new THREE.MeshBasicMaterial({ color: 0xfff6b0 });
-    for (const x of [-0.75, 0.75]) {
-      const hl = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.22, 0.06), mLight);
-      hl.position.set(x, 0.12, 2.11); g.add(hl);
-    }
-    wheels = [];
+  // --- くるま（はたらくくるま） ---
+  const VEHICLES = [
+    { key: 'police',    name: 'パトカー',         hl: 0.9, r: 1.3,  rear: 2.25 },
+    { key: 'fire',      name: 'しょうぼうしゃ',   hl: 1.3, r: 1.35, rear: 2.5 },
+    { key: 'ambulance', name: 'きゅうきゅうしゃ', hl: 1.0, r: 1.45, rear: 2.3 },
+    { key: 'bus',       name: 'バス',             hl: 1.5, r: 1.5,  rear: 2.6 },
+  ];
+  let VEH = VEHICLES[0];
+  let carGroup = null, wheels = [], flameMesh = null, lamps = [];
+  const LMB = (c) => new THREE.MeshLambertMaterial({ color: c });
+  function addBox(g, w, h, d, mat, x, y, z) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); g.add(m); return m;
+  }
+  function addLamp(g, w, h, d, x, y, z, on, off) {
+    const m = addBox(g, w, h, d, new THREE.MeshBasicMaterial({ color: off }), x, y, z);
+    lamps.push({ m, on: new THREE.Color(on), off: new THREE.Color(off), phase: lamps.length % 2 });
+    return m;
+  }
+  function addHeadlights(g, z, y) {
+    const mL = new THREE.MeshBasicMaterial({ color: 0xfff6b0 });
+    for (const x of [-0.75, 0.75]) addBox(g, 0.45, 0.22, 0.06, mL, x, y, z);
+  }
+  function addWheels(g, zs) {
     const tg = new THREE.CylinderGeometry(0.55, 0.55, 0.45, 18); tg.rotateZ(Math.PI / 2);
     const hg = new THREE.BoxGeometry(0.47, 0.75, 0.18);
-    const mTire = new THREE.MeshLambertMaterial({ color: 0x2f2a3a }), mHub = new THREE.MeshLambertMaterial({ color: 0xc9cfdd });
-    for (const x of [-1.15, 1.15]) for (const z of [-1.35, 1.35]) {
+    const mTire = LMB(0x2f2a3a), mHub = LMB(0xc9cfdd);
+    for (const x of [-1.15, 1.15]) for (const z of zs) {
       const w = new THREE.Group();
       w.add(new THREE.Mesh(tg, mTire));
       w.add(new THREE.Mesh(hg, mHub));
       w.position.set(x, -0.35, z);
       g.add(w); wheels.push(w);
     }
+  }
+  // むきは +z が まえ
+  function buildPolice(g) {
+    const mBlack = LMB(0x2b2b33), mWhite = LMB(0xf7f7fb), mGlass = LMB(0xbfe6ff), mGray = LMB(0x9aa3b5);
+    addBox(g, 2.3, 0.5, 4.3, mBlack, 0, -0.1, 0);
+    addBox(g, 2.32, 0.34, 4.32, mWhite, 0, 0.32, 0);
+    addBox(g, 1.95, 0.68, 2.1, [mGlass, mGlass, mWhite, mWhite, mGlass, mGlass], 0, 0.83, -0.2);
+    addBox(g, 2.34, 0.12, 0.5, mGray, 0, -0.2, 2.1);
+    addBox(g, 2.34, 0.12, 0.5, mGray, 0, -0.2, -2.1);
+    addLamp(g, 0.7, 0.2, 0.4, -0.38, 1.27, -0.2, 0xff2b2b, 0x7a1d1d);
+    addLamp(g, 0.7, 0.2, 0.4, 0.38, 1.27, -0.2, 0xff2b2b, 0x7a1d1d);
+    addHeadlights(g, 2.17, 0.25);
+    addWheels(g, [-1.35, 1.35]);
+  }
+  function buildFire(g) {
+    const mRed = LMB(0xe53935), mWhite = LMB(0xffffff), mGlass = LMB(0xbfe6ff), mSilver = LMB(0xc9cfdd);
+    addBox(g, 2.3, 0.7, 4.8, mRed, 0, 0.0, 0);
+    addBox(g, 2.2, 1.15, 1.5, [mRed, mRed, mRed, mRed, mGlass, mRed], 0, 0.85, 1.55);
+    for (const x of [-1.11, 1.11]) addBox(g, 0.04, 0.45, 0.9, mGlass, x, 1.05, 1.6);
+    addBox(g, 2.2, 0.9, 3.1, mRed, 0, 0.75, -0.75);
+    addBox(g, 2.34, 0.16, 4.82, mWhite, 0, 0.3, 0);
+    for (const x of [-0.45, 0.45]) addBox(g, 0.1, 0.1, 3.8, mSilver, x, 1.3, -0.5);
+    for (let z = -2.2; z <= 1.21; z += 0.55) addBox(g, 0.9, 0.08, 0.08, mSilver, 0, 1.3, z);
+    addBox(g, 2.34, 0.2, 0.3, mSilver, 0, -0.2, 2.42);
+    addLamp(g, 0.6, 0.2, 0.3, -0.35, 1.52, 1.6, 0xff2b2b, 0x7a1d1d);
+    addLamp(g, 0.6, 0.2, 0.3, 0.35, 1.52, 1.6, 0xff2b2b, 0x7a1d1d);
+    addHeadlights(g, 2.41, 0.2);
+    addWheels(g, [-1.6, 1.5]);
+  }
+  function buildAmbulance(g) {
+    const mWhite = LMB(0xffffff), mRed = LMB(0xe53950), mGlass = LMB(0xbfe6ff), mGray = LMB(0x9aa3b5);
+    addBox(g, 2.2, 1.0, 1.5, [mWhite, mWhite, mWhite, mWhite, mGlass, mWhite], 0, 0.45, 1.45);
+    for (const x of [-1.11, 1.11]) addBox(g, 0.04, 0.4, 0.8, mGlass, x, 0.65, 1.5);
+    addBox(g, 2.3, 0.5, 4.4, mWhite, 0, -0.05, 0);
+    addBox(g, 2.3, 1.7, 3.0, mWhite, 0, 0.95, -0.7);
+    addBox(g, 2.34, 0.22, 4.42, mRed, 0, 0.42, 0);
+    for (const x of [-1.16, 1.16]) addBox(g, 0.03, 0.5, 0.9, mGlass, x, 1.25, -0.4);
+    addBox(g, 2.34, 0.12, 0.4, mGray, 0, -0.22, 2.2);
+    addLamp(g, 0.6, 0.2, 0.3, -0.35, 1.05, 1.5, 0xff2b2b, 0x7a1d1d);
+    addLamp(g, 0.6, 0.2, 0.3, 0.35, 1.05, 1.5, 0xff2b2b, 0x7a1d1d);
+    addLamp(g, 0.3, 0.2, 0.2, -0.9, 1.9, -2.15, 0xff2b2b, 0x7a1d1d);
+    addLamp(g, 0.3, 0.2, 0.2, 0.9, 1.9, -2.15, 0xff2b2b, 0x7a1d1d);
+    addHeadlights(g, 2.21, 0.15);
+    addWheels(g, [-1.4, 1.4]);
+  }
+  function buildBus(g) {
+    const mBody = LMB(0xfff1cc), mGreen = LMB(0x38b56a), mGlass = LMB(0xbfe6ff), mGray = LMB(0x9aa3b5), mDark = LMB(0x3d3355);
+    addBox(g, 2.4, 2.2, 5.0, mBody, 0, 0.8, 0);
+    addBox(g, 2.43, 0.7, 4.0, mGlass, 0, 1.3, -0.4);
+    for (let z = -2.0; z <= 1.21; z += 0.8) addBox(g, 2.45, 0.7, 0.1, mBody, 0, 1.3, z);
+    addBox(g, 2.0, 0.95, 0.04, mGlass, 0, 1.2, 2.51);
+    addBox(g, 2.44, 0.32, 5.02, mGreen, 0, 0.35, 0);
+    addBox(g, 2.42, 0.12, 5.02, mGreen, 0, 1.72, 0);
+    addBox(g, 1.3, 0.24, 0.04, mDark, 0, 1.75, 2.52);
+    addBox(g, 0.04, 1.3, 0.9, mGlass, 1.22, 0.75, 1.6);
+    addBox(g, 2.44, 0.2, 0.3, mGray, 0, -0.2, 2.52);
+    addLamp(g, 0.9, 0.16, 0.04, 0, 1.75, 2.55, 0xffc23f, 0x5a4a20);
+    addHeadlights(g, 2.53, 0.15);
+    addWheels(g, [-1.7, 1.6]);
+  }
+  function buildCar(ci) {
+    if (carGroup) scene.remove(carGroup);
+    VEH = VEHICLES[ci];
+    wheels = []; lamps = [];
+    const g = new THREE.Group();
+    ({ police: buildPolice, fire: buildFire, ambulance: buildAmbulance, bus: buildBus })[VEH.key](g);
     const fg = new THREE.ConeGeometry(0.42, 1.8, 14); fg.rotateX(-Math.PI / 2);
     flameMesh = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ color: 0xff8a3d }));
-    flameMesh.position.set(0, 0.15, -2.9); g.add(flameMesh);
+    flameMesh.position.set(0, 0.1, -(VEH.rear + 0.6)); g.add(flameMesh);
     const inner = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ color: 0xffe066 }));
     inner.scale.set(0.55, 0.55, 0.6); inner.position.z = 0.3; flameMesh.add(inner);
     scene.add(g);
@@ -706,7 +790,10 @@
     if (b.inNet) return;
     t1.copy(c.p).addScaledVector(c.u, 0.2);
     t2.copy(b.p).sub(t1);
-    const d = t2.length(), min = BR + CAR_R;
+    const along = Math.max(-VEH.hl, Math.min(VEH.hl, t2.dot(c.f)));
+    t1.addScaledVector(c.f, along);
+    t2.copy(b.p).sub(t1);
+    const d = t2.length(), min = BR + VEH.r;
     if (d < min && d > 1e-4) {
       t2.divideScalar(d);
       b.p.copy(t1).addScaledVector(t2, min);
@@ -806,6 +893,8 @@
       const boosting = inp.boost && state === 'play';
       flameMesh.visible = boosting;
       if (boosting) { const s = 0.8 + Math.random() * 0.5; flameMesh.scale.set(1, 1, s); }
+      const blink = Math.floor(performance.now() / 180) % 2;
+      for (const L of lamps) L.m.material.color.copy(boosting && (blink === L.phase || VEH.key === 'bus') ? L.on : L.off);
     }
     ballMesh.position.copy(ball.p);
     const fy = -A.y + 0.04;
@@ -850,7 +939,7 @@
     if (inp.boost) {
       const c = car;
       for (let i = 0; i < 2; i++) {
-        t1.copy(c.p).addScaledVector(c.f, -2.4).addScaledVector(c.u, 0.15);
+        t1.copy(c.p).addScaledVector(c.f, -(VEH.rear + 0.1)).addScaledVector(c.u, 0.15);
         emit('dot', t1.x, t1.y, t1.z,
           -c.f.x * 9 + c.v.x * 0.4 + (Math.random() - 0.5) * 3,
           -c.f.y * 9 + c.v.y * 0.4 + (Math.random() - 0.5) * 3,
@@ -915,33 +1004,60 @@
   }
 
   // くるま えらび（よこから みた え）
-  function drawCar2D(c, color) {
-    const col = CAR_COLORS[color];
+  function drawVehicle2D(c, key) {
     const rr = (x, y, w, h, r) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
-    c.fillStyle = col.dark; rr(-54, -30, 12, 18, 4); c.fill();
-    c.fillStyle = col.body;
-    c.beginPath(); c.moveTo(-36, -12); c.lineTo(-24, -36); c.quadraticCurveTo(-4, -40, 14, -36); c.lineTo(30, -12); c.closePath(); c.fill();
-    c.fillStyle = '#bfe6ff';
-    c.beginPath(); c.moveTo(-28, -15); c.lineTo(-20, -31); c.lineTo(10, -31); c.lineTo(22, -15); c.closePath(); c.fill();
-    c.fillStyle = col.body; rr(-52, -16, 104, 28, 12); c.fill();
-    c.fillStyle = 'rgba(255,255,255,.85)'; rr(-40, -6, 70, 6, 3); c.fill();
-    c.fillStyle = '#fff6b0'; c.beginPath(); c.arc(46, -6, 5.5, 0, Math.PI * 2); c.fill();
-    for (const wx of [-30, 32]) {
+    const glass = '#bfe6ff';
+    let wheelsX = [-30, 32];
+    if (key === 'police') {
+      c.fillStyle = '#f7f7fb'; c.beginPath(); c.moveTo(-34, -12); c.lineTo(-22, -34); c.lineTo(14, -34); c.lineTo(28, -12); c.closePath(); c.fill();
+      c.fillStyle = glass; c.beginPath(); c.moveTo(-27, -14); c.lineTo(-19, -30); c.lineTo(10, -30); c.lineTo(21, -14); c.closePath(); c.fill();
+      c.fillStyle = '#ff2b2b'; rr(-14, -42, 22, 8, 3); c.fill();
+      c.fillStyle = '#f7f7fb'; rr(-52, -16, 104, 14, 8); c.fill();
+      c.fillStyle = '#2b2b33'; rr(-52, -4, 104, 16, 8); c.fill();
+    } else if (key === 'fire') {
+      wheelsX = [-34, 36];
+      c.fillStyle = '#e53935'; rr(-56, -24, 112, 36, 8); c.fill();
+      c.fillStyle = '#e53935'; rr(22, -40, 34, 30, 6); c.fill();
+      c.fillStyle = glass; rr(30, -36, 22, 14, 3); c.fill();
+      c.fillStyle = '#fff'; rr(-56, -6, 112, 6, 3); c.fill();
+      c.fillStyle = '#c9cfdd'; c.fillRect(-52, -32, 70, 4); c.fillRect(-52, -40, 70, 4);
+      for (let x = -48; x < 18; x += 10) c.fillRect(x, -40, 3, 12);
+      c.fillStyle = '#ff2b2b'; rr(30, -47, 18, 7, 3); c.fill();
+    } else if (key === 'ambulance') {
+      c.fillStyle = '#fff'; c.strokeStyle = '#d6dbe6'; c.lineWidth = 2;
+      rr(-54, -40, 74, 52, 6); c.fill(); c.stroke();
+      rr(18, -24, 36, 36, 8); c.fill(); c.stroke();
+      c.fillStyle = glass; rr(28, -20, 20, 12, 3); c.fill(); rr(-40, -32, 26, 14, 3); c.fill();
+      c.fillStyle = '#e53950'; c.fillRect(-54, -6, 108, 6);
+      c.fillStyle = '#ff2b2b'; rr(26, -30, 16, 6, 3); c.fill();
+    } else {
+      wheelsX = [-36, 36];
+      c.fillStyle = '#fff1cc'; c.strokeStyle = '#e8d9b0'; c.lineWidth = 2;
+      rr(-58, -46, 116, 58, 10); c.fill(); c.stroke();
+      c.fillStyle = glass;
+      for (let x = -52; x < 34; x += 18) rr(x, -40, 14, 16, 3), c.fill();
+      rr(42, -40, 12, 30, 3); c.fill();
+      c.fillStyle = '#38b56a'; c.fillRect(-58, -16, 116, 8); c.fillRect(-58, -46, 116, 4);
+    }
+    for (const wx of wheelsX) {
       c.fillStyle = '#2f2a3a'; c.beginPath(); c.arc(wx, 12, 14, 0, Math.PI * 2); c.fill();
       c.fillStyle = '#c9cfdd'; c.beginPath(); c.arc(wx, 12, 7, 0, Math.PI * 2); c.fill();
     }
   }
-  CAR_COLORS.forEach((_, i) => {
+  VEHICLES.forEach((v, i) => {
     const b = document.createElement('button');
     b.className = 'carbtn';
-    b.setAttribute('aria-label', 'くるま ' + (i + 1));
+    b.setAttribute('aria-label', v.name);
     const cv = document.createElement('canvas');
-    const dpr = window.devicePixelRatio || 1, W = 140, H = 80;
+    const dpr = window.devicePixelRatio || 1, W = 140, H = 86;
     cv.width = W * dpr; cv.height = H * dpr; cv.style.maxWidth = W + 'px';
     const c = cv.getContext('2d');
-    c.setTransform(dpr * 1.1, 0, 0, dpr * 1.1, W / 2 * dpr, H * 0.62 * dpr);
-    drawCar2D(c, i);
+    c.setTransform(dpr * 1.05, 0, 0, dpr * 1.05, W / 2 * dpr, H * 0.66 * dpr);
+    drawVehicle2D(c, v.key);
     b.appendChild(cv);
+    const lb = document.createElement('span');
+    lb.className = 'carname'; lb.textContent = v.name;
+    b.appendChild(lb);
     b.addEventListener('click', () => startGame(i));
     $('carPick').appendChild(b);
   });
