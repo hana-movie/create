@@ -33,8 +33,8 @@
     text-shadow: 0 4px 0 #fff;
   }
   .games {
-    display: grid; gap: clamp(14px, 2.5vw, 26px); width: 100%; max-width: 1100px;
-    grid-template-columns: repeat(3, 1fr);
+    display: grid; gap: clamp(14px, 2.5vw, 26px); width: 100%; max-width: 1240px;
+    grid-template-columns: repeat(4, 1fr);
   }
   @media (orientation: portrait), (max-width: 700px) {
     .games { grid-template-columns: 1fr; max-width: 560px; }
@@ -53,7 +53,8 @@
   .game:active { transform: translateY(8px); box-shadow: 0 2px 0 var(--d); }
   .game .thumb { width: 100%; aspect-ratio: 4 / 3; background: var(--bg); display: block; }
   .game .body { padding: 14px 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
-  .game .name { font-size: clamp(24px, 3.4vw, 34px); font-weight: bold; color: var(--d); }
+  .game .name { font-size: clamp(18px, 1.9vw, 28px); font-weight: bold; color: var(--d); overflow-wrap: anywhere; }
+  @media (orientation: portrait), (max-width: 700px) { .game .name { font-size: clamp(22px, 3.6vw, 32px); } }
   .game .desc { font-size: clamp(16px, 2.1vw, 21px); line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; }
   .game .name { word-break: keep-all; }
   .game .stars { font-size: clamp(16px, 2vw, 20px); color: #ffb000; letter-spacing: .1em; }
@@ -61,6 +62,7 @@
   .g1 { --c: #ff8fb5; --d: #e0578a; --bg: #fff0f6; }
   .g2 { --c: #ffb46b; --d: #e07d1e; --bg: #fff5e8; }
   .g3 { --c: #79b2ff; --d: #2f6fd1; --bg: #eaf3ff; }
+  .g4 { --c: #b48cff; --d: #7b4fe0; --bg: #f1fbe9; }
 </style>
 </head>
 <body>
@@ -90,6 +92,14 @@
         <div class="desc">パトカーや しょうぼうしゃで かべも てんじょうも！</div>
         <div class="stars">★★★</div>
         <div class="note">インターネットに つないで あそんでね</div>
+      </div>
+    </a>
+    <a class="game g4" href="hole/">
+      <canvas class="thumb" id="th4"></canvas>
+      <div class="body">
+        <div class="name">ぱくぱくホール</div>
+        <div class="desc">あなを うごかして まちを ぜんぶ たべちゃおう！</div>
+        <div class="stars">★☆☆</div>
       </div>
     </a>
   </div>
@@ -269,6 +279,57 @@
     c.font = 'bold 44px "Hiragino Maru Gothic ProN", sans-serif';
     c.lineWidth = 8; c.strokeStyle = '#fff'; c.strokeText('3D', 318, 52);
     c.fillStyle = '#2f6fd1'; c.fillText('3D', 318, 52);
+  }
+
+  // 4. ぱくぱくホール
+  {
+    const c = setup('th4');
+    c.fillStyle = '#8fd96b'; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#9ae276'; c.fillRect(0, 0, W, 70); c.fillRect(0, 160, W, 70);
+    c.fillStyle = '#ece4d2'; c.fillRect(0, 232, W, 68);
+    c.fillStyle = '#8b93a7'; c.fillRect(0, 240, W, 60);
+    c.fillStyle = '#fff'; for (let x = 10; x < W; x += 60) c.fillRect(x, 268, 30, 4);
+    const tree = (x, y, s) => {
+      c.fillStyle = '#8a5a3c'; rr(c, x - 5 * s, y - 30 * s, 10 * s, 30 * s, 3); c.fill();
+      const ci = (cx, cy, r, col) => { c.fillStyle = col; c.beginPath(); c.arc(x + cx * s, y + cy * s, r * s, 0, Math.PI * 2); c.fill(); };
+      ci(-14, -40, 15, '#38a14d'); ci(14, -40, 15, '#38a14d'); ci(0, -54, 22, '#3fae54'); ci(-6, -60, 8, '#5cc66d');
+    };
+    const flower = (x, y, col) => {
+      c.strokeStyle = '#3a9a4a'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - 12); c.stroke();
+      for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; c.fillStyle = col; c.beginPath(); c.arc(x + Math.cos(a) * 4, y - 15 + Math.sin(a) * 4, 3.4, 0, Math.PI * 2); c.fill(); }
+      c.fillStyle = '#fff3a0'; c.beginPath(); c.arc(x, y - 15, 2.5, 0, Math.PI * 2); c.fill();
+    };
+    // ビル
+    c.fillStyle = '#9fb4d9'; c.fillRect(300, 20, 80, 150);
+    c.fillStyle = '#e8f4ff'; for (let r = 0; r < 6; r++) for (let k = 0; k < 3; k++) c.fillRect(310 + k * 24, 32 + r * 22, 14, 12);
+    tree(60, 150, 1.1);
+    // あな
+    const hx = 200, hy = 175, rx = 92, ry = 64;
+    c.fillStyle = '#ff6fa0'; c.beginPath(); c.ellipse(hx, hy, rx + 8, ry + 6, 0, 0, Math.PI * 2); c.fill();
+    const g = c.createLinearGradient(0, hy - ry, 0, hy + ry);
+    g.addColorStop(0, '#2c2445'); g.addColorStop(1, '#000');
+    c.fillStyle = g; c.beginPath(); c.ellipse(hx, hy, rx, ry, 0, 0, Math.PI * 2); c.fill();
+    for (const s of [-1, 1]) {
+      c.fillStyle = '#fff'; c.beginPath(); c.ellipse(hx + s * 26, hy - 22, 12, 15, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#2c2445'; c.beginPath(); c.ellipse(hx + s * 26, hy - 18, 7, 9, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#fff'; c.beginPath(); c.arc(hx + s * 26 - 2.5, hy - 22, 2.5, 0, Math.PI * 2); c.fill();
+    }
+    // すいこまれる くるま
+    c.save();
+    c.beginPath(); c.ellipse(hx, hy, rx, ry, 0, 0, Math.PI * 2); c.rect(hx - rx, hy - 400, rx * 2, 400); c.clip();
+    c.translate(hx + 10, hy + 30); c.rotate(0.35);
+    c.fillStyle = '#3d8bff'; rr(c, -36, -26, 72, 18, 7); c.fill();
+    c.beginPath(); c.moveTo(-20, -25); c.lineTo(-13, -40); c.lineTo(12, -40); c.lineTo(22, -25); c.closePath(); c.fill();
+    c.fillStyle = '#bfe6ff'; c.fillRect(-12, -36, 11, 10); c.fillRect(2, -36, 12, 10);
+    c.fillStyle = '#2f2a3a'; c.beginPath(); c.arc(-20, -8, 8, 0, Math.PI * 2); c.arc(20, -8, 8, 0, Math.PI * 2); c.fill();
+    c.restore();
+    flower(330, 215, '#ff6fa0'); flower(360, 200, '#ffcc33'); flower(40, 220, '#a66cff');
+    c.fillStyle = '#ffd23f';
+    for (const [sx, sy, sz] of [[110, 92, 10], [292, 120, 12], [250, 70, 8]]) {
+      c.save(); c.translate(sx, sy); c.beginPath();
+      for (let i = 0; i < 10; i++) { const r = i % 2 ? sz * 0.45 : sz, a = i * Math.PI / 5 - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      c.closePath(); c.fill(); c.restore();
+    }
   }
 })();
 </script>
