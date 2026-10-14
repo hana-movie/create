@@ -1,0 +1,1712 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d2433">
+<title>ドローンファーム</title>
+<style>
+  :root {
+    --bg: #1a2030; --panel: #232b3d; --panel2: #2b3549; --line: #36415a;
+    --text: #e8ecf4; --muted: #9aa6bf; --accent: #ffcc40; --green: #5ed17a; --red: #ff6b6b; --blue: #6ea8ff;
+    --code-bg: #171b26; --lh: 22px; --fs: 15px; --pad: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  button, select { font-family: inherit; }
+  header {
+    display: flex; align-items: center; gap: 14px; padding: max(8px, env(safe-area-inset-top)) 14px 8px;
+    background: #141927; border-bottom: 1px solid var(--line);
+  }
+  header h1 { margin: 0; font-size: 18px; letter-spacing: .04em; white-space: nowrap; }
+  #status { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--panel2); color: var(--muted); white-space: nowrap; }
+  #status.run { background: #1f4a2e; color: #9ff0b5; }
+  #status.pause { background: #4a401c; color: #ffe08a; }
+  #status.err { background: #4f2026; color: #ffb3b3; }
+  header .sp { flex: 1; }
+  #pos { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(300px, 42%) 1fr; gap: 10px; padding: 10px; }
+  .left, .right { min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .farmwrap { flex: 0 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px; }
+  #farm { display: block; border-radius: 8px; touch-action: manipulation; }
+  .inv { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: var(--panel2); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .chip b { font-weight: 700; }
+  .chip.dim { opacity: .45; }
+  .shop { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .shop h2 { margin: 0; padding: 8px 12px; font-size: 14px; color: var(--muted); border-bottom: 1px solid var(--line); }
+  #shop { overflow: auto; padding: 8px; display: grid; gap: 8px; }
+  .up { background: var(--panel2); border-radius: 10px; padding: 9px 10px; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+  .up .nm { font-weight: 700; font-size: 14px; }
+  .up .ds { grid-column: 1 / -1; font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .up .ds code { color: #ffd88a; }
+  .up .cost { font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .up .cost span.no { color: var(--red); }
+  .up button { grid-row: 1 / 3; grid-column: 2; padding: 8px 12px; border: none; border-radius: 8px; background: var(--green); color: #10251a; font-weight: 700; cursor: pointer; }
+  .up button:disabled { background: #3b465e; color: #7f8aa3; cursor: default; }
+  .done-note { font-size: 13px; color: var(--muted); padding: 4px 4px 0; }
+
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; }
+  .tb { border: none; border-radius: 8px; padding: 8px 12px; font-size: 14px; font-weight: 700; cursor: pointer; background: var(--panel2); color: var(--text); touch-action: manipulation; }
+  .tb:disabled { opacity: .4; cursor: default; }
+  .tb.go { background: var(--green); color: #10251a; }
+  .tb.stop { background: #c94a55; color: #fff; }
+  .tb.small { padding: 8px 10px; font-weight: 600; }
+  .toolbar label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-left: 4px; }
+  .toolbar select { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 14px; }
+  .toolbar .sp { flex: 1; }
+
+  .editor { flex: 1; min-height: 160px; overflow: auto; background: var(--code-bg); border-radius: 12px; border: 1px solid var(--line); position: relative; }
+  .inner { display: flex; min-width: 100%; width: max-content; min-height: 100%; }
+  .gutter {
+    position: sticky; left: 0; z-index: 3; flex: none; min-width: 44px; padding: var(--pad) 8px var(--pad) 6px; text-align: right;
+    background: #141822; color: #5b6680; font: var(--fs)/var(--lh) ui-monospace, "SF Mono", Menlo, Consolas, monospace; user-select: none;
+    border-right: 1px solid #262d3d; white-space: pre;
+  }
+  .gutter .cur { color: var(--accent); font-weight: 700; }
+  .gutter .bad { color: var(--red); font-weight: 700; }
+  .area { position: relative; flex: 1; min-width: 0; }
+  #hl { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+  #hl div { position: absolute; left: 0; right: 0; height: var(--lh); }
+  #hl .cur { background: rgba(255, 204, 64, .2); box-shadow: inset 3px 0 0 var(--accent); }
+  #hl .call { background: rgba(110, 168, 255, .12); box-shadow: inset 3px 0 0 rgba(110, 168, 255, .6); }
+  #hl .bad { background: rgba(255, 90, 90, .25); box-shadow: inset 3px 0 0 var(--red); }
+  #view, #code {
+    margin: 0; padding: var(--pad) 14px; font: var(--fs)/var(--lh) ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    tab-size: 4; white-space: pre; letter-spacing: 0; border: 0;
+  }
+  #view { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none; color: #d7deea; }
+  #code {
+    position: relative; z-index: 2; display: block; resize: none; outline: none; overflow: hidden;
+    background: transparent; color: transparent; caret-color: #fff; -webkit-text-fill-color: transparent;
+  }
+  #code::selection { background: rgba(110, 168, 255, .35); -webkit-text-fill-color: transparent; }
+  #code[readonly] { caret-color: transparent; }
+  .t-kw { color: #c792ea; } .t-fn { color: #82aaff; } .t-en { color: #ffcb6b; } .t-num { color: #f78c6c; }
+  .t-str { color: #c3e88d; } .t-com { color: #6b7894; font-style: italic; } .t-call { color: #89ddff; } .t-op { color: #89ddff; }
+
+  .console {
+    flex: 0 0 auto; height: 128px; overflow: auto; padding: 8px 10px; background: #12161f; border-radius: 12px; border: 1px solid var(--line);
+    font: 13px/1.55 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #c8d0df; white-space: pre-wrap; word-break: break-all;
+  }
+  .console .e { color: #ff9b9b; }
+  .console .i { color: #8fb4ff; }
+  .console .g { color: #9ff0b5; }
+
+  .modal { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 10, 18, .6); }
+  .modal.on { display: flex; }
+  .modal .box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; max-width: 760px; width: 100%; max-height: 100%; overflow: auto; padding: 18px 20px; }
+  .modal h2 { margin: 0 0 8px; font-size: 18px; }
+  .modal h3 { margin: 16px 0 6px; font-size: 15px; color: var(--accent); }
+  .modal table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .modal td { border-top: 1px solid var(--line); padding: 6px 6px; vertical-align: top; line-height: 1.5; }
+  .modal td:first-child { white-space: nowrap; }
+  .modal code { font-family: ui-monospace, Menlo, Consolas, monospace; color: #ffd88a; }
+  .modal p { font-size: 13px; line-height: 1.6; color: #cfd6e4; margin: 6px 0; }
+  .modal .close { float: right; }
+  .danger { background: #5a2530 !important; color: #ffc4c4 !important; }
+
+  @media (max-width: 900px), (orientation: portrait) {
+    body { overflow: auto; height: auto; min-height: 100%; }
+    .layout { grid-template-columns: 1fr; }
+    .farmwrap { height: 46vh; }
+    .shop { max-height: 260px; }
+    .editor { min-height: 46vh; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚁 ドローンファーム</h1>
+  <span id="status">停止中</span>
+  <span class="sp"></span>
+  <span id="pos"></span>
+  <button class="tb small" id="helpBtn">❓ ヘルプ</button>
+</header>
+
+<div class="layout">
+  <section class="left">
+    <div class="card farmwrap" id="farmwrap"><canvas id="farm"></canvas></div>
+    <div class="card inv" id="inv"></div>
+    <div class="card shop"><h2>アンロック</h2><div id="shop"></div></div>
+  </section>
+  <section class="right">
+    <div class="card toolbar">
+      <button class="tb go" id="runBtn">▶ 実行</button>
+      <button class="tb" id="pauseBtn" disabled>⏸ 一時停止</button>
+      <button class="tb" id="stepBtn">⏭ 1ステップ</button>
+      <button class="tb stop" id="stopBtn" disabled>⏹ 停止</button>
+      <label>速さ
+        <select id="speed">
+          <option value="0.1">×0.1（じっくり）</option>
+          <option value="0.25">×0.25</option>
+          <option value="0.5">×0.5</option>
+          <option value="1" selected>×1</option>
+          <option value="2">×2</option>
+          <option value="4">×4</option>
+        </select>
+      </label>
+      <span class="sp"></span>
+      <button class="tb small" id="dedentBtn" title="字下げを戻す（Shift+Tab）">⇤</button>
+      <button class="tb small" id="indentBtn" title="字下げ（Tab）">⇥</button>
+    </div>
+    <div class="editor" id="editor">
+      <div class="inner">
+        <div class="gutter" id="gutter">1</div>
+        <div class="area" id="area">
+          <div id="hl"></div>
+          <pre id="view" aria-hidden="true"></pre>
+          <textarea id="code" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" wrap="off" aria-label="プログラム"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="console" id="console"></div>
+  </section>
+</div>
+
+<div class="modal" id="help">
+  <div class="box">
+    <button class="tb small close" id="helpClose">✕ とじる</button>
+    <h2>ドローンの命令</h2>
+    <p>Python とほぼ同じ書き方でドローンを動かします。<b>▶ 実行</b>すると上から順に1行ずつ動き、いま実行している行が<b style="color:#ffcc40">黄色</b>に光ります。関数の中を実行しているときは、呼び出し元の行が<b style="color:#6ea8ff">青</b>で光ります。</p>
+    <h3>ドローンを動かす（時間がかかる命令）</h3>
+    <table>
+      <tr><td><code>move(North)</code></td><td>1マス動く。<code>North</code>(上)・<code>East</code>(右)・<code>South</code>(下)・<code>West</code>(左)。端をこえると反対側に出る</td></tr>
+      <tr><td><code>harvest()</code></td><td>足もとの作物を収穫。育っていないと、こわれて何ももらえない</td></tr>
+      <tr><td><code>plant(Entities.Bush)</code></td><td>足もとに植える。植えられたら <code>True</code></td></tr>
+      <tr><td><code>till()</code></td><td>耕す。草地 ⇔ 土 が入れかわる</td></tr>
+      <tr><td><code>use_item(Items.Water)</code></td><td>足もとに水をまく。しばらく成長が速くなる</td></tr>
+      <tr><td><code>do_a_flip()</code></td><td>宙返り（1秒）</td></tr>
+      <tr><td><code>print(...)</code></td><td>コンソールに表示。ドローンもしゃべる</td></tr>
+      <tr><td><code>clear()</code></td><td>畑を全部草地にもどして、ドローンを (0, 0) へ</td></tr>
+    </table>
+    <h3>調べる（すぐ終わる命令）</h3>
+    <table>
+      <tr><td><code>can_harvest()</code></td><td>足もとが収穫できるなら <code>True</code></td></tr>
+      <tr><td><code>get_entity_type()</code></td><td>足もとの作物（<code>Entities.Grass</code> など）。何もなければ <code>None</code></td></tr>
+      <tr><td><code>get_ground_type()</code></td><td><code>Grounds.Grassland</code>（草地）か <code>Grounds.Soil</code>（土）</td></tr>
+      <tr><td><code>get_pos_x()</code> / <code>get_pos_y()</code></td><td>ドローンの位置。左下が (0, 0)</td></tr>
+      <tr><td><code>get_world_size()</code></td><td>畑の一辺のマス数</td></tr>
+      <tr><td><code>get_water()</code></td><td>足もとの水の量（0〜1）</td></tr>
+      <tr><td><code>num_items(Items.Hay)</code></td><td>持っているアイテムの数</td></tr>
+      <tr><td><code>get_time()</code></td><td>ゲーム内の経過時間（秒）</td></tr>
+    </table>
+    <h3>作物</h3>
+    <table>
+      <tr><td><code>Entities.Grass</code></td><td>草地に自動で生える。収穫で 🌾干し草 ×1</td></tr>
+      <tr><td><code>Entities.Bush</code></td><td>しげみ。🪵木材 ×1</td></tr>
+      <tr><td><code>Entities.Tree</code></td><td>木。🪵木材 ×5。上下左右に木があると育つのが半分の速さ</td></tr>
+      <tr><td><code>Entities.Carrot</code></td><td>ニンジン。土にだけ植えられる。植えるのに 🪵1 と 🌾1。収穫で 🥕×2</td></tr>
+      <tr><td><code>Entities.Pumpkin</code></td><td>カボチャ。土にだけ植えられる。植えるのに 🥕1。収穫で 🎃×3。ときどき枯れる（<code>Entities.Dead_Pumpkin</code>）</td></tr>
+    </table>
+    <h3>使える文法</h3>
+    <p><code>if / elif / else</code>、<code>while</code>、<code>for x in ...</code>、<code>break</code>、<code>continue</code>、<code>def</code>、<code>return</code>、<code>global</code>、<code>and / or / not</code>、リスト <code>[1, 2]</code>、タプル <code>(1, 2)</code>、辞書 <code>{"a": 1}</code>、<code>x if 条件 else y</code><br>
+    関数：<code>range len abs min max sum int float str list dict sorted round random</code>、リストの <code>.append .pop .insert .remove .index</code>、辞書の <code>.get .keys .values .items</code></p>
+    <h3>キー操作</h3>
+    <p>Tab で字下げ、Shift+Tab で戻す。Enter で次の行も同じ字下げ（<code>:</code> で終わる行のあとは1段ふかく）。Ctrl/⌘+Enter で実行。</p>
+    <h3>データ</h3>
+    <p>プログラムと進みぐあいは、このブラウザに自動で保存されます。</p>
+    <button class="tb small danger" id="resetBtn">進みぐあいを消して最初から</button>
+  </div>
+</div>
+
+<script>
+// ===== Python風 ミニ言語（1文ずつ止まりながら実行できる） =====
+const STMT_COST = 0.004;
+const TICK = { cost: STMT_COST };
+
+class PyError extends Error { constructor(msg, line) { super(msg); this.line = line; } }
+const BRK = { sig: 'break' }, CNT = { sig: 'continue' };
+class ReturnSig { constructor(v) { this.v = v; } }
+
+class PyEnum {
+  constructor(group, name) { this.group = group; this.name = name; }
+}
+class PyNamespace {
+  constructor(name, members) { this.name = name; this.members = members; }
+}
+class Builtin {
+  constructor(name, fn, gen) { this.name = name; this.fn = fn; this.gen = !!gen; }
+}
+class PyFunction {
+  constructor(name, params, defaults, body, closure, line) {
+    this.name = name; this.params = params; this.defaults = defaults; this.body = body; this.closure = closure; this.line = line;
+  }
+}
+class PyDict {
+  constructor() { this.m = new Map(); }
+  static key(k, line) {
+    if (typeof k === 'number' || typeof k === 'boolean') return 'n' + (+k);
+    if (typeof k === 'string') return 's' + k;
+    if (k === null) return 'N';
+    if (k instanceof PyEnum) return 'e' + k.group + '.' + k.name;
+    if (Array.isArray(k) && k.isTuple) return 't(' + k.map(x => PyDict.key(x, line)).join(',') + ')';
+    throw new PyError(`${typeName(k)} は辞書のキーに使えません`, line);
+  }
+  get(k, line) { const e = this.m.get(PyDict.key(k, line)); return e; }
+  set(k, v, line) { this.m.set(PyDict.key(k, line), [k, v]); }
+  has(k, line) { return this.m.has(PyDict.key(k, line)); }
+  del(k, line) { return this.m.delete(PyDict.key(k, line)); }
+  keys() { return [...this.m.values()].map(e => e[0]); }
+  get size() { return this.m.size; }
+}
+function mkTuple(a) { a.isTuple = true; return a; }
+function isNum(v) { return typeof v === 'number' || typeof v === 'boolean'; }
+function typeName(v) {
+  if (v === null || v === undefined) return 'None';
+  if (typeof v === 'boolean') return 'bool';
+  if (typeof v === 'number') return Number.isInteger(v) ? 'int' : 'float';
+  if (typeof v === 'string') return 'str';
+  if (Array.isArray(v)) return v.isTuple ? 'tuple' : 'list';
+  if (v instanceof PyDict) return 'dict';
+  if (v instanceof PyEnum) return v.group;
+  if (v instanceof PyFunction || v instanceof Builtin) return 'function';
+  if (v instanceof PyNamespace) return v.name;
+  return 'object';
+}
+function fmtNum(v) {
+  if (Number.isInteger(v)) return String(v);
+  if (!isFinite(v)) return v > 0 ? 'inf' : (v < 0 ? '-inf' : 'nan');
+  return String(Math.round(v * 1e12) / 1e12);
+}
+function repr(v) {
+  if (v === null || v === undefined) return 'None';
+  if (v === true) return 'True';
+  if (v === false) return 'False';
+  if (typeof v === 'number') return fmtNum(v);
+  if (typeof v === 'string') return "'" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n') + "'";
+  if (Array.isArray(v)) {
+    const inner = v.map(repr).join(', ');
+    return v.isTuple ? '(' + inner + (v.length === 1 ? ',' : '') + ')' : '[' + inner + ']';
+  }
+  if (v instanceof PyDict) return '{' + [...v.m.values()].map(([k, x]) => repr(k) + ': ' + repr(x)).join(', ') + '}';
+  if (v instanceof PyEnum) return v.group + '.' + v.name;
+  if (v instanceof PyFunction) return `<function ${v.name}>`;
+  if (v instanceof Builtin) return `<built-in function ${v.name}>`;
+  if (v instanceof PyNamespace) return v.name;
+  return String(v);
+}
+function str(v) { return typeof v === 'string' ? v : repr(v); }
+function truthy(v) {
+  if (v === null || v === undefined || v === false || v === 0 || v === '') return false;
+  if (Array.isArray(v)) return v.length > 0;
+  if (v instanceof PyDict) return v.size > 0;
+  return true;
+}
+function pyEq(a, b) {
+  if (isNum(a) && isNum(b)) return +a === +b;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (!!a.isTuple !== !!b.isTuple || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!pyEq(a[i], b[i])) return false;
+    return true;
+  }
+  if (a === undefined) a = null;
+  if (b === undefined) b = null;
+  return a === b;
+}
+
+// ----- 字句解析 -----
+const KEYWORDS = new Set(['if', 'elif', 'else', 'while', 'for', 'in', 'def', 'return', 'break', 'continue', 'pass',
+  'and', 'or', 'not', 'is', 'global', 'True', 'False', 'None']);
+const OPS3 = ['//=', '**='];
+const OPS2 = ['==', '!=', '<=', '>=', '//', '**', '+=', '-=', '*=', '/=', '%='];
+const OPS1 = '+-*/%<>=()[]{},:.';
+
+function tokenize(src) {
+  const lines = src.replace(/\r\n?/g, '\n').split('\n');
+  const toks = [], indents = [0];
+  let depth = 0, lastLine = 1;
+  for (let ln = 0; ln < lines.length; ln++) {
+    const line = lines[ln], L = ln + 1;
+    let i = 0;
+    if (depth === 0) {
+      let col = 0;
+      while (i < line.length && (line[i] === ' ' || line[i] === '\t')) { col += line[i] === '\t' ? 4 : 1; i++; }
+      if (i >= line.length || line[i] === '#') continue;
+      if (col > indents[indents.length - 1]) { indents.push(col); toks.push({ t: 'INDENT', line: L }); }
+      else {
+        while (col < indents[indents.length - 1]) { indents.pop(); toks.push({ t: 'DEDENT', line: L }); }
+        if (col !== indents[indents.length - 1]) throw new PyError('インデント（字下げ）の位置がずれています', L);
+      }
+    }
+    let any = false;
+    while (i < line.length) {
+      const c = line[i];
+      if (c === ' ' || c === '\t') { i++; continue; }
+      if (c === '#') break;
+      any = true;
+      if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(line[i + 1] || ''))) {
+        const m = /^(\d+\.\d*|\.\d+|\d+)/.exec(line.slice(i));
+        toks.push({ t: 'num', v: parseFloat(m[0]), line: L }); i += m[0].length; continue;
+      }
+      if (/[A-Za-z_]/.test(c)) {
+        const m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(line.slice(i));
+        toks.push({ t: KEYWORDS.has(m[0]) ? 'kw' : 'name', v: m[0], line: L }); i += m[0].length; continue;
+      }
+      if (c === '"' || c === "'") {
+        let j = i + 1, s = '';
+        while (j < line.length && line[j] !== c) {
+          if (line[j] === '\\' && j + 1 < line.length) {
+            const n = line[j + 1];
+            s += n === 'n' ? '\n' : n === 't' ? '\t' : n; j += 2;
+          } else { s += line[j]; j++; }
+        }
+        if (j >= line.length) throw new PyError('文字列が閉じられていません（" や \' が足りません）', L);
+        toks.push({ t: 'str', v: s, line: L }); i = j + 1; continue;
+      }
+      const three = line.substr(i, 3), two = line.substr(i, 2);
+      if (OPS3.includes(three)) { toks.push({ t: 'op', v: three, line: L }); i += 3; continue; }
+      if (OPS2.includes(two)) { toks.push({ t: 'op', v: two, line: L }); i += 2; continue; }
+      if (OPS1.includes(c)) {
+        if ('([{'.includes(c)) depth++;
+        if (')]}'.includes(c)) depth = Math.max(0, depth - 1);
+        toks.push({ t: 'op', v: c, line: L }); i++; continue;
+      }
+      throw new PyError(`使えない文字があります: ${c}`, L);
+    }
+    if (depth === 0 && any && toks.length && !['NEWLINE', 'INDENT', 'DEDENT'].includes(toks[toks.length - 1].t)) toks.push({ t: 'NEWLINE', line: L });
+    lastLine = L;
+  }
+  if (depth > 0) throw new PyError('かっこが閉じられていません', lastLine);
+  if (toks.length && toks[toks.length - 1].t !== 'NEWLINE') toks.push({ t: 'NEWLINE', line: lastLine });
+  while (indents.length > 1) { indents.pop(); toks.push({ t: 'DEDENT', line: lastLine }); }
+  toks.push({ t: 'EOF', line: lastLine });
+  return toks;
+}
+
+// ----- 構文解析 -----
+class Parser {
+  constructor(toks) { this.t = toks; this.p = 0; }
+  peek(o = 0) { return this.t[this.p + o]; }
+  next() { return this.t[this.p++]; }
+  is(t, v, o = 0) { const k = this.t[this.p + o]; return k && k.t === t && (v === undefined || k.v === v); }
+  isOp(v) { return this.is('op', v); }
+  isKw(v) { return this.is('kw', v); }
+  line() { return this.peek().line; }
+  err(msg) { throw new PyError(msg, this.line()); }
+  expectOp(v, msg) { if (!this.isOp(v)) this.err(msg || `'${v}' が必要です`); return this.next(); }
+  program() {
+    const body = [];
+    while (!this.is('EOF')) {
+      if (this.is('NEWLINE')) { this.next(); continue; }
+      if (this.is('INDENT')) this.err('ここで字下げ（インデント）はできません');
+      body.push(this.stmt());
+    }
+    return body;
+  }
+  stmt() {
+    if (this.is('kw')) {
+      switch (this.peek().v) {
+        case 'if': return this.ifStmt();
+        case 'while': { const line = this.line(); this.next(); const test = this.expr(); const body = this.suite(); return { k: 'while', test, body, line }; }
+        case 'for': return this.forStmt();
+        case 'def': return this.defStmt();
+        case 'elif': case 'else': this.err(`${this.peek().v} の前に if がありません（字下げを確認してください）`);
+      }
+    }
+    const s = this.simple();
+    this.endStmt();
+    return s;
+  }
+  endStmt() {
+    if (this.is('NEWLINE')) { this.next(); return; }
+    if (this.is('EOF') || this.is('DEDENT')) return;
+    this.err('文の書き方がまちがっています');
+  }
+  suite() {
+    this.expectOp(':', "行の最後に ':' が必要です");
+    if (this.is('NEWLINE')) {
+      this.next();
+      if (!this.is('INDENT')) this.err('次の行は字下げ（インデント）が必要です');
+      this.next();
+      const body = [];
+      while (!this.is('DEDENT') && !this.is('EOF')) {
+        if (this.is('NEWLINE')) { this.next(); continue; }
+        body.push(this.stmt());
+      }
+      if (this.is('DEDENT')) this.next();
+      return body;
+    }
+    const s = this.simple(); this.endStmt(); return [s];
+  }
+  ifStmt() {
+    const tests = [];
+    let line = this.line(); this.next();
+    let c = this.expr(); tests.push([c, this.suite(), line]);
+    let orelse = null;
+    while (this.isKw('elif')) { line = this.line(); this.next(); c = this.expr(); tests.push([c, this.suite(), line]); }
+    if (this.isKw('else')) { this.next(); orelse = this.suite(); }
+    return { k: 'if', tests, orelse, line: tests[0][2] };
+  }
+  forStmt() {
+    const line = this.line(); this.next();
+    const target = this.targetList();
+    if (!this.isKw('in')) this.err("for の後には 'in' が必要です（例: for i in range(5):）");
+    this.next();
+    const iter = this.exprList();
+    const body = this.suite();
+    return { k: 'for', target, iter, body, line };
+  }
+  targetList() {
+    const items = [this.postfix()];
+    while (this.isOp(',')) { this.next(); items.push(this.postfix()); }
+    return items.length === 1 ? items[0] : { k: 'tuple', items, line: items[0].line };
+  }
+  defStmt() {
+    const line = this.line(); this.next();
+    if (!this.is('name')) this.err('def の後には関数の名前が必要です');
+    const name = this.next().v;
+    this.expectOp('(');
+    const params = [], defaults = [];
+    while (!this.isOp(')')) {
+      if (!this.is('name')) this.err('引数の名前が必要です');
+      params.push(this.next().v);
+      if (this.isOp('=')) { this.next(); defaults.push(this.expr()); } else defaults.push(null);
+      if (this.isOp(',')) this.next(); else break;
+    }
+    this.expectOp(')');
+    const body = this.suite();
+    return { k: 'def', name, params, defaults, body, line };
+  }
+  simple() {
+    const line = this.line();
+    if (this.is('kw')) {
+      const v = this.peek().v;
+      if (v === 'pass') { this.next(); return { k: 'pass', line }; }
+      if (v === 'break') { this.next(); return { k: 'break', line }; }
+      if (v === 'continue') { this.next(); return { k: 'continue', line }; }
+      if (v === 'return') {
+        this.next();
+        const value = (this.is('NEWLINE') || this.is('EOF') || this.is('DEDENT')) ? null : this.exprList();
+        return { k: 'return', value, line };
+      }
+      if (v === 'global') {
+        this.next(); const names = [];
+        do { if (!this.is('name')) this.err('global の後には変数名が必要です'); names.push(this.next().v); } while (this.isOp(',') && this.next());
+        return { k: 'global', names, line };
+      }
+    }
+    const e = this.exprList();
+    if (this.isOp('=')) {
+      const targets = [e]; let value;
+      while (this.isOp('=')) { this.next(); value = this.exprList(); targets.push(value); }
+      targets.pop();
+      for (const t of targets) this.checkTarget(t);
+      return { k: 'assign', targets, value, line };
+    }
+    for (const op of ['+=', '-=', '*=', '/=', '//=', '%=', '**=']) {
+      if (this.isOp(op)) {
+        this.next(); this.checkTarget(e);
+        if (e.k === 'tuple') this.err('この書き方はできません');
+        return { k: 'aug', op: op.slice(0, -1), target: e, value: this.expr(), line };
+      }
+    }
+    return { k: 'expr', e, line };
+  }
+  checkTarget(t) {
+    if (t.k === 'name' || t.k === 'index') return;
+    if (t.k === 'tuple' || t.k === 'list') { t.items.forEach(x => this.checkTarget(x)); return; }
+    throw new PyError('= の左側には変数を書いてください（== と まちがえていませんか？）', t.line);
+  }
+  exprList() {
+    const line = this.line();
+    const first = this.expr();
+    if (!this.isOp(',')) return first;
+    const items = [first];
+    while (this.isOp(',')) {
+      this.next();
+      if (this.is('NEWLINE') || this.isOp('=') || this.isOp(':') || this.isOp(')') || this.is('EOF')) break;
+      items.push(this.expr());
+    }
+    return { k: 'tuple', items, line };
+  }
+  expr() {
+    const line = this.line();
+    const a = this.orExpr();
+    if (this.isKw('if')) {
+      this.next(); const cond = this.orExpr();
+      if (!this.isKw('else')) this.err("'else' が必要です");
+      this.next(); const b = this.expr();
+      return { k: 'ifexp', cond, a, b, line };
+    }
+    return a;
+  }
+  orExpr() { let l = this.andExpr(); while (this.isKw('or')) { const line = this.line(); this.next(); l = { k: 'or', l, r: this.andExpr(), line }; } return l; }
+  andExpr() { let l = this.notExpr(); while (this.isKw('and')) { const line = this.line(); this.next(); l = { k: 'and', l, r: this.notExpr(), line }; } return l; }
+  notExpr() { if (this.isKw('not')) { const line = this.line(); this.next(); return { k: 'unary', op: 'not', e: this.notExpr(), line }; } return this.comparison(); }
+  comparison() {
+    const line = this.line();
+    const first = this.arith(); const ops = [];
+    while (true) {
+      let op = null;
+      if (this.is('op') && ['==', '!=', '<', '>', '<=', '>='].includes(this.peek().v)) op = this.next().v;
+      else if (this.isKw('in')) { this.next(); op = 'in'; }
+      else if (this.isKw('not') && this.is('kw', 'in', 1)) { this.next(); this.next(); op = 'not in'; }
+      else if (this.isKw('is')) { this.next(); op = 'is'; if (this.isKw('not')) { this.next(); op = 'is not'; } }
+      if (!op) break;
+      ops.push([op, this.arith()]);
+    }
+    return ops.length ? { k: 'cmp', first, ops, line } : first;
+  }
+  arith() {
+    let l = this.term();
+    while (this.isOp('+') || this.isOp('-')) { const line = this.line(); const op = this.next().v; l = { k: 'bin', op, l, r: this.term(), line }; }
+    return l;
+  }
+  term() {
+    let l = this.unary();
+    while (this.is('op') && ['*', '/', '//', '%'].includes(this.peek().v)) { const line = this.line(); const op = this.next().v; l = { k: 'bin', op, l, r: this.unary(), line }; }
+    return l;
+  }
+  unary() {
+    if (this.isOp('-') || this.isOp('+')) { const line = this.line(); const op = this.next().v; return { k: 'unary', op, e: this.unary(), line }; }
+    return this.power();
+  }
+  power() {
+    const b = this.postfix();
+    if (this.isOp('**')) { const line = this.line(); this.next(); return { k: 'bin', op: '**', l: b, r: this.unary(), line }; }
+    return b;
+  }
+  postfix() {
+    let e = this.atom();
+    while (true) {
+      const line = this.line();
+      if (this.isOp('(')) {
+        this.next(); const args = [];
+        while (!this.isOp(')')) {
+          if (this.is('name') && this.is('op', '=', 1)) this.err('名前付き引数（x=1 のような書き方）は使えません');
+          args.push(this.expr());
+          if (this.isOp(',')) this.next(); else break;
+        }
+        this.expectOp(')', "')' が必要です");
+        e = { k: 'call', f: e, args, line };
+      } else if (this.isOp('[')) {
+        this.next();
+        let lo = null, hi = null, isSlice = false;
+        if (!this.isOp(':')) lo = this.expr();
+        if (this.isOp(':')) { isSlice = true; this.next(); if (!this.isOp(']')) hi = this.expr(); }
+        this.expectOp(']', "']' が必要です");
+        e = isSlice ? { k: 'slice', o: e, lo, hi, line } : { k: 'index', o: e, i: lo, line };
+      } else if (this.isOp('.')) {
+        this.next();
+        if (!this.is('name') && !this.is('kw')) this.err('. の後には名前が必要です');
+        e = { k: 'attr', o: e, name: this.next().v, line };
+      } else break;
+    }
+    return e;
+  }
+  atom() {
+    const k = this.peek(), line = k.line;
+    if (k.t === 'num') { this.next(); return { k: 'const', v: k.v, line }; }
+    if (k.t === 'str') { this.next(); let v = k.v; while (this.is('str')) v += this.next().v; return { k: 'const', v, line }; }
+    if (k.t === 'name') { this.next(); return { k: 'name', v: k.v, line }; }
+    if (k.t === 'kw') {
+      if (k.v === 'True') { this.next(); return { k: 'const', v: true, line }; }
+      if (k.v === 'False') { this.next(); return { k: 'const', v: false, line }; }
+      if (k.v === 'None') { this.next(); return { k: 'const', v: null, line }; }
+    }
+    if (this.isOp('(')) {
+      this.next();
+      if (this.isOp(')')) { this.next(); return { k: 'tuple', items: [], line }; }
+      const e = this.expr();
+      if (this.isOp(',')) {
+        const items = [e];
+        while (this.isOp(',')) { this.next(); if (this.isOp(')')) break; items.push(this.expr()); }
+        this.expectOp(')'); return { k: 'tuple', items, line };
+      }
+      this.expectOp(')', "')' が必要です"); return e;
+    }
+    if (this.isOp('[')) {
+      this.next(); const items = [];
+      while (!this.isOp(']')) { items.push(this.expr()); if (this.isOp(',')) this.next(); else break; }
+      this.expectOp(']', "']' が必要です"); return { k: 'list', items, line };
+    }
+    if (this.isOp('{')) {
+      this.next(); const items = [];
+      while (!this.isOp('}')) {
+        const key = this.expr(); this.expectOp(':', "辞書には ':' が必要です"); items.push([key, this.expr()]);
+        if (this.isOp(',')) this.next(); else break;
+      }
+      this.expectOp('}', "'}' が必要です"); return { k: 'dict', items, line };
+    }
+    if (k.t === 'NEWLINE' || k.t === 'EOF') this.err('式が途中で終わっています');
+    if (k.t === 'INDENT') this.err('ここで字下げ（インデント）はできません');
+    this.err(`ここに ${k.v !== undefined ? "'" + k.v + "'" : k.t} は書けません`);
+  }
+}
+
+function parse(src) { return new Parser(tokenize(src)).program(); }
+
+// ----- 実行 -----
+class Env {
+  constructor(parent) { this.vars = new Map(); this.parent = parent; this.globals = new Set(); }
+}
+
+class Interp {
+  constructor(prog, builtins) {
+    this.prog = prog; this.builtins = builtins;
+    this.globals = new Env(null);
+    this.stack = [0];
+  }
+  *main() { yield* this.block(this.prog, this.globals); }
+  *block(body, env) { for (const s of body) yield* this.stmt(s, env); }
+  mark(line) { this.stack[this.stack.length - 1] = line; }
+  *stmt(s, env) {
+    this.mark(s.line);
+    yield TICK;
+    switch (s.k) {
+      case 'expr': yield* this.eval(s.e, env); return;
+      case 'assign': {
+        const v = yield* this.eval(s.value, env);
+        for (const t of s.targets) yield* this.assign(t, v, env);
+        return;
+      }
+      case 'aug': {
+        const cur = yield* this.eval(s.target, env);
+        const r = yield* this.eval(s.value, env);
+        yield* this.assign(s.target, this.binop(s.op, cur, r, s.line), env);
+        return;
+      }
+      case 'pass': return;
+      case 'break': throw BRK;
+      case 'continue': throw CNT;
+      case 'return': {
+        const v = s.value ? yield* this.eval(s.value, env) : null;
+        throw new ReturnSig(v);
+      }
+      case 'global': if (env === this.globals) return; for (const n of s.names) env.globals.add(n); return;
+      case 'if': {
+        for (let i = 0; i < s.tests.length; i++) {
+          const [c, body, line] = s.tests[i];
+          if (i > 0) { this.mark(line); yield TICK; }
+          const cv = yield* this.eval(c, env);
+          if (truthy(cv)) { yield* this.block(body, env); return; }
+        }
+        if (s.orelse) yield* this.block(s.orelse, env);
+        return;
+      }
+      case 'while': {
+        let first = true;
+        while (true) {
+          if (!first) { this.mark(s.line); yield TICK; }
+          first = false;
+          const cv = yield* this.eval(s.test, env);
+          if (!truthy(cv)) break;
+          try { yield* this.block(s.body, env); }
+          catch (e) { if (e === BRK) break; if (e === CNT) continue; throw e; }
+        }
+        return;
+      }
+      case 'for': {
+        const itv = yield* this.eval(s.iter, env);
+        const items = this.iter(itv, s.line);
+        let first = true;
+        for (const v of items) {
+          if (!first) { this.mark(s.line); yield TICK; }
+          first = false;
+          yield* this.assign(s.target, v, env);
+          try { yield* this.block(s.body, env); }
+          catch (e) { if (e === BRK) break; if (e === CNT) continue; throw e; }
+        }
+        return;
+      }
+      case 'def': {
+        const defaults = [];
+        for (const d of s.defaults) defaults.push(d ? yield* this.eval(d, env) : undefined);
+        this.setName(env, s.name, new PyFunction(s.name, s.params, defaults, s.body, env, s.line));
+        return;
+      }
+    }
+    throw new PyError('不明な文です', s.line);
+  }
+  setName(env, name, v) {
+    if (env.globals.has(name)) this.globals.vars.set(name, v); else env.vars.set(name, v);
+  }
+  lookup(env, name, line) {
+    if (env.globals.has(name) && this.globals.vars.has(name)) return this.globals.vars.get(name);
+    for (let e = env; e; e = e.parent) if (e.vars.has(name)) return e.vars.get(name);
+    if (Object.prototype.hasOwnProperty.call(this.builtins, name)) return this.builtins[name];
+    throw new PyError(`'${name}' が見つかりません（名前のまちがい？ まだ作っていない変数？）`, line);
+  }
+  *assign(t, v, env) {
+    if (t.k === 'name') { this.setName(env, t.v, v); return; }
+    if (t.k === 'index') {
+      const o = yield* this.eval(t.o, env);
+      const i = yield* this.eval(t.i, env);
+      this.setIndex(o, i, v, t.line); return;
+    }
+    if (t.k === 'tuple' || t.k === 'list') {
+      const vals = this.iter(v, t.line);
+      if (vals.length !== t.items.length) throw new PyError(`${t.items.length} 個に分けようとしましたが、値は ${vals.length} 個です`, t.line);
+      for (let i = 0; i < vals.length; i++) yield* this.assign(t.items[i], vals[i], env);
+      return;
+    }
+    throw new PyError('ここには代入できません', t.line);
+  }
+  *eval(e, env) {
+    switch (e.k) {
+      case 'const': return e.v;
+      case 'name': return this.lookup(env, e.v, e.line);
+      case 'list': { const a = []; for (const x of e.items) a.push(yield* this.eval(x, env)); return a; }
+      case 'tuple': { const a = []; for (const x of e.items) a.push(yield* this.eval(x, env)); return mkTuple(a); }
+      case 'dict': {
+        const d = new PyDict();
+        for (const [k, v] of e.items) { const kk = yield* this.eval(k, env); const vv = yield* this.eval(v, env); d.set(kk, vv, e.line); }
+        return d;
+      }
+      case 'bin': { const a = yield* this.eval(e.l, env); const b = yield* this.eval(e.r, env); return this.binop(e.op, a, b, e.line); }
+      case 'unary': {
+        const v = yield* this.eval(e.e, env);
+        if (e.op === 'not') return !truthy(v);
+        if (!isNum(v)) throw new PyError(`${typeName(v)} に '${e.op}' は使えません`, e.line);
+        return e.op === '-' ? -v : +v;
+      }
+      case 'and': { const a = yield* this.eval(e.l, env); if (!truthy(a)) return a; return yield* this.eval(e.r, env); }
+      case 'or': { const a = yield* this.eval(e.l, env); if (truthy(a)) return a; return yield* this.eval(e.r, env); }
+      case 'cmp': {
+        let left = yield* this.eval(e.first, env);
+        for (const [op, re] of e.ops) {
+          const right = yield* this.eval(re, env);
+          if (!this.compare(op, left, right, e.line)) return false;
+          left = right;
+        }
+        return true;
+      }
+      case 'ifexp': { const c = yield* this.eval(e.cond, env); return yield* this.eval(truthy(c) ? e.a : e.b, env); }
+      case 'call': {
+        const f = yield* this.eval(e.f, env);
+        const args = [];
+        for (const a of e.args) args.push(yield* this.eval(a, env));
+        return yield* this.call(f, args, e.line);
+      }
+      case 'index': { const o = yield* this.eval(e.o, env); const i = yield* this.eval(e.i, env); return this.getIndex(o, i, e.line); }
+      case 'slice': {
+        const o = yield* this.eval(e.o, env);
+        const lo = e.lo ? yield* this.eval(e.lo, env) : null;
+        const hi = e.hi ? yield* this.eval(e.hi, env) : null;
+        if (!(typeof o === 'string' || Array.isArray(o))) throw new PyError(`${typeName(o)} は切り出せません`, e.line);
+        const n = o.length;
+        const fix = (x, d) => x === null ? d : (x < 0 ? Math.max(0, n + x) : Math.min(n, x));
+        const r = o.slice(fix(lo, 0), fix(hi, n));
+        return Array.isArray(o) && o.isTuple ? mkTuple(r) : r;
+      }
+      case 'attr': { const o = yield* this.eval(e.o, env); return this.getAttr(o, e.name, e.line); }
+    }
+    throw new PyError('不明な式です', e.line);
+  }
+  *call(f, args, line) {
+    if (f instanceof Builtin) {
+      if (f.gen) return yield* f.fn(args, line, this);
+      return f.fn(args, line, this);
+    }
+    if (f instanceof PyFunction) {
+      const p = f.params;
+      if (args.length > p.length) throw new PyError(`${f.name}() の引数が多すぎます（${p.length} 個までです）`, line);
+      const env = new Env(f.closure);
+      for (let i = 0; i < p.length; i++) {
+        const v = i < args.length ? args[i] : f.defaults[i];
+        if (v === undefined) throw new PyError(`${f.name}() の引数 '${p[i]}' が足りません`, line);
+        env.vars.set(p[i], v);
+      }
+      if (this.stack.length > 120) throw new PyError('関数の呼び出しが深すぎます（終わらない再帰になっていませんか？）', line);
+      this.stack.push(f.line);
+      try { yield* this.block(f.body, env); return null; }
+      catch (e) {
+        if (e instanceof ReturnSig) return e.v;
+        if (e === BRK || e === CNT) throw new PyError('break / continue はループの中でしか使えません', line);
+        throw e;
+      }
+      finally { this.stack.pop(); }
+    }
+    throw new PyError(`${typeName(f)} は関数ではないので () で呼べません`, line);
+  }
+  binop(op, a, b, line) {
+    switch (op) {
+      case '+':
+        if (isNum(a) && isNum(b)) return +a + +b;
+        if (typeof a === 'string' && typeof b === 'string') return a + b;
+        if (Array.isArray(a) && Array.isArray(b) && !!a.isTuple === !!b.isTuple) { const r = a.concat(b); return a.isTuple ? mkTuple(r) : r; }
+        if (typeof a === 'string' || typeof b === 'string') throw new PyError('文字列と数は + でつなげません（str() で文字列にしてください）', line);
+        break;
+      case '-': if (isNum(a) && isNum(b)) return a - b; break;
+      case '*':
+        if (isNum(a) && isNum(b)) return a * b;
+        if (typeof a === 'string' && isNum(b)) return a.repeat(Math.max(0, b | 0));
+        if (Array.isArray(a) && isNum(b)) { let r = []; for (let i = 0; i < b; i++) r = r.concat(a); return a.isTuple ? mkTuple(r) : r; }
+        break;
+      case '/': if (isNum(a) && isNum(b)) { if (+b === 0) throw new PyError('0 で割ることはできません', line); return a / b; } break;
+      case '//': if (isNum(a) && isNum(b)) { if (+b === 0) throw new PyError('0 で割ることはできません', line); return Math.floor(a / b); } break;
+      case '%': if (isNum(a) && isNum(b)) { if (+b === 0) throw new PyError('0 で割ることはできません', line); return ((a % b) + +b) % b; } break;
+      case '**': if (isNum(a) && isNum(b)) return Math.pow(a, b); break;
+    }
+    throw new PyError(`${typeName(a)} と ${typeName(b)} に '${op}' は使えません`, line);
+  }
+  compare(op, a, b, line) {
+    switch (op) {
+      case '==': return pyEq(a, b);
+      case '!=': return !pyEq(a, b);
+      case 'is': return pyEq(a, b) && (typeof a !== 'object' || a === b || a === null);
+      case 'is not': return !this.compare('is', a, b, line);
+      case 'in': return this.contains(b, a, line);
+      case 'not in': return !this.contains(b, a, line);
+    }
+    const ok = (isNum(a) && isNum(b)) || (typeof a === 'string' && typeof b === 'string');
+    if (!ok) throw new PyError(`${typeName(a)} と ${typeName(b)} は '${op}' でくらべられません`, line);
+    if (op === '<') return a < b;
+    if (op === '>') return a > b;
+    if (op === '<=') return a <= b;
+    return a >= b;
+  }
+  contains(c, x, line) {
+    if (Array.isArray(c)) return c.some(v => pyEq(v, x));
+    if (typeof c === 'string') { if (typeof x !== 'string') throw new PyError("文字列の 'in' には文字列が必要です", line); return c.includes(x); }
+    if (c instanceof PyDict) return c.has(x, line);
+    throw new PyError(`${typeName(c)} には 'in' は使えません`, line);
+  }
+  iter(v, line) {
+    if (Array.isArray(v)) return v.slice();
+    if (typeof v === 'string') return [...v];
+    if (v instanceof PyDict) return v.keys();
+    throw new PyError(`${typeName(v)} は for で順番に取り出せません`, line);
+  }
+  idx(o, i, line) {
+    if (typeof i === 'boolean') i = +i;
+    if (typeof i !== 'number' || !Number.isInteger(i)) throw new PyError('番号（インデックス）は整数で指定してください', line);
+    const j = i < 0 ? o.length + i : i;
+    if (j < 0 || j >= o.length) throw new PyError(`番号 ${i} は範囲外です（長さは ${o.length}）`, line);
+    return j;
+  }
+  getIndex(o, i, line) {
+    if (Array.isArray(o) || typeof o === 'string') return o[this.idx(o, i, line)];
+    if (o instanceof PyDict) { const e = o.get(i, line); if (!e) throw new PyError(`辞書にキー ${repr(i)} がありません`, line); return e[1]; }
+    throw new PyError(`${typeName(o)} には [ ] は使えません`, line);
+  }
+  setIndex(o, i, v, line) {
+    if (Array.isArray(o) && !o.isTuple) { o[this.idx(o, i, line)] = v; return; }
+    if (o instanceof PyDict) { o.set(i, v, line); return; }
+    throw new PyError(`${typeName(o)} の中身は書きかえられません`, line);
+  }
+  getAttr(o, name, line) {
+    if (o instanceof PyNamespace) {
+      if (Object.prototype.hasOwnProperty.call(o.members, name)) return o.members[name];
+      throw new PyError(`${o.name}.${name} はありません`, line);
+    }
+    const B = (fn) => new Builtin(name, fn, false);
+    if (Array.isArray(o) && !o.isTuple) {
+      switch (name) {
+        case 'append': return B(([x]) => { o.push(x); return null; });
+        case 'pop': return B(([i]) => { if (!o.length) throw new PyError('空のリストから pop できません', line); const j = i === undefined ? o.length - 1 : this.idx(o, i, line); return o.splice(j, 1)[0]; });
+        case 'insert': return B(([i, x]) => { o.splice(i < 0 ? Math.max(0, o.length + i) : i, 0, x); return null; });
+        case 'remove': return B(([x]) => { const j = o.findIndex(v => pyEq(v, x)); if (j < 0) throw new PyError(`${repr(x)} はリストにありません`, line); o.splice(j, 1); return null; });
+        case 'index': return B(([x]) => { const j = o.findIndex(v => pyEq(v, x)); if (j < 0) throw new PyError(`${repr(x)} はリストにありません`, line); return j; });
+        case 'count': return B(([x]) => o.filter(v => pyEq(v, x)).length);
+        case 'sort': return B(() => { o.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)); return null; });
+        case 'reverse': return B(() => { o.reverse(); return null; });
+        case 'clear': return B(() => { o.length = 0; return null; });
+      }
+    }
+    if (Array.isArray(o) && o.isTuple) {
+      if (name === 'index') return B(([x]) => { const j = o.findIndex(v => pyEq(v, x)); if (j < 0) throw new PyError(`${repr(x)} はありません`, line); return j; });
+      if (name === 'count') return B(([x]) => o.filter(v => pyEq(v, x)).length);
+    }
+    if (o instanceof PyDict) {
+      switch (name) {
+        case 'get': return B(([k, d]) => { const e = o.get(k, line); return e ? e[1] : (d === undefined ? null : d); });
+        case 'keys': return B(() => o.keys());
+        case 'values': return B(() => [...o.m.values()].map(e => e[1]));
+        case 'items': return B(() => [...o.m.values()].map(e => mkTuple([e[0], e[1]])));
+        case 'pop': return B(([k, d]) => { const e = o.get(k, line); if (!e) { if (d !== undefined) return d; throw new PyError(`辞書にキー ${repr(k)} がありません`, line); } o.del(k, line); return e[1]; });
+        case 'clear': return B(() => { o.m.clear(); return null; });
+      }
+    }
+    if (typeof o === 'string') {
+      switch (name) {
+        case 'upper': return B(() => o.toUpperCase());
+        case 'lower': return B(() => o.toLowerCase());
+        case 'split': return B(([s]) => s === undefined ? o.split(/\s+/).filter(Boolean) : o.split(s));
+        case 'join': return B(([a]) => this.iter(a, line).map(x => { if (typeof x !== 'string') throw new PyError('join には文字列のリストが必要です', line); return x; }).join(o));
+        case 'replace': return B(([a, b]) => o.split(a).join(b));
+        case 'strip': return B(() => o.trim());
+      }
+    }
+    throw new PyError(`${typeName(o)} に .${name} はありません`, line);
+  }
+}
+
+// 共通の 組み込み関数
+function baseBuiltins(out) {
+  const B = (name, fn) => new Builtin(name, fn, false);
+  const need = (args, n, name, line) => { if (args.length < n) throw new PyError(`${name}() の引数が足りません`, line); };
+  const toList = (it, args, line) => { const a = args.length === 1 ? it.iter(args[0], line) : args; if (!a.length) throw new PyError('空です', line); return a; };
+  return {
+    len: B('len', ([x], line) => {
+      if (typeof x === 'string' || Array.isArray(x)) return x.length;
+      if (x instanceof PyDict) return x.size;
+      throw new PyError(`${typeName(x)} には len() は使えません`, line);
+    }),
+    range: B('range', (args, line) => {
+      need(args, 1, 'range', line);
+      for (const a of args) if (!isNum(a) || !Number.isInteger(+a)) throw new PyError('range() には整数を渡してください', line);
+      let [a, b, s] = args.length === 1 ? [0, +args[0], 1] : [+args[0], +args[1], args[2] === undefined ? 1 : +args[2]];
+      if (s === 0) throw new PyError('range() のステップに 0 は使えません', line);
+      const r = [];
+      for (let i = a; s > 0 ? i < b : i > b; i += s) { r.push(i); if (r.length > 200000) throw new PyError('range が大きすぎます', line); }
+      return r;
+    }),
+    abs: B('abs', ([x], line) => { if (!isNum(x)) throw new PyError('abs() には数が必要です', line); return Math.abs(x); }),
+    min: B('min', function (args, line, it) { return toList(it, args, line).reduce((m, v) => (it.compare('<', v, m, line) ? v : m)); }),
+    max: B('max', function (args, line, it) { return toList(it, args, line).reduce((m, v) => (it.compare('>', v, m, line) ? v : m)); }),
+    sum: B('sum', (args, line, it) => it.iter(args[0], line).reduce((a, v) => it.binop('+', a, v, line), 0)),
+    int: B('int', ([x], line) => {
+      if (x === undefined) return 0;
+      if (isNum(x)) return Math.trunc(x);
+      if (typeof x === 'string' && /^\s*[-+]?\d+\s*$/.test(x)) return parseInt(x, 10);
+      throw new PyError(`${repr(x)} は整数にできません`, line);
+    }),
+    float: B('float', ([x], line) => {
+      if (x === undefined) return 0;
+      if (isNum(x)) return +x;
+      if (typeof x === 'string' && x.trim() !== '' && !isNaN(+x)) return +x;
+      throw new PyError(`${repr(x)} は小数にできません`, line);
+    }),
+    round: B('round', ([x, n]) => { const k = Math.pow(10, n || 0); return Math.round(x * k) / k; }),
+    str: B('str', ([x]) => (x === undefined ? '' : str(x))),
+    bool: B('bool', ([x]) => truthy(x)),
+    list: B('list', (args, line, it) => (args.length ? it.iter(args[0], line) : [])),
+    tuple: B('tuple', (args, line, it) => mkTuple(args.length ? it.iter(args[0], line) : [])),
+    dict: B('dict', () => new PyDict()),
+    sorted: B('sorted', (args, line, it) => it.iter(args[0], line).sort((a, b) => (it.compare('<', a, b, line) ? -1 : it.compare('>', a, b, line) ? 1 : 0))),
+    random: B('random', () => Math.random()),
+    type: B('type', ([x]) => typeName(x)),
+  };
+}
+
+if (typeof module !== 'undefined') module.exports = { parse, Interp, baseBuiltins, Builtin, PyError, PyEnum, PyNamespace, PyDict, repr, str, truthy, mkTuple, STMT_COST };
+
+</script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  // ===== 定数 =====
+  const mkEnum = (group, names) => { const o = {}; for (const n of names) o[n] = new PyEnum(group, n); return o; };
+  const DIR = mkEnum('Direction', ['North', 'East', 'South', 'West']);
+  const DIRV = { North: [0, 1], East: [1, 0], South: [0, -1], West: [-1, 0] };
+  const ENTITIES = mkEnum('Entities', ['Grass', 'Bush', 'Tree', 'Carrot', 'Pumpkin', 'Dead_Pumpkin']);
+  const ITEMS = mkEnum('Items', ['Hay', 'Wood', 'Carrot', 'Pumpkin', 'Water']);
+  const GROUNDS = mkEnum('Grounds', ['Grassland', 'Soil']);
+  const ITEM_ICON = { Hay: '🌾', Wood: '🪵', Carrot: '🥕', Pumpkin: '🎃', Water: '💧' };
+  const ITEM_JP = { Hay: '干し草', Wood: '木材', Carrot: 'ニンジン', Pumpkin: 'カボチャ', Water: '水' };
+  const ENT = {
+    Grass:   { dur: [0.5, 0.15], yld: ['Hay', 1] },
+    Bush:    { dur: [3.2, 1.0], yld: ['Wood', 1], unlock: 'bush' },
+    Tree:    { dur: [7, 2], yld: ['Wood', 5], unlock: 'tree' },
+    Carrot:  { dur: [6, 1.5], yld: ['Carrot', 2], unlock: 'carrot', soil: true, cost: { Wood: 1, Hay: 1 } },
+    Pumpkin: { dur: [2.5, 0.5], yld: ['Pumpkin', 3], unlock: 'pumpkin', soil: true, cost: { Carrot: 1 } },
+    Dead_Pumpkin: { dur: [1, 0], yld: null },
+  };
+  const UNLOCKS = [
+    { id: 'bush', name: 'しげみ（Bush）', ds: '<code>plant(Entities.Bush)</code> で しげみを植えられる。収穫すると木材', cost: { Hay: 15 } },
+    { id: 'expand1', name: '畑を 4×4 に広げる', cost: { Hay: 40 }, req: ['bush'], size: 4 },
+    { id: 'speed1', name: 'ドローン高速化 Lv1', ds: '動く・収穫する などの時間が 25% 短くなる', cost: { Hay: 50, Wood: 10 }, req: ['bush'], speed: 1 },
+    { id: 'carrot', name: 'ニンジンと 耕す', ds: '<code>till()</code> で土にして <code>plant(Entities.Carrot)</code>。植えるのに 木材1・干し草1', cost: { Wood: 25, Hay: 30 }, req: ['bush'] },
+    { id: 'expand2', name: '畑を 5×5 に広げる', cost: { Hay: 120, Wood: 40 }, req: ['expand1'], size: 5 },
+    { id: 'tree', name: '木（Tree）', ds: '<code>plant(Entities.Tree)</code>。木材が5つ。となりに木があると育つのが遅い', cost: { Wood: 60, Carrot: 10 }, req: ['carrot'] },
+    { id: 'water', name: '水やり', ds: '<code>use_item(Items.Water)</code> で成長が速くなる。水は2秒に1つたまる', cost: { Wood: 50, Carrot: 20 }, req: ['carrot'] },
+    { id: 'speed2', name: 'ドローン高速化 Lv2', ds: 'さらに 25% 速く', cost: { Carrot: 60, Wood: 80 }, req: ['speed1', 'carrot'], speed: 2 },
+    { id: 'pumpkin', name: 'カボチャ', ds: '<code>plant(Entities.Pumpkin)</code>。ニンジン1で植えて カボチャ3。ときどき枯れる', cost: { Carrot: 120, Wood: 120 }, req: ['carrot'] },
+    { id: 'expand3', name: '畑を 6×6 に広げる', cost: { Wood: 250, Carrot: 120 }, req: ['expand2'], size: 6 },
+    { id: 'speed3', name: 'ドローン高速化 Lv3', ds: 'さらに 25% 速く', cost: { Pumpkin: 120, Carrot: 150 }, req: ['speed2', 'pumpkin'], speed: 3 },
+    { id: 'expand4', name: '畑を 8×8 に広げる', cost: { Pumpkin: 300, Wood: 500 }, req: ['expand3', 'pumpkin'], size: 8 },
+    { id: 'expand5', name: '畑を 10×10 に広げる', cost: { Pumpkin: 1000, Wood: 1500, Carrot: 800 }, req: ['expand4'], size: 10 },
+  ];
+  const DEFAULT_CODE = `# ドローンの プログラム
+# ▶ 実行 すると 上から1行ずつ 動きます。
+# いま実行している行が 黄色く 光ります。
+
+while True:
+    for i in range(get_world_size()):
+        if can_harvest():
+            harvest()
+        move(North)
+    move(East)
+`;
+
+  // ===== 畑 =====
+  const W = {
+    n: 3, tiles: [], items: { Hay: 0, Wood: 0, Carrot: 0, Pumpkin: 0, Water: 0 }, unlocked: new Set(), speedLv: 0,
+    drone: { x: 0, y: 0, anim: null, say: null }, clock: 0, waterAcc: 0,
+  };
+  function mkEnt(type, ready) {
+    const d = ENT[type];
+    return { type, prog: ready ? 1 : 0, dur: Math.max(0.2, d.dur[0] + (Math.random() * 2 - 1) * d.dur[1]), dead: type === 'Pumpkin' && Math.random() < 0.2 };
+  }
+  const newTile = (ready) => ({ ground: 'Grassland', ent: mkEnt('Grass', ready), water: 0 });
+  function setSize(n) {
+    const old = W.tiles, on = W.n, tiles = [];
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) tiles.push(x < on && y < on && old.length ? old[y * on + x] : newTile(true));
+    W.n = n; W.tiles = tiles;
+    W.drone.x = Math.min(W.drone.x, n - 1); W.drone.y = Math.min(W.drone.y, n - 1);
+    resize();
+  }
+  const tileAt = (x, y) => W.tiles[y * W.n + x];
+  const here = () => tileAt(W.drone.x, W.drone.y);
+  function treeNear(x, y) {
+    for (const [dx, dy] of Object.values(DIRV)) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= W.n || ny >= W.n) continue;
+      const t = tileAt(nx, ny);
+      if (t.ent && t.ent.type === 'Tree') return true;
+    }
+    return false;
+  }
+  const K_WATER = 0.06;
+  function advance(t) {
+    const dt = t - W.clock;
+    if (!(dt > 0)) return;
+    W.clock = t;
+    const decay = Math.exp(-K_WATER * dt);
+    for (let y = 0; y < W.n; y++) for (let x = 0; x < W.n; x++) {
+      const tl = tileAt(x, y), w0 = tl.water;
+      const eff = dt + 4 * w0 * (1 - decay) / K_WATER;
+      tl.water = w0 * decay < 0.002 ? 0 : w0 * decay;
+      const e = tl.ent;
+      if (e && e.prog < 1) {
+        let rate = 1 / e.dur;
+        if (e.type === 'Tree' && treeNear(x, y)) rate /= 2;
+        e.prog = Math.min(1, e.prog + eff * rate);
+        if (e.prog >= 1 && e.type === 'Pumpkin' && e.dead) tl.ent = { type: 'Dead_Pumpkin', prog: 1, dur: 1 };
+      }
+    }
+    if (W.unlocked.has('water')) {
+      W.waterAcc += dt / 2;
+      const add = Math.floor(W.waterAcc);
+      if (add > 0) { W.items.Water = Math.min(500, W.items.Water + add); W.waterAcc -= add; }
+    }
+  }
+  function addItem(name, n, x, y) {
+    W.items[name] += n;
+    if (floats.length < 60) floats.push({ x, y, text: `+${n}${ITEM_ICON[name]}`, t0: performance.now() });
+  }
+
+  // ===== ドローンの命令 =====
+  let EXEC_T = 0;
+  const ac = (base) => base * Math.pow(0.75, W.speedLv);
+  function needUnlock(id, what, line) {
+    if (!W.unlocked.has(id)) {
+      const u = UNLOCKS.find(u => u.id === id);
+      throw new PyError(`${what} を使うには「${u.name}」のアンロックが必要です`, line);
+    }
+  }
+  function checkEnum(v, group, fname, line, hint) {
+    if (!(v instanceof PyEnum) || v.group !== group) throw new PyError(`${fname}() には ${hint} を渡してください（今は ${repr(v === undefined ? null : v)}）`, line);
+  }
+  function makeBuiltins() {
+    const b = baseBuiltins();
+    const G = (name, fn) => new Builtin(name, fn, true);
+    const F = (name, fn) => new Builtin(name, fn, false);
+    const act = (cost, anim) => ({ cost: ac(cost), anim: anim || { type: 'act' } });
+
+    b.print = G('print', function* (args) {
+      const s = args.map(str).join(' ');
+      log(s);
+      W.drone.say = { text: s, until: performance.now() + 2500 };
+      yield { cost: 0.05 };
+      return null;
+    });
+    b.move = G('move', function* ([d], line) {
+      checkEnum(d, 'Direction', 'move', line, 'North / East / South / West');
+      const [dx, dy] = DIRV[d.name], fx = W.drone.x, fy = W.drone.y;
+      W.drone.x = (fx + dx + W.n) % W.n; W.drone.y = (fy + dy + W.n) % W.n;
+      yield act(0.2, { type: 'move', fx, fy, tx: fx + dx, ty: fy + dy });
+      return true;
+    });
+    b.harvest = G('harvest', function* () {
+      advance(EXEC_T);
+      const t = here(), e = t.ent; let ok = false;
+      if (e) {
+        if (e.prog >= 1 && ENT[e.type].yld) { addItem(ENT[e.type].yld[0], ENT[e.type].yld[1], W.drone.x, W.drone.y); ok = true; }
+        t.ent = t.ground === 'Grassland' ? mkEnt('Grass', false) : null;
+      }
+      yield act(0.2);
+      return ok;
+    });
+    b.plant = G('plant', function* ([en], line) {
+      checkEnum(en, 'Entities', 'plant', line, 'Entities.Bush などの作物');
+      advance(EXEC_T);
+      const d = ENT[en.name];
+      if (en.name === 'Dead_Pumpkin') throw new PyError('枯れたカボチャは植えられません', line);
+      if (d.unlock) needUnlock(d.unlock, `plant(Entities.${en.name})`, line);
+      const t = here(); let ok = false;
+      const groundOk = d.soil ? t.ground === 'Soil' : true;
+      const empty = !t.ent || t.ent.type === 'Grass';
+      const afford = !d.cost || Object.entries(d.cost).every(([k, v]) => W.items[k] >= v);
+      if (groundOk && empty && afford && en.name !== 'Grass') {
+        if (d.cost) for (const [k, v] of Object.entries(d.cost)) W.items[k] -= v;
+        t.ent = mkEnt(en.name, false); ok = true;
+      } else if (en.name === 'Grass' && t.ground === 'Grassland' && empty) { ok = true; }
+      yield act(0.2);
+      return ok;
+    });
+    b.till = G('till', function* (args, line) {
+      needUnlock('carrot', 'till()', line);
+      const t = here();
+      t.ground = t.ground === 'Grassland' ? 'Soil' : 'Grassland';
+      t.ent = t.ground === 'Grassland' ? mkEnt('Grass', false) : null;
+      yield act(0.2);
+      return null;
+    });
+    b.use_item = G('use_item', function* ([it], line) {
+      checkEnum(it, 'Items', 'use_item', line, 'Items.Water');
+      if (it.name !== 'Water') throw new PyError(`${repr(it)} は使えません（使えるのは Items.Water です）`, line);
+      needUnlock('water', 'use_item(Items.Water)', line);
+      advance(EXEC_T);
+      let ok = false;
+      if (W.items.Water >= 1) { W.items.Water -= 1; const t = here(); t.water = Math.min(1, t.water + 0.25); ok = true; }
+      yield act(0.2);
+      return ok;
+    });
+    b.do_a_flip = G('do_a_flip', function* () { yield { cost: ac(1), anim: { type: 'flip' } }; return null; });
+    b.clear = G('clear', function* () {
+      for (let i = 0; i < W.tiles.length; i++) W.tiles[i] = newTile(false);
+      const fx = W.drone.x, fy = W.drone.y; W.drone.x = 0; W.drone.y = 0;
+      yield { cost: ac(0.2), anim: { type: 'move', fx, fy, tx: 0, ty: 0 } };
+      return null;
+    });
+    b.can_harvest = F('can_harvest', () => { advance(EXEC_T); const e = here().ent; return !!(e && e.prog >= 1 && ENT[e.type].yld); });
+    b.get_entity_type = F('get_entity_type', () => { advance(EXEC_T); const e = here().ent; return e ? ENTITIES[e.type] : null; });
+    b.get_ground_type = F('get_ground_type', () => GROUNDS[here().ground]);
+    b.get_water = F('get_water', () => { advance(EXEC_T); return Math.round(here().water * 1000) / 1000; });
+    b.get_pos_x = F('get_pos_x', () => W.drone.x);
+    b.get_pos_y = F('get_pos_y', () => W.drone.y);
+    b.get_world_size = F('get_world_size', () => W.n);
+    b.get_time = F('get_time', () => Math.round(EXEC_T * 1000) / 1000);
+    b.num_items = F('num_items', ([it], line) => { checkEnum(it, 'Items', 'num_items', line, 'Items.Hay など'); advance(EXEC_T); return W.items[it.name]; });
+    b.North = DIR.North; b.East = DIR.East; b.South = DIR.South; b.West = DIR.West;
+    b.Entities = new PyNamespace('Entities', ENTITIES);
+    b.Items = new PyNamespace('Items', ITEMS);
+    b.Grounds = new PyNamespace('Grounds', GROUNDS);
+    return b;
+  }
+  const BUILTINS = makeBuiltins();
+
+  // ===== 実行エンジン =====
+  let run = null;          // { it, gen, state: 'run' | 'pause' }
+  let execT = 0, gameTime = 0, speed = 1, errLine = 0;
+  const ta = $('code');
+
+  function setStatus(text, cls) { const s = $('status'); s.textContent = text; s.className = cls || ''; }
+  function updateButtons() {
+    const running = !!run;
+    $('runBtn').textContent = run && run.state === 'pause' ? '▶ 再開' : '▶ 実行';
+    $('runBtn').disabled = !!(run && run.state === 'run');
+    $('pauseBtn').disabled = !(run && run.state === 'run');
+    $('stopBtn').disabled = !running;
+    $('stepBtn').disabled = !!(run && run.state === 'run');
+    ta.readOnly = running;
+  }
+  function startProgram(paused) {
+    errLine = 0;
+    let prog;
+    try { prog = parse(ta.value); }
+    catch (e) { fail(e); return false; }
+    const it = new Interp(prog, BUILTINS);
+    run = { it, gen: it.main(), state: paused ? 'pause' : 'run' };
+    execT = gameTime;
+    log('▶ 実行をはじめます', 'i');
+    setStatus(paused ? '一時停止' : '実行中', paused ? 'pause' : 'run');
+    updateButtons();
+    return true;
+  }
+  function stepOnce() {
+    EXEC_T = execT;
+    let r;
+    try { r = run.gen.next(); }
+    catch (e) { fail(e); return false; }
+    if (r.done) { finish(); return false; }
+    const v = r.value;
+    if (v.anim) { v.anim.start = execT; v.anim.dur = v.cost; W.drone.anim = v.anim; }
+    execT += v.cost;
+    return true;
+  }
+  function finish() {
+    log('■ プログラムが最後まで終わりました', 'g');
+    endRun('停止中', '');
+  }
+  function fail(e) {
+    if (e instanceof PyError) {
+      errLine = e.line || 0;
+      log(`エラー（${errLine} 行目）: ${e.message}`, 'e');
+      if (errLine) scrollToLine(errLine);
+    } else {
+      log('エラー: ' + (e && e.message ? e.message : String(e)), 'e');
+      console.error(e);
+    }
+    endRun('エラー', 'err');
+  }
+  function endRun(text, cls) {
+    run = null;
+    gameTime = Math.max(gameTime, execT);
+    setStatus(text, cls);
+    updateButtons();
+    drawHL(true);
+  }
+  function stopProgram() {
+    if (!run) return;
+    log('⏹ 停止しました', 'i');
+    W.drone.anim = null;
+    endRun('停止中', '');
+  }
+
+  $('runBtn').addEventListener('click', () => {
+    if (run && run.state === 'pause') { run.state = 'run'; setStatus('実行中', 'run'); updateButtons(); return; }
+    if (!run) startProgram(false);
+  });
+  $('pauseBtn').addEventListener('click', () => { if (run) { run.state = 'pause'; setStatus('一時停止', 'pause'); updateButtons(); } });
+  $('stopBtn').addEventListener('click', stopProgram);
+  $('stepBtn').addEventListener('click', () => {
+    if (!run) { if (!startProgram(true)) return; }
+    if (run.state !== 'pause') return;
+    stepOnce();
+    drawHL(true);
+  });
+  $('speed').addEventListener('change', e => { speed = e.target.value === 'inf' ? Infinity : +e.target.value; });
+
+  // ===== コンソール =====
+  const con = $('console');
+  function log(text, cls) {
+    const d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.textContent = text;
+    con.appendChild(d);
+    while (con.childNodes.length > 300) con.removeChild(con.firstChild);
+    con.scrollTop = con.scrollHeight;
+  }
+
+  // ===== エディタ =====
+  const view = $('view'), gutter = $('gutter'), hl = $('hl'), editor = $('editor');
+  const KW = new Set(['if', 'elif', 'else', 'while', 'for', 'in', 'def', 'return', 'break', 'continue', 'pass', 'and', 'or', 'not', 'is', 'global', 'True', 'False', 'None']);
+  const FN = new Set(Object.keys(BUILTINS).filter(k => BUILTINS[k] instanceof Builtin));
+  const EN = new Set(['North', 'East', 'South', 'West', 'Entities', 'Items', 'Grounds']);
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function hlLine(line) {
+    const re = /(#.*$)|("(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?)|(\d+\.?\d*)|([A-Za-z_][A-Za-z0-9_]*)|([+\-*/%=<>!]+)|(\s+|.)/g;
+    let out = '', m;
+    while ((m = re.exec(line))) {
+      const [all, com, s, num, name, op] = m;
+      if (com) out += `<span class="t-com">${esc(com)}</span>`;
+      else if (s) out += `<span class="t-str">${esc(s)}</span>`;
+      else if (num) out += `<span class="t-num">${num}</span>`;
+      else if (name) {
+        const after = line.slice(re.lastIndex).trimStart()[0];
+        let c = KW.has(name) ? 't-kw' : FN.has(name) ? 't-fn' : EN.has(name) ? 't-en' : after === '(' ? 't-call' : '';
+        out += c ? `<span class="${c}">${name}</span>` : name;
+      } else if (op) out += `<span class="t-op">${esc(op)}</span>`;
+      else out += esc(all);
+      if (all === '') break;
+    }
+    return out;
+  }
+  let charW = 9;
+  function measure() {
+    const c = document.createElement('canvas').getContext('2d');
+    const cs = getComputedStyle(ta);
+    c.font = `${cs.fontSize} ${cs.fontFamily}`;
+    charW = c.measureText('M'.repeat(40)).width / 40 || 9;
+  }
+  const LH = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lh')) || 22;
+  const PAD = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pad')) || 10;
+  let lineCount = 0;
+  function refreshEditor() {
+    const src = ta.value, lines = src.split('\n');
+    view.innerHTML = lines.map(hlLine).join('\n') + '\n';
+    if (lines.length !== lineCount) {
+      lineCount = lines.length;
+      let g = '';
+      for (let i = 1; i <= lines.length; i++) g += `<span data-l="${i}">${i}</span>\n`;
+      gutter.innerHTML = g;
+    }
+    const longest = lines.reduce((m, l) => Math.max(m, l.replace(/\t/g, '    ').length), 0);
+    const w = Math.max(editor.clientWidth - gutter.offsetWidth - 2, longest * charW + 60);
+    ta.style.width = w + 'px';
+    ta.style.height = (lines.length * LH() + PAD() * 2 + 24) + 'px';
+    view.style.width = w + 'px';
+    drawHL(true);
+  }
+  let hlKey = '';
+  function drawHL(force) {
+    let lines = [];
+    if (run) lines = run.it.stack.slice();
+    const key = lines.join(',') + '|' + errLine;
+    if (!force && key === hlKey) return;
+    hlKey = key;
+    const lh = LH(), pad = PAD();
+    let html = '';
+    const marks = {};
+    for (let i = 0; i < lines.length - 1; i++) if (lines[i]) { html += `<div class="call" style="top:${pad + (lines[i] - 1) * lh}px"></div>`; }
+    const cur = lines[lines.length - 1];
+    if (cur) { html += `<div class="cur" style="top:${pad + (cur - 1) * lh}px"></div>`; marks[cur] = 'cur'; }
+    if (errLine && !run) { html += `<div class="bad" style="top:${pad + (errLine - 1) * lh}px"></div>`; marks[errLine] = 'bad'; }
+    hl.innerHTML = html;
+    gutter.querySelectorAll('span.cur, span.bad').forEach(s => s.className = '');
+    for (const [l, c] of Object.entries(marks)) { const s = gutter.querySelector(`span[data-l="${l}"]`); if (s) s.className = c; }
+    if (cur && run && run.state === 'run' && speed !== Infinity) scrollToLine(cur, true);
+    else if (cur && run) scrollToLine(cur, true);
+  }
+  function scrollToLine(l, soft) {
+    const lh = LH(), pad = PAD();
+    const top = pad + (l - 1) * lh, bottom = top + lh;
+    const st = editor.scrollTop, h = editor.clientHeight;
+    if (top < st + (soft ? 4 : 30)) editor.scrollTop = Math.max(0, top - 40);
+    else if (bottom > st + h - (soft ? 4 : 30)) editor.scrollTop = bottom - h + 40;
+  }
+  function insertText(t) {
+    ta.focus();
+    let ok = false;
+    try { ok = document.execCommand('insertText', false, t); } catch (_) {}
+    if (!ok) ta.setRangeText(t, ta.selectionStart, ta.selectionEnd, 'end');
+    onInput();
+  }
+  function lineRange() {
+    const v = ta.value, s = ta.selectionStart, e = ta.selectionEnd;
+    const ls = v.lastIndexOf('\n', s - 1) + 1;
+    let le = v.indexOf('\n', e > s && v[e - 1] === '\n' ? e - 1 : e); if (le < 0) le = v.length;
+    return [ls, le];
+  }
+  function indentSel(dir) {
+    if (ta.readOnly) return;
+    const v = ta.value, s = ta.selectionStart, e = ta.selectionEnd;
+    if (dir > 0 && s === e) { insertText('    '); return; }
+    const [ls, le] = lineRange();
+    const block = v.slice(ls, le).split('\n');
+    const nb = block.map(l => dir > 0 ? '    ' + l : l.replace(/^ {1,4}|^\t/, '')).join('\n');
+    ta.setSelectionRange(ls, le);
+    insertText(nb);
+    ta.setSelectionRange(ls, ls + nb.length);
+  }
+  ta.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); $('runBtn').click(); return; }
+    if (ta.readOnly) return;
+    if (e.key === 'Tab') { e.preventDefault(); indentSel(e.shiftKey ? -1 : 1); return; }
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      const v = ta.value, s = ta.selectionStart;
+      const ls = v.lastIndexOf('\n', s - 1) + 1, cur = v.slice(ls, s);
+      let ind = /^[ \t]*/.exec(cur)[0].replace(/\t/g, '    ').length;
+      if (/:\s*(#.*)?$/.test(cur)) ind += 4;
+      insertText('\n' + ' '.repeat(ind));
+      return;
+    }
+    if (e.key === 'Backspace' && ta.selectionStart === ta.selectionEnd) {
+      const v = ta.value, s = ta.selectionStart, ls = v.lastIndexOf('\n', s - 1) + 1, before = v.slice(ls, s);
+      if (before.length && /^ +$/.test(before)) {
+        e.preventDefault();
+        const k = before.length % 4 || 4;
+        ta.setSelectionRange(s - k, s);
+        let ok = false;
+        try { ok = document.execCommand('delete'); } catch (_) {}
+        if (!ok) ta.setRangeText('', s - k, s, 'end');
+        onInput();
+      }
+    }
+  });
+  let saveTimer = 0;
+  function onInput() {
+    if (errLine) errLine = 0;
+    refreshEditor();
+    clearTimeout(saveTimer); saveTimer = setTimeout(save, 600);
+  }
+  ta.addEventListener('input', onInput);
+  $('indentBtn').addEventListener('click', () => indentSel(1));
+  $('dedentBtn').addEventListener('click', () => indentSel(-1));
+
+  // ===== アンロック =====
+  const shop = $('shop');
+  let shopKey = '';
+  function renderShop() {
+    const avail = UNLOCKS.filter(u => !W.unlocked.has(u.id) && (u.req || []).every(r => W.unlocked.has(r)));
+    const key = avail.map(u => u.id).join(',');
+    if (key === shopKey) return;
+    shopKey = key;
+    shop.innerHTML = '';
+    if (!avail.length) { shop.innerHTML = '<div class="done-note">ぜんぶアンロックしました！ 🎉 プログラムを速くする工夫をしてみよう。</div>'; return; }
+    for (const u of avail) {
+      const d = document.createElement('div'); d.className = 'up'; d.dataset.id = u.id;
+      d.innerHTML = `<div class="nm">${u.name}</div><button>アンロック</button>
+        <div class="cost">${Object.entries(u.cost).map(([k, v]) => `<span data-k="${k}" data-v="${v}">${ITEM_ICON[k]} ${v}</span>`).join('')}</div>
+        ${u.ds ? `<div class="ds">${u.ds}</div>` : ''}`;
+      d.querySelector('button').addEventListener('click', () => buy(u));
+      shop.appendChild(d);
+    }
+    updateShop();
+  }
+  function updateShop() {
+    shop.querySelectorAll('.up').forEach(d => {
+      const u = UNLOCKS.find(x => x.id === d.dataset.id);
+      let all = true;
+      d.querySelectorAll('.cost span').forEach(s => { const ok = W.items[s.dataset.k] >= +s.dataset.v; s.className = ok ? '' : 'no'; if (!ok) all = false; });
+      d.querySelector('button').disabled = !all;
+    });
+  }
+  function applyUnlock(u) {
+    W.unlocked.add(u.id);
+    if (u.size && u.size > W.n) setSize(u.size);
+    if (u.speed) W.speedLv = Math.max(W.speedLv, u.speed);
+  }
+  function buy(u) {
+    if (!Object.entries(u.cost).every(([k, v]) => W.items[k] >= v)) return;
+    for (const [k, v] of Object.entries(u.cost)) W.items[k] -= v;
+    applyUnlock(u);
+    log(`🔓 アンロック: ${u.name}`, 'g');
+    renderShop(); save();
+  }
+
+  // ===== 持ち物 =====
+  let invKey = '';
+  function renderInv() {
+    const key = Object.values(W.items).join(',') + W.unlocked.size;
+    if (key === invKey) return;
+    invKey = key;
+    $('inv').innerHTML = Object.keys(W.items).map(k => {
+      const show = k === 'Hay' || k === 'Wood' && W.unlocked.has('bush') || k === 'Carrot' && W.unlocked.has('carrot') || k === 'Pumpkin' && W.unlocked.has('pumpkin') || k === 'Water' && W.unlocked.has('water') || W.items[k] > 0;
+      return show ? `<span class="chip" title="Items.${k}">${ITEM_ICON[k]} ${ITEM_JP[k]} <b>${W.items[k]}</b></span>` : '';
+    }).join('');
+    updateShop();
+  }
+
+  // ===== 畑の絵 =====
+  const cv = $('farm'), ctx = cv.getContext('2d');
+  let S = 300, DPR = 1;
+  const floats = [];
+  function resize() {
+    const wrap = $('farmwrap');
+    const narrow = matchMedia('(max-width: 900px), (orientation: portrait)').matches;
+    const w = wrap.clientWidth - 18;
+    const h = narrow ? wrap.clientHeight - 18 : document.querySelector('.left').clientHeight - $('inv').offsetHeight - 220;
+    S = Math.max(160, Math.floor(Math.min(w, h)));
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = S * DPR; cv.height = S * DPR;
+    cv.style.width = S + 'px'; cv.style.height = S + 'px';
+    measure(); refreshEditor();
+  }
+  function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+  const circ = (x, y, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+  function drawTile(t, x, y, T) {
+    const px = x * T, py = (W.n - 1 - y) * T;
+    ctx.fillStyle = t.ground === 'Soil' ? ((x + y) % 2 ? '#7a5235' : '#825839') : ((x + y) % 2 ? '#5fae55' : '#67b85c');
+    ctx.fillRect(px, py, T, T);
+    if (t.ground === 'Soil') {
+      ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = Math.max(1, T * 0.03);
+      for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(px + T * 0.12, py + T * i / 4); ctx.lineTo(px + T * 0.88, py + T * i / 4); ctx.stroke(); }
+    }
+    if (t.water > 0.01) { ctx.fillStyle = `rgba(70,150,255,${0.42 * t.water})`; ctx.fillRect(px, py, T, T); }
+    const e = t.ent;
+    if (e) {
+      const p = e.prog, cx = px + T / 2, base = py + T * 0.82, ready = p >= 1;
+      switch (e.type) {
+        case 'Grass': {
+          ctx.strokeStyle = ready ? '#d9f27a' : '#9fdc7a'; ctx.lineWidth = Math.max(1.5, T * 0.04); ctx.lineCap = 'round';
+          const h = T * (0.1 + 0.4 * p);
+          for (let i = 0; i < 5; i++) {
+            const bx = px + T * (0.22 + i * 0.14);
+            ctx.beginPath(); ctx.moveTo(bx, base); ctx.quadraticCurveTo(bx + T * 0.03, base - h * 0.6, bx + (i - 2) * T * 0.03, base - h * (0.8 + (i % 2) * 0.2)); ctx.stroke();
+          }
+          break;
+        }
+        case 'Bush': {
+          const r = T * (0.1 + 0.22 * p), cy = base - r * 0.8;
+          circ(cx - r * 0.55, cy + r * 0.2, r * 0.7, '#2f8a3e'); circ(cx + r * 0.55, cy + r * 0.2, r * 0.7, '#2f8a3e'); circ(cx, cy - r * 0.15, r * 0.85, '#3aa14b');
+          if (ready) { circ(cx - r * 0.3, cy - r * 0.2, r * 0.12, '#ff5d6c'); circ(cx + r * 0.35, cy + r * 0.1, r * 0.12, '#ff5d6c'); circ(cx + r * 0.05, cy - r * 0.55, r * 0.12, '#ff5d6c'); }
+          break;
+        }
+        case 'Tree': {
+          const s = 0.35 + 0.65 * p;
+          ctx.fillStyle = '#7a4e30'; ctx.fillRect(cx - T * 0.05 * s, base - T * 0.3 * s, T * 0.1 * s, T * 0.3 * s);
+          const r = T * 0.3 * s, cy = base - T * 0.3 * s - r * 0.7;
+          circ(cx, cy, r, ready ? '#1f7a37' : '#3f9f4f'); circ(cx - r * 0.35, cy - r * 0.3, r * 0.35, ready ? '#2f9a49' : '#59b866');
+          break;
+        }
+        case 'Carrot': {
+          ctx.strokeStyle = '#4fbf5a'; ctx.lineWidth = Math.max(1.5, T * 0.045); ctx.lineCap = 'round';
+          const h = T * (0.1 + 0.32 * p);
+          for (const a of [-0.45, 0, 0.45]) { ctx.beginPath(); ctx.moveTo(cx, base - T * 0.06); ctx.lineTo(cx + Math.sin(a) * h, base - T * 0.06 - Math.cos(a) * h); ctx.stroke(); }
+          if (p > 0.3) { ctx.fillStyle = '#ff8a2a'; ctx.beginPath(); ctx.moveTo(cx - T * 0.09 * p, base - T * 0.06); ctx.lineTo(cx + T * 0.09 * p, base - T * 0.06); ctx.lineTo(cx, base + T * 0.1 * p); ctx.closePath(); ctx.fill(); }
+          break;
+        }
+        case 'Pumpkin': {
+          const rx = T * (0.08 + 0.3 * p), ry = rx * 0.75, cy = base - ry;
+          ctx.fillStyle = '#ff9a2e'; ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(160,70,0,.5)'; ctx.lineWidth = Math.max(1, T * 0.025);
+          for (const k of [-0.45, 0, 0.45]) { ctx.beginPath(); ctx.ellipse(cx + rx * k, cy, rx * 0.35, ry * 0.95, 0, 0, Math.PI * 2); ctx.stroke(); }
+          ctx.fillStyle = '#4f8a2a'; ctx.fillRect(cx - T * 0.02, cy - ry - T * 0.06, T * 0.04, T * 0.08);
+          break;
+        }
+        case 'Dead_Pumpkin': {
+          const rx = T * 0.28, ry = rx * 0.55, cy = base - ry;
+          ctx.fillStyle = '#6e5a46'; ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#4a3b2e'; ctx.lineWidth = Math.max(1, T * 0.025);
+          ctx.beginPath(); ctx.moveTo(cx - rx * 0.6, cy); ctx.lineTo(cx - rx * 0.2, cy - ry * 0.4); ctx.lineTo(cx + rx * 0.1, cy + ry * 0.2); ctx.lineTo(cx + rx * 0.5, cy - ry * 0.3); ctx.stroke();
+          break;
+        }
+      }
+      if (ready && ENT[e.type].yld) {
+        ctx.fillStyle = 'rgba(255,255,255,.9)';
+        const sx = px + T * 0.86, sy = py + T * 0.14, r = Math.max(2.5, T * 0.05);
+        ctx.beginPath(); ctx.moveTo(sx, sy - r * 1.6); ctx.lineTo(sx + r * 0.4, sy - r * 0.4); ctx.lineTo(sx + r * 1.6, sy); ctx.lineTo(sx + r * 0.4, sy + r * 0.4);
+        ctx.lineTo(sx, sy + r * 1.6); ctx.lineTo(sx - r * 0.4, sy + r * 0.4); ctx.lineTo(sx - r * 1.6, sy); ctx.lineTo(sx - r * 0.4, sy - r * 0.4); ctx.closePath(); ctx.fill();
+      }
+    }
+    if (T >= 34) {
+      ctx.fillStyle = 'rgba(255,255,255,.38)'; ctx.font = `${Math.max(9, Math.min(13, T * 0.13))}px ui-monospace, Menlo, monospace`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      ctx.fillText(`${x},${y}`, px + 3, py + T - 2);
+    }
+  }
+  function drawDrone(x, y, T, now, flip) {
+    const D = Math.min(T * 0.62, 90), cx = x * T + T / 2, cy = (W.n - 1 - y) * T + T / 2 - D * 0.15 + Math.sin(now / 300) * D * 0.04;
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    ctx.beginPath(); ctx.ellipse(cx, (W.n - 1 - y) * T + T * 0.85, D * 0.35, D * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(cx, cy); if (flip) ctx.rotate(flip);
+    ctx.strokeStyle = '#2a3040'; ctx.lineWidth = D * 0.07; ctx.lineCap = 'round';
+    const a = D * 0.36;
+    ctx.beginPath(); ctx.moveTo(-a, -a * 0.55); ctx.lineTo(a, a * 0.55); ctx.moveTo(a, -a * 0.55); ctx.lineTo(-a, a * 0.55); ctx.stroke();
+    for (const [rx, ry] of [[-a, -a * 0.55], [a, -a * 0.55], [-a, a * 0.55], [a, a * 0.55]]) {
+      ctx.fillStyle = 'rgba(200,220,255,.28)'; ctx.beginPath(); ctx.ellipse(rx, ry, D * 0.2, D * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+      const sp = now / 40 * (rx * ry > 0 ? 1 : -1);
+      ctx.strokeStyle = '#dfe7f5'; ctx.lineWidth = D * 0.03;
+      ctx.beginPath(); ctx.moveTo(rx - Math.cos(sp) * D * 0.18, ry - Math.sin(sp) * D * 0.06); ctx.lineTo(rx + Math.cos(sp) * D * 0.18, ry + Math.sin(sp) * D * 0.06); ctx.stroke();
+      circ(rx, ry, D * 0.04, '#2a3040');
+    }
+    ctx.fillStyle = '#f2b632'; rr(ctx, -D * 0.22, -D * 0.16, D * 0.44, D * 0.32, D * 0.1); ctx.fill();
+    ctx.fillStyle = '#2a3040'; rr(ctx, -D * 0.15, -D * 0.08, D * 0.3, D * 0.13, D * 0.06); ctx.fill();
+    circ(-D * 0.07, -D * 0.015, D * 0.035, '#7ff0ff'); circ(D * 0.07, -D * 0.015, D * 0.035, '#7ff0ff');
+    ctx.restore();
+    const say = W.drone.say;
+    if (say && now < say.until) {
+      const text = say.text.length > 26 ? say.text.slice(0, 25) + '…' : say.text;
+      ctx.font = `${Math.max(11, Math.min(15, T * 0.2))}px "Hiragino Sans", system-ui, sans-serif`;
+      const tw = ctx.measureText(text).width + 14, th = 22;
+      let bx = Math.min(Math.max(4, cx - tw / 2), S - tw - 4), by = cy - D * 0.45 - th;
+      if (by < 4) by = cy + D * 0.4;
+      ctx.fillStyle = 'rgba(255,255,255,.95)'; rr(ctx, bx, by, tw, th, 8); ctx.fill();
+      ctx.fillStyle = '#1d2433'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(text, bx + 7, by + th / 2 + 1);
+    }
+  }
+  function render(now) {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const T = S / W.n;
+    for (let y = 0; y < W.n; y++) for (let x = 0; x < W.n; x++) drawTile(tileAt(x, y), x, y, T);
+    ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 1;
+    for (let i = 1; i < W.n; i++) {
+      ctx.beginPath(); ctx.moveTo(i * T, 0); ctx.lineTo(i * T, S); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * T); ctx.lineTo(S, i * T); ctx.stroke();
+    }
+    // ドローン
+    const d = W.drone, an = d.anim;
+    let dx = d.x, dy = d.y, flip = 0;
+    if (an) {
+      const p = an.dur > 0 ? Math.min(1, Math.max(0, (gameTime - an.start) / an.dur)) : 1;
+      if (an.type === 'move') {
+        const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        dx = an.fx + (an.tx - an.fx) * e; dy = an.fy + (an.ty - an.fy) * e;
+      } else if (an.type === 'flip') flip = p * Math.PI * 2;
+      if (p >= 1) d.anim = null;
+    }
+    drawDrone(dx, dy, T, now, flip);
+    // はしを こえる ときは 反対側にも かく
+    if (dx < 0 || dy < 0 || dx > W.n - 1 || dy > W.n - 1) {
+      const wx = dx < 0 ? dx + W.n : dx > W.n - 1 ? dx - W.n : dx;
+      const wy = dy < 0 ? dy + W.n : dy > W.n - 1 ? dy - W.n : dy;
+      drawDrone(wx, wy, T, now, flip);
+    }
+    // +1 の 文字
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let i = floats.length - 1; i >= 0; i--) {
+      const f = floats[i], age = (now - f.t0) / 900;
+      if (age >= 1) { floats.splice(i, 1); continue; }
+      ctx.globalAlpha = 1 - age;
+      ctx.font = `bold ${Math.max(12, Math.min(18, T * 0.24))}px system-ui, sans-serif`;
+      const fx = f.x * T + T / 2, fy = (W.n - 1 - f.y) * T + T * 0.3 - age * T * 0.4;
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.strokeText(f.text, fx, fy);
+      ctx.fillStyle = '#fff'; ctx.fillText(f.text, fx, fy);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ===== メインループ =====
+  let last = 0, uiTimer = 0;
+  function loop(now) {
+    const dt = Math.min(0.1, (now - (last || now)) / 1000);
+    last = now;
+    if (run && run.state === 'run') {
+      gameTime += dt * (speed === Infinity ? 0 : speed);
+      const maxN = speed === Infinity ? 30000 : 20000;
+      let n = 0;
+      if (speed === Infinity) { while (run && n < maxN) { if (!stepOnce()) break; n++; } if (run) gameTime = execT; }
+      else { while (run && execT < gameTime && n < maxN) { if (!stepOnce()) break; n++; } if (run && n >= maxN) gameTime = execT; }
+      advance(run ? execT : gameTime);
+    } else if (run) {
+      gameTime = Math.min(execT, gameTime + dt * Math.max(1, speed === Infinity ? 50 : speed));
+    } else {
+      gameTime += dt;
+      execT = gameTime;
+      advance(gameTime);
+    }
+    render(now);
+    drawHL(false);
+    uiTimer -= dt;
+    if (uiTimer <= 0) {
+      uiTimer = 0.1;
+      renderInv(); renderShop();
+      $('pos').textContent = `ドローン (${W.drone.x}, ${W.drone.y})　畑 ${W.n}×${W.n}　⏱ ${Math.floor(run ? execT : gameTime)}秒`;
+    }
+    requestAnimationFrame(loop);
+  }
+
+  // ===== 保存 =====
+  const KEY = 'droneFarm.v1';
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ code: ta.value, items: W.items, unlocked: [...W.unlocked] })); } catch (_) {}
+  }
+  function load() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (_) {}
+    ta.value = d && typeof d.code === 'string' ? d.code : DEFAULT_CODE;
+    W.n = 3; W.tiles = []; setSize(3);
+    if (d) {
+      for (const k of Object.keys(W.items)) if (d.items && typeof d.items[k] === 'number') W.items[k] = d.items[k];
+      for (const id of d.unlocked || []) { const u = UNLOCKS.find(x => x.id === id); if (u) applyUnlock(u); }
+    }
+  }
+  setInterval(save, 5000);
+  window.addEventListener('beforeunload', save);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); last = 0; });
+
+  // ===== ヘルプ =====
+  $('helpBtn').addEventListener('click', () => $('help').classList.add('on'));
+  $('helpClose').addEventListener('click', () => $('help').classList.remove('on'));
+  $('help').addEventListener('click', e => { if (e.target.id === 'help') $('help').classList.remove('on'); });
+  let resetArm = false;
+  $('resetBtn').addEventListener('click', () => {
+    if (!resetArm) { resetArm = true; $('resetBtn').textContent = 'もう一度押すと消えます'; setTimeout(() => { resetArm = false; $('resetBtn').textContent = '進みぐあいを消して最初から'; }, 3000); return; }
+    try { localStorage.removeItem(KEY); } catch (_) {}
+    location.reload();
+  });
+
+  window.addEventListener('resize', resize);
+  load();
+  resize();
+  refreshEditor();
+  updateButtons();
+  log('ようこそ！ ▶ 実行 を押すと ドローンが動きます。命令の一覧は ❓ ヘルプ へ。', 'i');
+  requestAnimationFrame(loop);
+  window.__farm = { W, get run() { return run; }, get execT() { return execT; } };
+})();
+</script>
+</body>
+</html>
