@@ -23,12 +23,12 @@ const CONFIG = {
   LAND_BASE: 30, LAND_STEP: 12,   // 土地開放価格 = BASE + STEP×開放済み数
   HOUSE_CAP: 4,         // 住居1棟あたり人口上限
   POP_GROW_SEC: 60,     // 人口+1の間隔
-  HAPPY_MIN_FOR_GROW: 40,
-  HAPPY_DECAY_SEC: 20,  // 幸福度が1下がる間隔
-  HAPPY_PER_DELIVERY: 3,
-  PLAZA_BONUS: 10,
-  OFFLINE_MAX_SEC: 12 * 3600,
-  SAVE_KEY: 'nonbiri-island-v1',
+  HAPPY_MIN_FOR_GROW: 60,   // 幸福度(%)がこれ以上で人口増
+  SUPPLY_WINDOW_SEC: 120,   // 直近この秒数内に配送された商品を「供給中」とみなす
+  MAX_GATHER_ITEMS: 3,  // 採集アイテムの種類上限
+  MAX_PROD_ITEMS: 5,    // 生産アイテムの種類上限
+  DEFAULT_SLOTS: ['wood', 'stone', 'wheat', null, null],  // 最初の倉庫のスロット初期設定
+  SAVE_KEY: 'nonbiri-island-v2',
 };
 
 const ITEMS = {
@@ -52,11 +52,10 @@ const CATS = [
   { id: 'gather', name: '採集' },
   { id: 'prod',   name: '生産' },
   { id: 'home',   name: '暮らし' },
-  { id: 'other',  name: 'その他' },
 ];
 
 const BUILD = {
-  house:     { name: '住居',   cat: 'home',   size: 1, kind: 'house',   cost: { coins: 30, wood: 5 },  desc: '住民が4人まで住めます。人口が増えると作業員を割り当てられます。' },
+  house:     { name: '住居',   cat: 'home',   size: 1, kind: 'house',   cost: { coins: 30, wood: 5 },  desc: '住民が4人まで住めます。人口が増えると作業員を割り当てられます。棟数制限なし。', nolimit: true },
   lumber:    { name: '伐採所', cat: 'gather', size: 1, kind: 'gather',  res: 'wood',  cost: { coins: 20 }, desc: '周囲5×5マスの木から木材を集めます。' },
   quarry:    { name: '採石場', cat: 'gather', size: 1, kind: 'gather',  res: 'stone', cost: { coins: 30 }, desc: '周囲5×5マスの岩から石材を集めます。' },
   farm:      { name: '農場',   cat: 'gather', size: 1, kind: 'gather',  res: 'wheat', cost: { coins: 25 }, desc: '周囲5×5マスの小麦畑から小麦を集めます。' },
@@ -64,46 +63,284 @@ const BUILD = {
   mason:     { name: '石工所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['brick'], cost: { coins: 60, stone: 10 }, desc: '石材2 → レンガ1' },
   mill:      { name: '製粉所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['flour'], cost: { coins: 80, plank: 5, stone: 5 }, desc: '小麦2 → 小麦粉1' },
   bakery:    { name: 'パン屋', cat: 'prod',   size: 1, kind: 'prod', recipes: ['bread'], cost: { coins: 120, plank: 10, brick: 5 }, desc: '小麦粉1＋木材1 → パン1' },
-  warehouse: { name: '倉庫',   cat: 'other',  size: 1, kind: 'warehouse', cost: { coins: 100, wood: 10, stone: 10 }, desc: '共通倉庫の容量が5スロット（各100個）増えます。' },
-  market:    { name: '市場',   cat: 'home',   size: 2, kind: 'market', cost: { coins: 80, plank: 5 }, desc: '作業員が住民に商品を届け、コインを得ます。幸福度も上がります。' },
-  plaza:     { name: '広場',   cat: 'home',   size: 2, kind: 'plaza', cost: { coins: 150, brick: 10 }, desc: '島の幸福度の基準が10上がります。' },
-  road:      { name: '道',     cat: 'other',  size: 1, kind: 'road', cost: { coins: 5 }, desc: '見た目用の道。棟数制限なし。' },
+  warehouse: { name: '倉庫',   cat: 'home',   size: 1, kind: 'warehouse', cost: { coins: 100, wood: 10, stone: 10 }, desc: '共通倉庫の容量が5スロット（各100個）増えます。' },
+  market:    { name: '市場',   cat: 'home',   size: 1, kind: 'market', cost: { coins: 40 }, desc: '作業員が住民に商品を届け、コインを得ます。届けた商品の種類が多いほど幸福度が上がります。' },
 };
 
 // チュートリアル目標（順番に進行）
 const GOALS = [
-  { id: 'g1', text: '伐採所を建てる',       stat: 'built_lumber', n: 1,  reward: 40,  unlock: ['quarry', 'farm'] },
-  { id: 'g2', text: '木材を10個集める',     stat: 'got_wood',     n: 10, reward: 40,  unlock: ['sawmill'] },
-  { id: 'g3', text: '採石場を建てる',       stat: 'built_quarry', n: 1,  reward: 50,  unlock: ['mason'] },
-  { id: 'g4', text: '板材を5個つくる',      stat: 'got_plank',    n: 5,  reward: 60,  unlock: ['market'] },
-  { id: 'g5', text: '市場を建てる',         stat: 'built_market', n: 1,  reward: 80,  unlock: ['mill'] },
+  { id: 'g1', text: '市場を建てる',         stat: 'built_market', n: 1,  reward: 30,  unlock: [] },
+  { id: 'g2', text: '伐採所を建てる',       stat: 'built_lumber', n: 1,  reward: 40,  unlock: ['quarry', 'farm'] },
+  { id: 'g3', text: '木材を10個集める',     stat: 'got_wood',     n: 10, reward: 40,  unlock: ['sawmill'] },
+  { id: 'g4', text: '販売で50コイン稼ぐ',   stat: 'earned',       n: 50, reward: 60,  unlock: ['mason'] },
+  { id: 'g5', text: '板材を5個つくる',      stat: 'got_plank',    n: 5,  reward: 60,  unlock: ['mill'] },
   { id: 'g6', text: '住民を6人にする',      stat: 'pop',          n: 6,  reward: 80,  unlock: ['bakery'] },
-  { id: 'g7', text: '販売で100コイン稼ぐ',  stat: 'earned',       n: 100, reward: 120, unlock: ['plaza'] },
+  { id: 'g7', text: '幸福度を60%にする',    stat: 'happyMax',     n: 60, reward: 100, unlock: [] },
   { id: 'g8', text: 'パンを10個つくる',     stat: 'got_bread',    n: 10, reward: 200, unlock: [] },
 ];
-const INITIAL_UNLOCK = ['house', 'lumber', 'warehouse', 'road'];
+const INITIAL_UNLOCK = ['market', 'house', 'lumber', 'warehouse'];
 
-// ---------- ドット絵スプライト（8×8） ----------
-const PAL = { g: '#5aa84a', G: '#3f8a35', t: '#2e6b2a', T: '#1f4d1d', b: '#7a4a1e', B: '#5a3412', s: '#9a9a9a', S: '#6a6a6a',
-  w: '#e3c25a', W: '#b8942e', r: '#c0392b', R: '#8e2a1f', y: '#f0b63c', Y: '#b57f14', k: '#2b2b2b', o: '#d9893b', O: '#a8641f',
-  c: '#f4e7c3', C: '#d8c69b', p: '#e8e8e8', P: '#bdbdbd', l: '#4a90e2', L: '#2f6fb8', x: '#a0a0a0', n: '#c49a5a', f: '#f2eee0' };
-const SPR = {
-  tree: ['...tt...', '..tTTt..', '.tTTTTt.', 'tTTTTTTt', '.tTTTTt.', '..tTTt..', '...bb...', '...BB...'],
-  rock: ['........', '...ss...', '..sSSs..', '.sSSSSs.', 'sSSSSSSs', 'sSSxSSSs', '.SSSSSS.', '........'],
-  wheat: ['.w.w.w.w', 'w.w.w.w.', '.W.W.W.W', 'W.W.W.W.', '.w.w.w.w', 'w.w.w.w.', '.W.W.W.W', 'W.W.W.W.'],
-  house: ['...rr...', '..rRRr..', '.rRRRRr.', 'rRRRRRRr', '.cccccc.', '.cCkkCc.', '.cCkkCc.', '.cccccc.'],
-  lumber: ['..bb..tt', '.bBBb.tT', 'bBBBBbtT', '.bBBb...', '..bb..xx', '.cccccc.', '.cCCCCc.', '.cccccc.'],
-  quarry: ['........', '..ssss..', '.sSSSSs.', 'sSxSSxSs', 'sSSSSSSs', '.cccccc.', '.cCkkCc.', '.cccccc.'],
-  farm: ['w.w.w.w.', '.w.w.w.w', 'bbbbbbbb', 'bBBBBBBb', '.cccccc.', '.cCCCCc.', '.cCkkCc.', '.cccccc.'],
-  sawmill: ['..bbbb..', '.bBBBBb.', 'bBBBBBBb', 'cccccccc', 'cnnCnnCc', 'cnnCnnCc', 'cCCCCCCc', 'cccccccc'],
-  mason: ['..ssss..', '.sSSSSs.', 'sSSSSSSs', 'cccccccc', 'crrCrrCc', 'cRRCRRCc', 'cCCCCCCc', 'cccccccc'],
-  mill: ['.p.pp.p.', '..pPPp..', '.pPPPPp.', '..pPPp..', '.p.pp.p.', '.cccccc.', '.cCkkCc.', '.cccccc.'],
-  bakery: ['..oooo..', '.oOOOOo.', 'oOOOOOOo', 'cccccccc', 'cffCffCc', 'cooCooCc', 'cCCkkCCc', 'cccccccc'],
-  warehouse: ['.bbbbbb.', 'bBBBBBBb', 'bBBBBBBb', 'bbbbbbbb', 'bnnBnnBb', 'bnnBnnBb', 'bBBkkBBb', 'bbbbbbbb'],
-  market: ['rrrrrrrr', 'rcrcrcrc', 'rrrrrrrr', 'bBBBBBBb', 'bwwooffb', 'bwwooffb', 'bBBBBBBb', 'bbbbbbbb'],
-  plaza: ['.ggggggg', 'gllllllg', 'glLllLlg', 'gllllllg', 'glLllLlg', 'gllllllg', 'gllllllg', 'ggggggg.'],
-  road: ['xxxxxxxx', 'xPxxxxPx', 'xxxxxxxx', 'xxxPxxxx', 'xxxxxxxx', 'xPxxxxxx', 'xxxxxPxx', 'xxxxxxxx'],
+// ---------- ドット絵スプライト（16×16） ----------
+const PAL = {
+  // 木・草
+  g: '#6abf5a', G: '#4d9a44', t: '#3f8f3a', T: '#2c6b2a', u: '#1f4f1f',
+  // 幹・木材
+  b: '#8a5a2b', B: '#5e3a16', n: '#c89a5e', N: '#a87a42', m: '#e2bf86',
+  // 石
+  s: '#b8b8b8', S: '#8c8c8c', d: '#5e5e5e', x: '#d8d8d8',
+  // 小麦
+  w: '#f0d060', W: '#c9a43a', v: '#8f7020',
+  // 屋根・レンガ
+  r: '#d9483b', R: '#a3302a', q: '#c0634e', Q: '#8e4232',
+  // 壁
+  c: '#f6ead0', C: '#d9c7a2', k: '#2d2d2d',
+  // 黄色・オレンジ
+  y: '#f4c04a', Y: '#c48f1f', o: '#e08a3c', O: '#a85f22',
+  // 白・小麦粉・パン
+  p: '#f2f2f2', P: '#c4c4c4', f: '#fbf5e4', h: '#d89a4a', H: '#a86a22',
+  // 水色・青
+  l: '#5aa0e6', L: '#2f6fb8', e: '#8fd0ff',
+  // 肌
+  i: '#f5d2a8',
 };
+const SPR = {
+  tree: [
+    '......uu........',
+    '.....uTTu.......',
+    '....uTTTTu......',
+    '...uTTttTTu.....',
+    '..uTTtttTTTu....',
+    '..uTttttTTTu....',
+    '.uTTtttTTTTTu...',
+    '.uTTTttTTTTTu...',
+    '.uTTTTTTTTTTu...',
+    '..uTTTTTTTTu....',
+    '...uTTTTTTu.....',
+    '....uuBBuu......',
+    '......BB........',
+    '......BB........',
+    '.....bBBb.......',
+    '................',
+  ],
+  rock: [
+    '................',
+    '................',
+    '......ddd.......',
+    '.....dxssd......',
+    '....dxsssSd.....',
+    '...dxssssSSd....',
+    '...dssssSSSd....',
+    '..dxsssSSSSSd...',
+    '..dsssSSSSSSd...',
+    '..dssSSSSSSdd...',
+    '..ddSSSSSSSd....',
+    '...dddSSSddd....',
+    '.....ddddd......',
+    '................',
+    '................',
+    '................',
+  ],
+  wheat: [
+    '................',
+    '..w...w...w.....',
+    '.wWw.wWw.wWw....',
+    '.wWw.wWw.wWw..w.',
+    '.wWw.wWw.wWw.wWw',
+    '..W...W...W..wWw',
+    '..v...v...v..wWw',
+    '..v...v...v...W.',
+    '.w.v.w.v.w.v..v.',
+    'wWwv.wWwvwWwv.v.',
+    'wWwv.wWwvwWwv.v.',
+    '.W.v..W.v.W.v.v.',
+    '.v.v..v.v.v.v.v.',
+    '.v.v..v.v.v.v.v.',
+    '.v....v...v...v.',
+    '................',
+  ],
+  house: [
+    '................',
+    '.......RR.......',
+    '......RrrR......',
+    '.....RrrrrR.....',
+    '....RrrrrrrR....',
+    '...RrrrrrrrrR...',
+    '..RrrrrrrrrrrR..',
+    '.RRRRRRRRRRRRRR.',
+    '..cccccccccccc..',
+    '..cCCccccccCCc..',
+    '..cCkCcccckCkc..',
+    '..cCkCcccckCkc..',
+    '..cCCCccBBcCCc..',
+    '..ccccccBBcccc..',
+    '..CCCCCCBBCCCC..',
+    '................',
+  ],
+  lumber: [
+    '................',
+    '......uu........',
+    '.....uTTu.......',
+    '....uTTTTu...BB.',
+    '...uTTTTTTu.BnnB',
+    '....uTTTTu..BnnB',
+    '......BB.....BB.',
+    '..BBBBBBBBBBBB..',
+    '.BnnnnnnnnnnnnB.',
+    '.BnNNNNNNNNNNnB.',
+    '.BnNcccccccCNnB.',
+    '.BnNcCkkCccCNnB.',
+    '.BnNcCkkCccCNnB.',
+    '.BnNcccccccCNnB.',
+    '.BBBBBBBBBBBBBB.',
+    '................',
+  ],
+  quarry: [
+    '................',
+    '....ddd.........',
+    '...dxssd...dd...',
+    '..dxsssSd.dxsd..',
+    '..dssSSSd.dsSd..',
+    '..ddSSSdd..dd...',
+    '...ddddd........',
+    '..dddddddddddd..',
+    '.dssssssssssssd.',
+    '.dsSSSSSSSSSSsd.',
+    '.dsSccccccccSsd.',
+    '.dsScCkkCcccSsd.',
+    '.dsScCkkCcccSsd.',
+    '.dsSccccccccSsd.',
+    '.dddddddddddddd.',
+    '................',
+  ],
+  farm: [
+    '................',
+    '.w.w.w.w.w.w.w..',
+    'wWwWwWwWwWwWwWw.',
+    '.v.v.v.v.v.v.v..',
+    '.v.v.v.v.v.v.v..',
+    '.BBBBBBBBBBBBBB.',
+    '.BnnnnnnnnnnnnB.',
+    '.BnRRRRRRRRRRnB.',
+    '.BnRrrrrrrrrRnB.',
+    '.BnccccccccccnB.',
+    '.BncCCccccCCcnB.',
+    '.BncCkCccbbkcnB.',
+    '.BncCkCccbbkcnB.',
+    '.BnccccccbbccnB.',
+    '.BBBBBBBBBBBBBB.',
+    '................',
+  ],
+  sawmill: [
+    '................',
+    '..BBBBBBBBBBBB..',
+    '.BnnnnnnnnnnnnB.',
+    '.BnNNNNNNNNNNnB.',
+    '.BBBBBBBBBBBBBB.',
+    '.BccccccccccccB.',
+    '.BcmmmmccmmmmcB.',
+    '.BcmNNmccmNNmcB.',
+    '.BcmmmmccmmmmcB.',
+    '.BccccccccccccB.',
+    '.BcCCCCccCCCCcB.',
+    '.Bcccccc..ddd.B.',
+    '.BcCkkCc.dxsxd..',
+    '.BcCkkCc.dxsxd..',
+    '.BBBBBBBB.ddd...',
+    '................',
+  ],
+  mason: [
+    '................',
+    '..dddddddddddd..',
+    '.dssssssssssssd.',
+    '.dsSSSSSSSSSSsd.',
+    '.dddddddddddddd.',
+    '.dccccccccccccd.',
+    '.dcqqQqqQqqQqcd.',
+    '.dcQqqQqqQqqQcd.',
+    '.dcqqQqqQqqQqcd.',
+    '.dccccccccccccd.',
+    '.dcCCCCccCCCCcd.',
+    '.dccccccckkkccd.',
+    '.dcCkkCcckkkccd.',
+    '.dcCkkCccccccd..',
+    '.dddddddddddddd.',
+    '................',
+  ],
+  mill: [
+    '....p.......p...',
+    '...pPp.....pPp..',
+    '....pPp...pPp...',
+    '.....pPp.pPp....',
+    '......pPpPp.....',
+    '.......ppp......',
+    '......pPpPp.....',
+    '.....pPp.pPp....',
+    '....pPp.ccc.pPp.',
+    '...pPp.ccccc.pPp',
+    '..p...ccccccc...',
+    '......cCCCCCc...',
+    '......cCkkkCc...',
+    '......cCkkkCc...',
+    '......CCCCCCC...',
+    '................',
+  ],
+  bakery: [
+    '................',
+    '..OOOOOOOOOOOO..',
+    '.OooooooooooooO.',
+    '.OohhhhhhhhhhoO.',
+    '.OOOOOOOOOOOOOO.',
+    '.OccccccccccccO.',
+    '.OcffffccffffcO.',
+    '.OcfhhfccfhhfcO.',
+    '.OcfHhfccfhHfcO.',
+    '.OcffffccffffcO.',
+    '.OcCCCCccCCCCcO.',
+    '.OccccccccccccO.',
+    '.OcCkkCcccccccO.',
+    '.OcCkkCcckkkccO.',
+    '.OOOOOOOOOOOOOO.',
+    '................',
+  ],
+  warehouse: [
+    '................',
+    '..BBBBBBBBBBBB..',
+    '.BnnnnnnnnnnnnB.',
+    '.BnNNNNNNNNNNnB.',
+    '.BnnnnnnnnnnnnB.',
+    '.BBBBBBBBBBBBBB.',
+    '.BNNNNNNNNNNNNB.',
+    '.BNmmmNNNmmmNNB.',
+    '.BNmBmNNNmBmNNB.',
+    '.BNmmmNNNmmmNNB.',
+    '.BNNNNNNNNNNNNB.',
+    '.BNNNNBBBBNNNNB.',
+    '.BNNNNBnnBNNNNB.',
+    '.BNNNNBnnBNNNNB.',
+    '.BBBBBBBBBBBBBB.',
+    '................',
+  ],
+  market: [
+    '................',
+    '.rrpprrpprrpprr.',
+    '.rrpprrpprrpprr.',
+    '.RRRRRRRRRRRRRR.',
+    '..B..........B..',
+    '..B..........B..',
+    '..B.ww.hh.ss.B..',
+    '..B.wW.hH.sS.B..',
+    '..BBBBBBBBBBBB..',
+    '..BnnnnnnnnnnB..',
+    '..BnNNNNNNNNnB..',
+    '..BnnnnnnnnnnB..',
+    '..B..........B..',
+    '..B..........B..',
+    '.BBB........BBB.',
+    '................',
+  ],
+};
+// 住民（8×8、1色差し替え用）
+const VILL = ['..ii....', '..ii....', '.llll...', '.llll...', '..ll....', '.ll.l...', '.B..B...', '........'];
 
 // ---------- 状態 ----------
 let S = null;          // セーブ対象の状態
@@ -133,12 +370,12 @@ function newGame() {
   tiles[idx(c - 1, c)].res = null; tiles[idx(c + 1, c)].res = null; tiles[idx(c, c)].res = null;
 
   S = {
-    v: 1, coins: CONFIG.START_COINS, pop: CONFIG.START_POP, happy: 60,
+    v: 2, coins: CONFIG.START_COINS, pop: CONFIG.START_POP, happy: 0, supplied: {},
     tiles, buildings: [], nextId: 1, order: 1,
     slots: [], unlocked: [...INITIAL_UNLOCK], lastTab: 'gather',
-    stats: { built_lumber: 0, built_quarry: 0, built_market: 0, got_wood: 0, got_plank: 0, got_bread: 0, earned: 0 },
+    stats: { built_lumber: 0, built_quarry: 0, built_market: 0, got_wood: 0, got_plank: 0, got_bread: 0, earned: 0, happyMax: 0 },
     goal: 0, goalClaimed: false,
-    t: 0, timers: { transfer: 0, refill: 0, regen: 0, grow: 0, decay: 0 },
+    t: 0, timers: { transfer: 0, refill: 0, regen: 0, grow: 0 },
     lastSave: Date.now(),
   };
   addBuilding('warehouse', c - 1, c, true);
@@ -151,13 +388,13 @@ function makeBuilding(type, x, y) {
   const b = { id: S.nextId++, type, x, y, order: S.order++, workers: 0 };
   if (d.kind === 'gather') { b.inv = { out: 0 }; b.prog = 0; }
   if (d.kind === 'prod') { b.recipe = d.recipes[0]; b.inv = { a: 0, b: 0, out: 0 }; b.prog = 0; b.active = false; b.pending = {}; }
-  if (d.kind === 'market') { b.items = ['bread', 'flour', 'plank', 'brick', 'wheat']; b.stock = {}; b.prog = 0; }
+  if (d.kind === 'market') { b.items = ['wood', 'stone', 'wheat', 'plank', 'brick']; b.stock = {}; b.prog = 0; }
   return b;
 }
 function addBuilding(type, x, y, free) {
   const b = makeBuilding(type, x, y);
   S.buildings.push(b);
-  if (BUILD[type].kind === 'warehouse') for (let i = 0; i < CONFIG.SLOTS_PER_WH; i++) S.slots.push({ cfg: null, item: null, qty: 0 });
+  if (BUILD[type].kind === 'warehouse') for (let i = 0; i < CONFIG.SLOTS_PER_WH; i++) S.slots.push({ cfg: S.slots.length < CONFIG.SLOTS_PER_WH ? (CONFIG.DEFAULT_SLOTS[i] || null) : null, item: null, qty: 0 });
   rebuildOcc();
   if (!free) { const k = 'built_' + type; if (k in S.stats) S.stats[k]++; }
   return b;
@@ -231,10 +468,11 @@ function sim(dt, acc) {
   while (S.timers.transfer >= CONFIG.TRANSFER_SEC) { S.timers.transfer -= CONFIG.TRANSFER_SEC; doTransfer(acc); }
   S.timers.refill += dt;
   while (S.timers.refill >= CONFIG.REFILL_SEC) { S.timers.refill -= CONFIG.REFILL_SEC; doRefill(); doMarketRefill(); }
-  // 幸福度・人口
-  S.timers.decay += dt;
-  const base = 50 + countType('plaza') * CONFIG.PLAZA_BONUS;
-  while (S.timers.decay >= CONFIG.HAPPY_DECAY_SEC) { S.timers.decay -= CONFIG.HAPPY_DECAY_SEC; if (S.happy > base) S.happy--; else if (S.happy < base) S.happy++; }
+  // 幸福度 = 直近に配送された商品の種類 / 全商品の種類
+  const total = Object.keys(ITEMS).length;
+  let sup = 0; for (const k in S.supplied) if (S.t - S.supplied[k] <= CONFIG.SUPPLY_WINDOW_SEC) sup++;
+  S.happy = Math.round(sup / total * 100);
+  if (S.happy > S.stats.happyMax) S.stats.happyMax = S.happy;
   const cap = countType('house') * CONFIG.HOUSE_CAP;
   S.timers.grow += dt;
   while (S.timers.grow >= CONFIG.POP_GROW_SEC) {
@@ -274,7 +512,7 @@ function stepBuilding(b, dt, acc) {
     if (b.prog >= 1) {
       b.prog = 0; b.stock[it]--;
       const p = ITEMS[it].price; S.coins += p; S.stats.earned += p; if (acc) acc.coins += p;
-      S.happy = Math.min(100, S.happy + CONFIG.HAPPY_PER_DELIVERY);
+      S.supplied[it] = S.t;
     }
   }
 }
@@ -344,7 +582,7 @@ function setWorkers(b, n) {
 // ---------- 建築・移動・取り壊し ----------
 function build(type, x, y) {
   const d = BUILD[type];
-  if (!S.unlocked.includes(type) || (type !== 'road' && countType(type) >= CONFIG.MAX_SAME)) return false;
+  if (!S.unlocked.includes(type) || (!d.nolimit && countType(type) >= CONFIG.MAX_SAME)) return false;
   if (!canPlace(type, x, y) || !canAfford(d.cost)) return false;
   payCost(d.cost);
   addBuilding(type, x, y, false);
@@ -388,14 +626,6 @@ function save() { S.lastSave = Date.now(); try { localStorage.setItem(CONFIG.SAV
 function load() {
   try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); rebuildOcc(); return true; } catch (e) { return false; }
 }
-function offlineProgress() {
-  const elapsed = Math.min(CONFIG.OFFLINE_MAX_SEC, Math.floor((Date.now() - S.lastSave) / 1000));
-  if (elapsed < 30) return null;
-  const acc = { coins: 0, pop: 0, items: {} };
-  for (let i = 0; i < elapsed; i++) sim(1, acc);
-  acc.elapsed = elapsed;
-  return acc;
-}
 
 // ============================================================
 //  描画
@@ -406,8 +636,9 @@ let W = 0, H = 0, DPR = 1;
 const spriteCache = {};
 function sprite(name) {
   if (spriteCache[name]) return spriteCache[name];
-  const c = document.createElement('canvas'); c.width = 8; c.height = 8; const g = c.getContext('2d');
-  SPR[name].forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') { g.fillStyle = PAL[ch]; g.fillRect(x, y, 1, 1); } }));
+  const rows = name === 'villager' ? VILL : SPR[name], n = rows.length;
+  const c = document.createElement('canvas'); c.width = n; c.height = n; const g = c.getContext('2d');
+  rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') { g.fillStyle = PAL[ch]; g.fillRect(x, y, 1, 1); } }));
   return spriteCache[name] = c;
 }
 function resize() {
@@ -437,8 +668,8 @@ function draw() {
     ctx.fillStyle = ((x + y) & 1) ? '#6db85a' : '#64ad52'; ctx.fillRect(sx, sy, ts + 0.5, ts + 0.5);
     if (t.unl && t.res && !occ[idx(x, y)]) {
       const nm = t.res.t === 'wood' ? 'tree' : t.res.t === 'stone' ? 'rock' : 'wheat';
-      if (t.res.amt > 0) ctx.drawImage(sprite(nm), sx + ts * 0.1, sy + ts * 0.1, ts * 0.8, ts * 0.8);
-      else { ctx.globalAlpha = 0.3; ctx.drawImage(sprite(nm), sx + ts * 0.2, sy + ts * 0.2, ts * 0.6, ts * 0.6); ctx.globalAlpha = 1; }
+      if (t.res.amt > 0) ctx.drawImage(sprite(nm), sx, sy, ts, ts);
+      else { ctx.globalAlpha = 0.3; ctx.drawImage(sprite(nm), sx + ts * 0.15, sy + ts * 0.15, ts * 0.7, ts * 0.7); ctx.globalAlpha = 1; }
     }
   }
   // 採集範囲
@@ -452,15 +683,27 @@ function draw() {
     if (UI.mode === 'move' && UI.moveB === b) continue;
     drawBuilding(b.type, b.x, b.y, ox, oy, ts, UI.sel === b ? 'sel' : null);
   }
-  // 霧
+  // マス目
+  ctx.strokeStyle = 'rgba(0,0,0,.10)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let i = 0; i <= N; i++) { ctx.moveTo(ox + i * ts, oy); ctx.lineTo(ox + i * ts, oy + N * ts); ctx.moveTo(ox, oy + i * ts); ctx.lineTo(ox + N * ts, oy + i * ts); }
+  ctx.stroke();
+  // 霧（未開放）：隣接マスは明るめ＋「＋」、それ以外は暗い霧
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const t = S.tiles[idx(x, y)]; if (t.unl) continue;
-    const sx = ox + x * ts, sy = oy + y * ts;
+    const sx = ox + x * ts, sy = oy + y * ts; if (sx + ts < 0 || sy + ts < 0 || sx > W || sy > H) continue;
     const edge = canUnlock(x, y);
-    ctx.fillStyle = edge ? 'rgba(230,240,255,.78)' : 'rgba(200,210,225,.92)'; ctx.fillRect(sx, sy, ts + 0.5, ts + 0.5);
-    if (edge) { ctx.fillStyle = 'rgba(80,100,130,.7)'; ctx.font = `${Math.max(10, ts * 0.4)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('＋', sx + ts / 2, sy + ts / 2); }
-    if (UI.land && UI.land[0] === x && UI.land[1] === y) { ctx.strokeStyle = '#f0b63c'; ctx.lineWidth = 3; ctx.strokeRect(sx + 1, sy + 1, ts - 2, ts - 2); }
+    if (edge) {
+      ctx.fillStyle = 'rgba(235,245,255,.55)'; ctx.fillRect(sx, sy, ts + 0.5, ts + 0.5);
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.strokeRect(sx + 2, sy + 2, ts - 4, ts - 4); ctx.setLineDash([]);
+      const r = ts * 0.22; ctx.fillStyle = '#f0b63c'; ctx.beginPath(); ctx.arc(sx + ts / 2, sy + ts / 2, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#4a2e00'; ctx.font = `bold ${Math.max(10, ts * 0.36)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('+', sx + ts / 2, sy + ts / 2 + 1);
+    } else {
+      ctx.fillStyle = ((x + y) & 1) ? 'rgba(90,110,130,.82)' : 'rgba(80,100,120,.82)'; ctx.fillRect(sx, sy, ts + 0.5, ts + 0.5);
+    }
+    if (UI.land && UI.land[0] === x && UI.land[1] === y) { ctx.strokeStyle = '#ff6a00'; ctx.lineWidth = 4; ctx.strokeRect(sx + 2, sy + 2, ts - 4, ts - 4); }
   }
+  // 島の外周
+  ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2; ctx.strokeRect(ox, oy, N * ts, N * ts);
   // プレビュー
   if (UI.mode === 'place' || UI.mode === 'move') {
     const type = UI.mode === 'place' ? UI.placeType : UI.moveB.type;
@@ -472,7 +715,7 @@ function draw() {
 }
 function drawBuilding(type, x, y, ox, oy, ts, mark) {
   const s = BUILD[type].size, sx = ox + x * ts, sy = oy + y * ts;
-  if (type !== 'road') { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(sx + ts * 0.08, sy + ts * 0.15, ts * s, ts * s); }
+  ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(sx + ts * s / 2, sy + ts * s * 0.9, ts * s * 0.45, ts * s * 0.12, 0, 0, Math.PI * 2); ctx.fill();
   ctx.drawImage(sprite(type), sx, sy, ts * s, ts * s);
   if (mark === 'sel') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect(sx + 1, sy + 1, ts * s - 2, ts * s - 2); }
   if (mark === 'ok') { ctx.strokeStyle = '#3ad24a'; ctx.lineWidth = 3; ctx.strokeRect(sx + 1, sy + 1, ts * s - 2, ts * s - 2); }
@@ -488,9 +731,9 @@ function drawVillagers(ox, oy, ts) {
       if (d < 0.05) { v.wait = 1 + Math.random() * 3; let tries = 10; while (tries--) { const nx = Math.floor(v.x) + Math.floor(Math.random() * 7) - 3, ny = Math.floor(v.y) + Math.floor(Math.random() * 7) - 3; if (inMap(nx, ny) && S.tiles[idx(nx, ny)].unl && !occ[idx(nx, ny)]) { v.tx = nx + 0.5; v.ty = ny + 0.5; break; } } }
       else { v.x += dx / d * 0.02; v.y += dy / d * 0.02; }
     }
-    const sx = ox + v.x * ts, sy = oy + v.y * ts;
-    ctx.fillStyle = '#f5d2a8'; ctx.fillRect(sx - ts * 0.08, sy - ts * 0.3, ts * 0.16, ts * 0.14);
-    ctx.fillStyle = '#4a90e2'; ctx.fillRect(sx - ts * 0.1, sy - ts * 0.16, ts * 0.2, ts * 0.2);
+    const sx = ox + v.x * ts, sy = oy + v.y * ts, vs = ts * 0.5;
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(sx, sy + vs * 0.4, vs * 0.25, vs * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.drawImage(sprite('villager'), sx - vs * 0.25, sy - vs * 0.45, vs, vs);
   }
 }
 
@@ -513,7 +756,7 @@ cv.addEventListener('pointermove', e => {
   } else if (ptrs.size === 2 && pinch0) {
     p.x = e.clientX; p.y = e.clientY;
     const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
-    cam.s = Math.max(0.8, Math.min(4, pinch0.s * d / pinch0.d));
+    cam.s = Math.max(0.6, Math.min(5, pinch0.s * d / pinch0.d));
   }
   p.x = e.clientX; p.y = e.clientY;
   clampCam();
@@ -526,7 +769,7 @@ function endPtr(e) {
   if (ptrs.size === 0) tapInfo = null;
 }
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
-cv.addEventListener('wheel', e => { cam.s = Math.max(0.8, Math.min(4, cam.s * (e.deltaY < 0 ? 1.1 : 0.9))); clampCam(); }, { passive: true });
+cv.addEventListener('wheel', e => { cam.s = Math.max(0.6, Math.min(5, cam.s * (e.deltaY < 0 ? 1.1 : 0.9))); clampCam(); }, { passive: true });
 function clampCam() { const m = T * N; cam.x = Math.max(0, Math.min(m, cam.x)); cam.y = Math.max(0, Math.min(m, cam.y)); }
 
 function onTap(sx, sy) {
@@ -554,7 +797,13 @@ const panels = ['buildmenu', 'placepanel', 'infopanel', 'landpanel', 'storepanel
 function closeAll(resetSel = true) { panels.forEach(p => $(p).classList.add('hidden')); if (resetSel) { UI.sel = null; UI.land = null; } }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { $(b.dataset.close).classList.add('hidden'); if (b.dataset.close === 'infopanel') UI.sel = null; if (b.dataset.close === 'landpanel') UI.land = null; }));
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 1800); }
-function modal(title, html, onOk) { $('modal-title').textContent = title; $('modal-body').innerHTML = html; $('modal').classList.remove('hidden'); $('modal-ok').onclick = () => { $('modal').classList.add('hidden'); onOk && onOk(); }; }
+function modal(title, html, onOk, cancel) {
+  $('modal-title').textContent = title; $('modal-body').innerHTML = html; $('modal').classList.remove('hidden');
+  $('modal-cancel').classList.toggle('hidden', !cancel);
+  $('modal-ok').textContent = cancel ? '実行する' : 'OK';
+  $('modal-ok').onclick = () => { $('modal').classList.add('hidden'); onOk && onOk(); };
+  $('modal-cancel').onclick = () => $('modal').classList.add('hidden');
+}
 function costHtml(cost, check) {
   let h = '';
   for (const k in cost) {
@@ -564,7 +813,7 @@ function costHtml(cost, check) {
   }
   return h;
 }
-function iconCanvas(type) { const c = document.createElement('canvas'); c.width = 8; c.height = 8; c.getContext('2d').drawImage(sprite(type), 0, 0); return c; }
+function iconCanvas(type) { const c = document.createElement('canvas'); c.width = 16; c.height = 16; c.getContext('2d').drawImage(sprite(type), 0, 0); return c; }
 
 // --- 建築メニュー ---
 $('btn-build').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); openBuildMenu(); });
@@ -574,7 +823,7 @@ function openBuildMenu() {
   const list = $('build-list'); list.innerHTML = '';
   for (const type in BUILD) {
     const d = BUILD[type]; if (d.cat !== S.lastTab || !S.unlocked.includes(type)) continue;
-    const full = type !== 'road' && countType(type) >= CONFIG.MAX_SAME;
+    const full = !d.nolimit && countType(type) >= CONFIG.MAX_SAME;
     const el = document.createElement('div'); el.className = 'bitem' + (full ? ' disabled' : '');
     el.appendChild(iconCanvas(type));
     el.insertAdjacentHTML('beforeend', `<div>${d.name}${d.size === 2 ? '<br><small>2×2</small>' : ''}</div><div class="bcost">🪙${d.cost.coins || 0}${full ? '<br>上限' : ''}</div>`);
@@ -592,7 +841,7 @@ function showDetail(type) {
   const d = BUILD[type];
   let extra = '';
   if (d.kind === 'prod') extra += `<div>レシピ: ${d.recipes.map(r => `${Object.entries(RECIPES[r].need).map(([k, v]) => ITEMS[k].name + v).join('＋')} → ${ITEMS[RECIPES[r].out].name}1`).join(' / ')}</div>`;
-  modal(d.name, `<div>${d.desc}</div>${extra}<div style="margin-top:8px"><b>建築費用</b>${costHtml(d.cost, false)}</div><div class="hint">同種は島全体で${type === 'road' ? '無制限' : CONFIG.MAX_SAME + '棟まで'}（現在 ${countType(type)}）</div>`);
+  modal(d.name, `<div>${d.desc}</div>${extra}<div style="margin-top:8px"><b>建築費用</b>${costHtml(d.cost, false)}</div><div class="hint">同種は島全体で${d.nolimit ? '無制限' : CONFIG.MAX_SAME + '棟まで'}（現在 ${countType(type)}）</div>`);
 }
 function startPlace(type) {
   UI.mode = 'place'; UI.placeType = type; UI.sel = null;
@@ -649,14 +898,14 @@ function renderInfo() {
   } else if (d.kind === 'market') {
     h += workersLine();
     h += gaugeLine('配送進捗', b.prog * 100, 100, 'prog');
+    const sup = Object.keys(ITEMS).filter(k => S.supplied[k] !== undefined && S.t - S.supplied[k] <= CONFIG.SUPPLY_WINDOW_SEC);
+    h += `<div class="line"><span class="lbl">供給中の商品</span><span class="val">${sup.length}/${Object.keys(ITEMS).length}種 (😊${S.happy}%)</span></div>`;
     h += `<div class="hint" style="text-align:left">販売商品（上から優先）。タップで変更</div>`;
     b.items.forEach((it, i) => { h += `<div class="line"><span class="lbl">${i + 1}. <button class="recipe-btn mk-item" data-i="${i}">${it ? ITEMS[it].name : '（なし）'}</button></span><span class="val">${it ? `${b.stock[it] || 0}/${CONFIG.INV_CAP}　🪙${ITEMS[it].price}` : ''}</span></div>`; });
   } else if (d.kind === 'house') {
-    h += `<div class="line"><span class="lbl">住める人数</span><span class="val">${CONFIG.HOUSE_CAP}人</span></div><div class="line"><span class="lbl">島の人口</span><span class="val">${S.pop}/${countType('house') * CONFIG.HOUSE_CAP}人</span></div><div class="hint" style="text-align:left">幸福度${CONFIG.HAPPY_MIN_FOR_GROW}以上で${CONFIG.POP_GROW_SEC}秒ごとに1人増えます</div>`;
+    h += `<div class="line"><span class="lbl">住める人数</span><span class="val">${CONFIG.HOUSE_CAP}人</span></div><div class="line"><span class="lbl">島の人口</span><span class="val">${S.pop}/${countType('house') * CONFIG.HOUSE_CAP}人</span></div><div class="hint" style="text-align:left">幸福度${CONFIG.HAPPY_MIN_FOR_GROW}%以上で${CONFIG.POP_GROW_SEC}秒ごとに1人増えます</div>`;
   } else if (d.kind === 'warehouse') {
     h += `<div class="line"><span class="lbl">容量</span><span class="val">${CONFIG.SLOTS_PER_WH}スロット×${CONFIG.SLOT_CAP}個</span></div><div class="line"><span class="lbl">島全体</span><span class="val">${S.slots.length}スロット</span></div>`;
-  } else if (d.kind === 'plaza') {
-    h += `<div class="line"><span class="lbl">幸福度の基準</span><span class="val">+${CONFIG.PLAZA_BONUS}</span></div>`;
   } else { h += `<div class="hint">${d.desc}</div>`; }
   $('info-body').innerHTML = h;
   let acts = '';
@@ -670,7 +919,12 @@ function renderInfo() {
   document.querySelectorAll('.mk-item').forEach(el => el.onclick = () => pickMarketItem(b, +el.dataset.i));
   const as = $('a-store'); if (as) as.onclick = () => { $('infopanel').classList.add('hidden'); openStore(); };
   $('a-move').onclick = () => { UI.mode = 'move'; UI.moveB = b; UI.px = b.x; UI.py = b.y; $('infopanel').classList.add('hidden'); showMovePanel(); };
-  $('a-demo').onclick = () => { demolish(b); UI.sel = null; $('infopanel').classList.add('hidden'); toast(`${d.name}を取り壊しました`); save(); };
+  $('a-demo').onclick = () => {
+    let note = `<div>${d.name}を取り壊します。</div><div>🪙 ${d.cost.coins || 0} を返金します（建築に使った材料は戻りません）。</div>`;
+    if (b.workers) note += `<div>作業員 ${b.workers}人は未割り当てに戻ります。</div>`;
+    if (b.inv || b.stock) note += `<div>施設内の在庫は倉庫へ返却し、入りきらない分は破棄されます。</div>`;
+    modal('取り壊しの確認', note, () => { demolish(b); UI.sel = null; $('infopanel').classList.add('hidden'); toast(`${d.name}を取り壊しました`); save(); }, true);
+  };
 }
 function pickRecipe(b) {
   const list = BUILD[b.type].recipes;
@@ -727,6 +981,7 @@ function openLand() {
 }
 
 // --- 目標 ---
+$('btn-reset').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); resetGame(); });
 $('btn-goal').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); $('goalpanel').classList.remove('hidden'); renderGoal(); });
 function goalProgress(g) { return Math.min(g.n, S.stats[g.stat] || 0); }
 function renderGoal() {
@@ -742,7 +997,7 @@ function renderTop() {
   $('st-coins').querySelector('span').textContent = S.coins;
   $('st-pop').querySelector('span').textContent = S.pop;
   $('st-free').querySelector('span').textContent = freeWorkers();
-  $('st-happy').querySelector('span').textContent = Math.round(S.happy);
+  $('st-happy').querySelector('span').textContent = Math.round(S.happy) + '%';
   const g = GOALS[S.goal];
   $('btn-goal').textContent = (g && goalProgress(g) >= g.n) ? '🎁' : '🎯';
 }
@@ -750,22 +1005,23 @@ function renderTop() {
 // ============================================================
 //  起動・ループ
 // ============================================================
+function showWelcome() {
+  modal('のんびり島ぐらしへようこそ', '<div>小さな島をのんびり育てる経営ゲームです。</div><div>・下の「🔨 建築」から施設を建てられます<br>・施設をタップして作業員を割り当てましょう<br>・霧の「＋」マスをタップすると土地を開放できます<br>・🎯 の目標を進めると新しい施設が解放されます<br>・😊 は「住民に届いている商品の種類」の割合です。60%以上で人口が増えます</div>');
+}
+function resetGame() {
+  modal('最初からやり直す', '<div>今の島のデータを消して、新しい島を始めます。元には戻せません。</div>', () => {
+    try { localStorage.removeItem(CONFIG.SAVE_KEY); } catch (e) { }
+    newGame(); villagers.length = 0; UI.mode = 'normal'; UI.sel = null; closeAll();
+    cam.x = T * N / 2; cam.y = T * N / 2; save(); showWelcome();
+  }, true);
+}
 function start() {
   resize();
   const loaded = load();
   if (!loaded) newGame();
   cam.x = T * N / 2; cam.y = T * N / 2;
-  cam.s = Math.max(1, Math.min(3, (Math.min(W, H) / (T * 7))));
-  if (loaded) {
-    const acc = offlineProgress();
-    if (acc) {
-      const hrs = Math.floor(acc.elapsed / 3600), mins = Math.floor(acc.elapsed % 3600 / 60);
-      const items = Object.keys(acc.items).map(k => `${ITEMS[k].name} +${acc.items[k]}`).join('、') || 'なし';
-      modal('おかえりなさい', `<div>留守の間：約 ${hrs ? hrs + '時間' : ''}${mins}分${acc.elapsed >= CONFIG.OFFLINE_MAX_SEC ? '（上限12時間分）' : ''}</div><div>🪙 販売収入 +${acc.coins}</div><div>👤 住民 +${acc.pop}</div><div>📦 倉庫に届いた品：${items}</div><div class="hint" style="text-align:left">倉庫に入りきらない完成品は施設内に残っています。</div>`);
-    }
-  } else {
-    modal('のんびり島ぐらしへようこそ', '<div>小さな島をのんびり育てる経営ゲームです。</div><div>・下の「🔨 建築」から施設を建てられます<br>・施設をタップして作業員を割り当てましょう<br>・霧の「＋」マスをタップすると土地を開放できます<br>・🎯 の目標を進めると新しい施設が解放されます</div><div class="hint" style="text-align:left">離れている間も生産は進みます（最大12時間分）。</div>');
-  }
+  cam.s = Math.max(1, Math.min(4, (W - 16) / (T * 7)));
+  if (!loaded) showWelcome();
   let last = performance.now(), saveT = 0, uiT = 0;
   function loop(now) {
     const dt = Math.min(0.25, (now - last) / 1000); last = now;
@@ -776,13 +1032,7 @@ function start() {
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { save(); return; }
-    // 復帰時：バックグラウンド中の経過分を進める
-    const el = Math.min(CONFIG.OFFLINE_MAX_SEC, Math.floor((Date.now() - S.lastSave) / 1000));
-    if (el >= 5) for (let i = 0; i < el; i++) sim(1, null);
-    save(); last = performance.now();
-  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });
   window.addEventListener('pagehide', save);
 }
 start();
