@@ -808,7 +808,7 @@ function onTap(sx, sy) {
 //  UI パネル
 // ============================================================
 const $ = id => document.getElementById(id);
-const panels = ['buildmenu', 'placepanel', 'infopanel', 'landpanel', 'storepanel', 'goalpanel'];
+const panels = ['buildmenu', 'placepanel', 'infopanel', 'landpanel', 'storepanel', 'goalpanel', 'peoplepanel'];
 function closeAll(resetSel = true) { panels.forEach(p => $(p).classList.add('hidden')); if (resetSel) { UI.sel = null; UI.land = null; } }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { $(b.dataset.close).classList.add('hidden'); if (b.dataset.close === 'infopanel') UI.sel = null; if (b.dataset.close === 'landpanel') UI.land = null; }));
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 1800); }
@@ -936,7 +936,7 @@ function renderInfo() {
   if (wp) wp.onclick = () => { setWorkers(b, b.workers + 1); renderInfo(); };
   const rb = $('recipe-btn'); if (rb) rb.onclick = () => pickRecipe(b);
   document.querySelectorAll('.mk-item').forEach(el => el.onclick = () => pickMarketItem(b, +el.dataset.i));
-  const as = $('a-store'); if (as) as.onclick = () => { $('infopanel').classList.add('hidden'); openStore(); };
+  const as = $('a-store'); if (as) as.onclick = () => { $('infopanel').classList.add('hidden'); storeTab = 'slots'; openStore(); };
   $('a-move').onclick = () => { UI.mode = 'move'; UI.moveB = b; UI.px = b.x; UI.py = b.y; $('infopanel').classList.add('hidden'); showMovePanel(); };
   $('a-demo').onclick = () => {
     let note = `<div>${d.name}を取り壊します。</div><div>🪙 ${d.cost.coins || 0} を返金します（建築に使った材料は戻りません）。</div>`;
@@ -964,15 +964,70 @@ function pickMarketItem(b, i) {
   });
 }
 
+// --- 住民パネル ---
+$('st-pop').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); openPeople(); });
+$('st-happy').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); openPeople(); });
+$('st-free').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); openPeople(); });
+function openPeople() { $('peoplepanel').classList.remove('hidden'); renderPeople(); }
+function renderPeople() {
+  const cap = countType('house') * CONFIG.HOUSE_CAP, ul = unlockedItems();
+  let h = `<div class="line"><span class="lbl">人口</span><span class="val">${S.pop} / ${cap}人 <small>(住居${countType('house')}棟)</small></span></div>`;
+  h += `<div class="line"><span class="lbl">未割り当て</span><span class="val">${freeWorkers()}人</span></div>`;
+  const ok = S.happy >= CONFIG.HAPPY_MIN_FOR_GROW, full = S.pop >= cap;
+  h += `<div class="line"><span class="lbl">次の住民まで</span><span class="val">${full ? '<span class="red">住居が足りません</span>' : ok ? Math.ceil(CONFIG.POP_GROW_SEC - S.timers.grow) + '秒' : '<span class="red">😊が' + CONFIG.HAPPY_MIN_FOR_GROW + '%未満</span>'}</span></div>`;
+  h += `<div class="sub">😊 幸福度 ${S.happy}%　<small>作れる商品 ${ul.length}種のうち 届いている ${ul.filter(k => (S.demand[k] || 0) > 0).length}種</small></div>`;
+  h += `<div class="chips">` + ul.map(k => { const d = Math.round(S.demand[k] || 0); return `<span class="chip ${d > 0 ? 'on' : ''}">${ITEMS[k].name} ${d}%</span>`; }).join('') + `</div>`;
+  h += `<div class="sub">作業員の割り当て</div>`;
+  const work = S.buildings.filter(b => b.workers !== undefined && ['gather', 'prod', 'market'].includes(BUILD[b.type].kind)).sort((a, b) => a.order - b.order);
+  if (!work.length) h += `<div class="hint">まだ作業できる施設がありません</div>`;
+  for (const b of work) {
+    const d = BUILD[b.type];
+    const what = d.kind === 'gather' ? ITEMS[d.res].name : d.kind === 'prod' ? ITEMS[RECIPES[b.recipe].out].name : '配達';
+    h += `<div class="line"><span class="lbl"><a class="jump" data-id="${b.id}">${d.name}</a> <small>${what}</small></span><span class="val">${b.workers}人</span><button class="btn small pw-minus" data-id="${b.id}" ${b.workers === 0 ? 'disabled' : ''}>－</button><button class="btn small pw-plus" data-id="${b.id}" ${(b.workers >= CONFIG.MAX_WORKERS || freeWorkers() <= 0) ? 'disabled' : ''}>＋</button></div>`;
+  }
+  $('people-body').innerHTML = h;
+  document.querySelectorAll('.pw-minus').forEach(el => el.onclick = () => { const b = getB(+el.dataset.id); setWorkers(b, b.workers - 1); renderPeople(); });
+  document.querySelectorAll('.pw-plus').forEach(el => el.onclick = () => { const b = getB(+el.dataset.id); setWorkers(b, b.workers + 1); renderPeople(); });
+  document.querySelectorAll('.jump').forEach(el => el.onclick = () => { const b = getB(+el.dataset.id); cam.x = (b.x + 0.5) * T; cam.y = (b.y + 0.5) * T; UI.sel = b; closeAll(false); openInfo(); });
+}
+
 // --- 倉庫パネル ---
 $('btn-store').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); openStore(); });
+document.querySelectorAll('#store-tabs .tab').forEach(t => t.onclick = () => { storeTab = t.dataset.tab; renderStore(); });
+let storeTab = 'items';
 function openStore() { $('storepanel').classList.remove('hidden'); renderStore(); }
+function islandItems() {
+  // 島全体の品物：倉庫 / 施設内 / 市場
+  const o = {}; const add = (k, where, n) => { if (!n) return; o[k] = o[k] || { wh: 0, fac: 0, mk: 0 }; o[k][where] += n; };
+  for (const sl of S.slots) if (sl.item) add(sl.item, 'wh', sl.qty);
+  for (const b of S.buildings) {
+    const d = BUILD[b.type];
+    if (d.kind === 'gather') add(d.res, 'fac', b.inv.out);
+    if (d.kind === 'prod') { add(RECIPES[b.recipe].out, 'fac', b.inv.out); recipeMats(b).forEach((m, i) => add(m, 'fac', b.inv[i === 0 ? 'a' : 'b'])); for (const k in b.pending) add(k, 'fac', b.pending[k]); }
+    if (d.kind === 'market') for (const k in b.stock) add(k, 'mk', b.stock[k]);
+  }
+  return o;
+}
+function renderItems() {
+  const o = islandItems(), el = $('store-items'); let h = '';
+  for (const k of Object.keys(ITEMS)) {
+    const v = o[k]; if (!v && !unlockedItems().includes(k)) continue;
+    const t = v ? v.wh + v.fac + v.mk : 0;
+    h += `<div class="line"><span class="lbl"><b>${ITEMS[k].name}</b> <small>🪙${ITEMS[k].price}</small></span><span class="val"><b>${t}</b> <small>倉庫${v ? v.wh : 0}・施設${v ? v.fac : 0}・市場${v ? v.mk : 0}</small></span></div>`;
+  }
+  el.innerHTML = h || '<div class="hint">まだ品物がありません</div>';
+}
 function slotHtml(s) {
   const cfgName = s.cfg === 'block' ? '🚫' : s.cfg ? ITEMS[s.cfg].name : '未設定';
   const col = s.item ? (ITEMS[s.item].color === '#f2eee0' ? '#999' : ITEMS[s.item].color) : '#bbb';
   return `<div class="sq" style="color:${col}">${s.item ? ITEMS[s.item].name : '－'}</div><div>${s.qty}/${CONFIG.SLOT_CAP}</div><div class="cfg">設定: ${cfgName}</div>`;
 }
 function renderStore() {
+  document.querySelectorAll('#store-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === storeTab));
+  $('store-items').classList.toggle('hidden', storeTab !== 'items');
+  $('store-slots').classList.toggle('hidden', storeTab !== 'slots');
+  $('store-hint').classList.toggle('hidden', storeTab !== 'slots');
+  if (storeTab === 'items') { renderItems(); return; }
   const el = $('store-slots'); el.innerHTML = '';
   S.slots.forEach(s => {
     const d = document.createElement('div'); d.className = 'slot';
@@ -985,6 +1040,7 @@ function renderStore() {
   });
 }
 function updateStore() {
+  if (storeTab === 'items') { renderItems(); return; }
   const infos = document.querySelectorAll('#store-slots .sinfo');
   if (infos.length !== S.slots.length) { renderStore(); return; }
   S.slots.forEach((s, i) => { const h = slotHtml(s); if (infos[i].innerHTML !== h) infos[i].innerHTML = h; });
@@ -1046,7 +1102,7 @@ function start() {
     const dt = Math.min(0.25, (now - last) / 1000); last = now;
     sim(dt, null);
     draw(); renderTop();
-    uiT += dt; if (uiT > 0.5) { uiT = 0; if (!$('infopanel').classList.contains('hidden')) renderInfo(); if (!$('storepanel').classList.contains('hidden')) updateStore(); if (!$('goalpanel').classList.contains('hidden')) renderGoal(); }
+    uiT += dt; if (uiT > 0.5) { uiT = 0; if (!$('infopanel').classList.contains('hidden')) renderInfo(); if (!$('storepanel').classList.contains('hidden')) updateStore(); if (!$('goalpanel').classList.contains('hidden')) renderGoal(); if (!$('peoplepanel').classList.contains('hidden')) renderPeople(); }
     saveT += dt; if (saveT > 5) { saveT = 0; save(); }
     requestAnimationFrame(loop);
   }

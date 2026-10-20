@@ -76,3 +76,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .goal { background: #fff; border-radius: 12px; padding: 10px; border: 2px solid #e8dcc0; }
 .goal .gt { font-weight: bold; }
 .goal .gr { font-size: 13px; color: #777; margin-top: 2px; }
+
+.sub { font-weight: bold; margin: 10px 0 4px; font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { background: #e8dcc0; color: #887; border-radius: 10px; padding: 3px 8px; font-size: 12px; }
+.chip.on { background: #cfe8b8; color: #2a5a1a; }
+.jump { text-decoration: underline; color: #2f6fb8; }
+.stat { cursor: pointer; }

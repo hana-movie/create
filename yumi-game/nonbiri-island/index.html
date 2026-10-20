@@ -67,9 +67,19 @@
 
 <!-- 倉庫パネル -->
 <div id="storepanel" class="sheet hidden">
-  <div class="sheet-head"><div class="title">共通倉庫</div><button class="close" data-close="storepanel">✕</button></div>
-  <div id="store-slots"></div>
-  <div class="hint">各スロットに保管する品物を設定してください。未設定のスロットには何も入りません</div>
+  <div class="sheet-head">
+    <div class="tabs" id="store-tabs"><button class="tab active" data-tab="items">品物</button><button class="tab" data-tab="slots">倉庫スロット</button></div>
+    <button class="close" data-close="storepanel">✕</button>
+  </div>
+  <div id="store-items"></div>
+  <div id="store-slots" class="hidden"></div>
+  <div class="hint hidden" id="store-hint">各スロットに保管する品物を設定してください。未設定のスロットには何も入りません</div>
+</div>
+
+<!-- 住民パネル -->
+<div id="peoplepanel" class="sheet hidden">
+  <div class="sheet-head"><div class="title">住民</div><button class="close" data-close="peoplepanel">✕</button></div>
+  <div id="people-body"></div>
 </div>
 
 <!-- 目標パネル -->
