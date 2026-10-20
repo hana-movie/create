@@ -70,8 +70,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .modal-box .title { font-weight: bold; font-size: 18px; margin-bottom: 8px; }
 #modal-body { font-size: 15px; line-height: 1.6; }
 
-#toast { position: fixed; top: 90px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff;
-  padding: 8px 16px; border-radius: 20px; font-size: 14px; z-index: 10; white-space: nowrap; }
+#toast { position: fixed; top: calc(env(safe-area-inset-top) + 52px); left: 10px; right: 10px; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.toast-item { background: rgba(0,0,0,.78); color: #fff; padding: 8px 14px; border-radius: 14px; font-size: 13px; max-width: 100%; text-align: center;
+  animation: tin .25s ease-out; transition: opacity .3s, transform .3s; }
+.toast-item.out { opacity: 0; transform: translateY(-6px); }
+@keyframes tin { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+#btn-build { position: relative; }
+.badge { position: absolute; top: -8px; right: -8px; background: #e23c3c; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 10px; box-shadow: 0 2px 0 #8e1f1f; }
+.tab .new { display: inline-block; background: #e23c3c; color: #fff; font-size: 10px; border-radius: 8px; padding: 0 5px; margin-left: 4px; }
+.bitem { position: relative; overflow: hidden; }
+.ribbon { position: absolute; top: 6px; right: -18px; background: #e23c3c; color: #fff; font-size: 10px; font-weight: bold; padding: 1px 22px; transform: rotate(45deg); }
+.pulse { animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100% { background: rgba(255,255,255,.15); } 50% { background: rgba(240,182,60,.8); } }
 
 .goal { background: #fff; border-radius: 12px; padding: 10px; border: 2px solid #e8dcc0; }
 .goal .gt { font-weight: bold; }

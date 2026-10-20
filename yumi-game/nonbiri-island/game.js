@@ -343,6 +343,7 @@ const SPR = {
 };
 // 住民（8×8、1色差し替え用）
 const VILL = ['..ii....', '..ii....', '.llll...', '.llll...', '..ll....', '.ll.l...', '.B..B...', '........'];
+const WORK = ['..ii....', '.yii....', '.oooo...', '.oooo...', '..oo....', '.oo.o...', '.B..B...', '........'];
 
 // ---------- 状態 ----------
 let S = null;          // セーブ対象の状態
@@ -376,7 +377,7 @@ function newGame() {
     tiles, buildings: [], nextId: 1, order: 1,
     slots: [], unlocked: [...INITIAL_UNLOCK], lastTab: 'gather',
     stats: { built_lumber: 0, built_quarry: 0, built_market: 0, got_wood: 0, got_plank: 0, got_bread: 0, earned: 0, happyMax: 0, slot_set: 0, market_set: 0 },
-    goal: 0, goalClaimed: false,
+    goal: 0, goalNotified: false, newTypes: [], notified: {},
     t: 0, timers: { transfer: 0, refill: 0, regen: 0, grow: 0 },
     lastSave: Date.now(),
   };
@@ -639,7 +640,7 @@ function canUnlock(x, y) {
 // ---------- セーブ ----------
 function save() { S.lastSave = Date.now(); try { localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(S)); } catch (e) { } }
 function load() {
-  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); rebuildOcc(); return true; } catch (e) { return false; }
+  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; rebuildOcc(); return true; } catch (e) { return false; }
 }
 
 // ============================================================
@@ -651,7 +652,7 @@ let W = 0, H = 0, DPR = 1;
 const spriteCache = {};
 function sprite(name) {
   if (spriteCache[name]) return spriteCache[name];
-  const rows = name === 'villager' ? VILL : SPR[name], n = rows.length;
+  const rows = name === 'villager' ? VILL : name === 'worker' ? WORK : SPR[name], n = rows.length;
   const c = document.createElement('canvas'); c.width = n; c.height = n; const g = c.getContext('2d');
   rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') { g.fillStyle = PAL[ch]; g.fillRect(x, y, 1, 1); } }));
   return spriteCache[name] = c;
@@ -737,21 +738,54 @@ function drawBuilding(type, x, y, ox, oy, ts, mark) {
   if (mark === 'ng') { ctx.fillStyle = 'rgba(255,0,0,.45)'; ctx.fillRect(sx, sy, ts * s, ts * s); }
 }
 const villagers = [];
+// 採集対象マスの座標版
+function gatherTargetPos(b) {
+  const res = BUILD[b.type].res; let best = null, bestD = 1e9, bestP = 9;
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+    const x = b.x + dx, y = b.y + dy; if (!inMap(x, y)) continue;
+    const i = idx(x, y), t = S.tiles[i];
+    if (!t.unl || !t.res || t.res.t !== res || t.res.amt <= 0 || occ[i]) continue;
+    const dist = Math.abs(dx) + Math.abs(dy);
+    const pri = (dy < 0 && dx === 0) ? 0 : (dx > 0 && dy === 0) ? 1 : (dy > 0 && dx === 0) ? 2 : (dx < 0 && dy === 0) ? 3 : 4 + (dy < 0 ? 0 : 2) + (dx > 0 ? 0 : 1);
+    if (dist < bestD || (dist === bestD && pri < bestP)) { best = [x, y]; bestD = dist; bestP = pri; }
+  }
+  return best;
+}
 function drawVillagers(ox, oy, ts) {
-  while (villagers.length < S.pop) { const c = Math.floor(N / 2); villagers.push({ x: c + Math.random(), y: c + Math.random(), tx: c, ty: c, wait: 0 }); }
+  const c = Math.floor(N / 2);
+  while (villagers.length < S.pop) villagers.push({ x: c + 0.5, y: c + 0.5, tx: c + 0.5, ty: c + 0.5, wait: 0, job: null, phase: 0 });
   villagers.length = Math.min(villagers.length, S.pop);
+  // 作業員を施設に割り当て（建築順で前から）
+  let vi = 0;
+  const jobs = [];
+  for (const b of S.buildings.slice().sort((a, b) => a.order - b.order)) for (let k = 0; k < (b.workers || 0); k++) jobs.push(b);
+  for (const v of villagers) { const j = jobs[vi++] || null; if (v.job !== j) { v.job = j; v.phase = 0; v.wait = 0; if (j) { v.tx = j.x + 0.5; v.ty = j.y + 0.5; } } }
   for (const v of villagers) {
-    if (v.wait > 0) v.wait -= 1 / 60; else {
-      const dx = v.tx - v.x, dy = v.ty - v.y, d = Math.hypot(dx, dy);
-      if (d < 0.05) { v.wait = 1 + Math.random() * 3; let tries = 10; while (tries--) { const nx = Math.floor(v.x) + Math.floor(Math.random() * 7) - 3, ny = Math.floor(v.y) + Math.floor(Math.random() * 7) - 3; if (inMap(nx, ny) && S.tiles[idx(nx, ny)].unl && !occ[idx(nx, ny)]) { v.tx = nx + 0.5; v.ty = ny + 0.5; break; } } }
-      else { v.x += dx / d * 0.02; v.y += dy / d * 0.02; }
+    const dx = v.tx - v.x, dy = v.ty - v.y, d = Math.hypot(dx, dy);
+    if (v.wait > 0) v.wait -= 1 / 60;
+    else if (d > 0.04) { const sp = 0.025; v.x += dx / d * Math.min(sp, d); v.y += dy / d * Math.min(sp, d); }
+    else if (v.job) {
+      const b = v.job, k = BUILD[b.type].kind;
+      if (k === 'gather') {
+        // 施設 ⇄ 採集先 を往復。採集先がなければ施設前で待つ
+        if (v.phase === 0) { const t = gatherTargetPos(b); if (t) { v.tx = t[0] + 0.5; v.ty = t[1] + 0.5; v.phase = 1; } v.wait = 1; }
+        else { v.tx = b.x + 0.5; v.ty = b.y + 0.9; v.phase = 0; v.wait = 1.5; }
+      } else if (k === 'market') {
+        // 市場 ⇄ 住居 を往復
+        if (v.phase === 0) { const hs = S.buildings.filter(h => h.type === 'house'); const h = hs[Math.floor(Math.random() * hs.length)]; if (h) { v.tx = h.x + 0.5; v.ty = h.y + 0.9; v.phase = 1; } v.wait = 1; }
+        else { v.tx = b.x + 0.5; v.ty = b.y + 0.9; v.phase = 0; v.wait = 1.5; }
+      } else { v.tx = b.x + 0.5; v.ty = b.y + 0.9; v.wait = 3; } // 生産施設：前に立つ
+    } else {
+      // 未割り当て：何もないマスだけを散歩
+      v.wait = 1 + Math.random() * 3;
+      let tries = 12;
+      while (tries--) { const nx = Math.floor(v.x) + Math.floor(Math.random() * 7) - 3, ny = Math.floor(v.y) + Math.floor(Math.random() * 7) - 3; if (inMap(nx, ny) && S.tiles[idx(nx, ny)].unl && !occ[idx(nx, ny)] && !S.tiles[idx(nx, ny)].res) { v.tx = nx + 0.5; v.ty = ny + 0.5; break; } }
     }
     const sx = ox + v.x * ts, sy = oy + v.y * ts, vs = ts * 0.5;
     ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(sx, sy + vs * 0.4, vs * 0.25, vs * 0.1, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.drawImage(sprite('villager'), sx - vs * 0.25, sy - vs * 0.45, vs, vs);
+    ctx.drawImage(sprite(v.job ? 'worker' : 'villager'), sx - vs * 0.25, sy - vs * 0.45, vs, vs);
   }
 }
-
 // ============================================================
 //  入力（パン・ズーム・タップ）
 // ============================================================
@@ -809,9 +843,14 @@ function onTap(sx, sy) {
 // ============================================================
 const $ = id => document.getElementById(id);
 const panels = ['buildmenu', 'placepanel', 'infopanel', 'landpanel', 'storepanel', 'goalpanel', 'peoplepanel'];
-function closeAll(resetSel = true) { panels.forEach(p => $(p).classList.add('hidden')); if (resetSel) { UI.sel = null; UI.land = null; } }
+function closeAll(resetSel = true) { if (shownNew.length) { S.newTypes = S.newTypes.filter(t => !shownNew.includes(t)); shownNew = []; } panels.forEach(p => $(p).classList.add('hidden')); if (resetSel) { UI.sel = null; UI.land = null; } }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { $(b.dataset.close).classList.add('hidden'); if (b.dataset.close === 'infopanel') UI.sel = null; if (b.dataset.close === 'landpanel') UI.land = null; }));
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 1800); }
+function toast(msg, ms = 2200) {
+  const box = $('toast'); const el = document.createElement('div'); el.className = 'toast-item'; el.textContent = msg; box.appendChild(el);
+  while (box.children.length > 3) box.removeChild(box.firstChild);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, ms);
+}
+function notify(msg) { toast(msg, 3500); }
 function modal(title, html, onOk, cancel) {
   $('modal-title').textContent = title; $('modal-body').innerHTML = html; $('modal').classList.remove('hidden');
   $('modal-cancel').classList.toggle('hidden', !cancel);
@@ -832,16 +871,20 @@ function iconCanvas(type) { const c = document.createElement('canvas'); c.width 
 
 // --- 建築メニュー ---
 $('btn-build').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); openBuildMenu(); });
+let shownNew = [];
 function openBuildMenu() {
+  // 前回表示したNEWは既読にする
+  if (shownNew.length) { S.newTypes = S.newTypes.filter(t => !shownNew.includes(t)); shownNew = []; }
   const tabs = $('build-tabs'); tabs.innerHTML = '';
-  for (const c of CATS) { const b = document.createElement('button'); b.className = 'tab' + (S.lastTab === c.id ? ' active' : ''); b.textContent = c.name; b.onclick = () => { S.lastTab = c.id; openBuildMenu(); }; tabs.appendChild(b); }
+  for (const c of CATS) { const b = document.createElement('button'); b.className = 'tab' + (S.lastTab === c.id ? ' active' : ''); b.textContent = c.name; if (S.newTypes.some(t => BUILD[t].cat === c.id)) b.innerHTML += '<span class="new">N</span>'; b.onclick = () => { S.lastTab = c.id; openBuildMenu(); }; tabs.appendChild(b); }
   const list = $('build-list'); list.innerHTML = '';
   for (const type in BUILD) {
     const d = BUILD[type]; if (d.cat !== S.lastTab || !S.unlocked.includes(type)) continue;
     const full = !d.nolimit && countType(type) >= CONFIG.MAX_SAME;
     const el = document.createElement('div'); el.className = 'bitem' + (full ? ' disabled' : '');
     el.appendChild(iconCanvas(type));
-    el.insertAdjacentHTML('beforeend', `<div>${d.name}${d.size === 2 ? '<br><small>2×2</small>' : ''}</div><div class="bcost">🪙${d.cost.coins || 0}${full ? '<br>上限' : ''}</div>`);
+    el.insertAdjacentHTML('beforeend', `<div>${d.name}</div><div class="bcost">${d.cost.coins ? '🪙' + d.cost.coins : '無料'}${full ? '<br>上限' : ''}</div>`);
+    if (S.newTypes.includes(type)) { el.insertAdjacentHTML('beforeend', '<span class="ribbon">NEW</span>'); shownNew.push(type); }
     let lp = null, fired = false, p0 = null;
     el.addEventListener('pointerdown', e => { fired = false; p0 = [e.clientX, e.clientY]; lp = setTimeout(() => { fired = true; showDetail(type); }, 500); });
     el.addEventListener('pointermove', e => { if (p0 && Math.hypot(e.clientX - p0[0], e.clientY - p0[1]) > 10) { clearTimeout(lp); fired = true; } });
@@ -862,6 +905,7 @@ function startPlace(type) {
   UI.mode = 'place'; UI.placeType = type; UI.sel = null;
   const c = Math.round(cam.x / T), r = Math.round(cam.y / T), s = BUILD[type].size;
   UI.px = Math.max(0, Math.min(N - s, c)); UI.py = Math.max(0, Math.min(N - s, r));
+  if (shownNew.length) { S.newTypes = S.newTypes.filter(t => !shownNew.includes(t)); shownNew = []; }
   $('buildmenu').classList.add('hidden'); showPlacePanel();
 }
 function showPlacePanel() {
@@ -1064,9 +1108,38 @@ function renderGoal() {
   if (!g) { $('goal-body').innerHTML = '<div class="goal"><div class="gt">すべての目標を達成しました！</div><div class="gr">あとはのんびり島を育ててください。</div></div>'; return; }
   const p = goalProgress(g), done = p >= g.n;
   $('goal-body').innerHTML = `<div class="goal"><div class="gt">${S.goal + 1}. ${g.text}</div><div class="gr">進捗 ${p} / ${g.n}　報酬 🪙${g.reward}${g.unlock.length ? '　解放: ' + g.unlock.map(u => BUILD[u].name).join('・') : ''}</div><div class="row"><button class="btn primary" id="goal-claim" ${done ? '' : 'disabled'}>獲得</button></div></div>`;
-  $('goal-claim').onclick = () => { if (goalProgress(g) < g.n) return; S.coins += g.reward; for (const u of g.unlock) if (!S.unlocked.includes(u)) S.unlocked.push(u); S.goal++; toast(`目標達成！ 🪙${g.reward} 獲得`); save(); renderGoal(); };
+  $('goal-claim').onclick = () => {
+    if (goalProgress(g) < g.n) return;
+    S.coins += g.reward; toast(`🪙${g.reward} 獲得`);
+    const nu = g.unlock.filter(u => !S.unlocked.includes(u));
+    for (const u of nu) { S.unlocked.push(u); S.newTypes.push(u); }
+    if (nu.length) notify(`🔨 新しい施設：${nu.map(u => BUILD[u].name).join('・')} が建てられるようになりました`);
+    S.goal++; S.goalNotified = false; save(); renderGoal();
+  };
 }
 
+// --- 通知チェック（毎フレーム） ---
+let prevPop = null;
+function checkEvents() {
+  const g = GOALS[S.goal];
+  if (g && !S.goalNotified && goalProgress(g) >= g.n) { S.goalNotified = true; notify(`🎁 目標達成「${g.text}」 🎯で報酬を受け取れます`); }
+  if (prevPop !== null && S.pop > prevPop) notify(`👤 住民が増えました（${S.pop}人）`);
+  prevPop = S.pop;
+  for (const b of S.buildings) {
+    const d = BUILD[b.type], key = 'b' + b.id;
+    if (d.kind === 'gather') {
+      const dead = b.workers > 0 && !gatherTarget(b);
+      if (dead && !S.notified[key + 'res']) { S.notified[key + 'res'] = true; notify(`🪓 ${d.name}の周りの${ITEMS[d.res].name}がなくなりました（回復待ち）`); }
+      if (!dead) delete S.notified[key + 'res'];
+    }
+    if (b.inv) {
+      const full = b.inv.out >= CONFIG.INV_CAP;
+      const item = d.kind === 'gather' ? d.res : RECIPES[b.recipe].out;
+      if (full && !S.notified[key + 'full']) { S.notified[key + 'full'] = true; notify(`📦 ${d.name}の${ITEMS[item].name}が倉庫に入らず満杯です（スロットを確認）`); }
+      if (!full) delete S.notified[key + 'full'];
+    }
+  }
+}
 // --- 上部バー ---
 function renderTop() {
   $('st-coins').querySelector('span').textContent = S.coins;
@@ -1075,6 +1148,8 @@ function renderTop() {
   $('st-happy').querySelector('span').textContent = Math.round(S.happy) + '%';
   const g = GOALS[S.goal];
   $('btn-goal').textContent = (g && goalProgress(g) >= g.n) ? '🎁' : '🎯';
+  $('btn-goal').classList.toggle('pulse', !!(g && goalProgress(g) >= g.n));
+  $('build-badge').classList.toggle('hidden', S.newTypes.length === 0);
 }
 
 // ============================================================
@@ -1101,6 +1176,7 @@ function start() {
   function loop(now) {
     const dt = Math.min(0.25, (now - last) / 1000); last = now;
     sim(dt, null);
+    checkEvents();
     draw(); renderTop();
     uiT += dt; if (uiT > 0.5) { uiT = 0; if (!$('infopanel').classList.contains('hidden')) renderInfo(); if (!$('storepanel').classList.contains('hidden')) updateStore(); if (!$('goalpanel').classList.contains('hidden')) renderGoal(); if (!$('peoplepanel').classList.contains('hidden')) renderPeople(); }
     saveT += dt; if (saveT > 5) { saveT = 0; save(); }
