@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2a6f3b">
+<title>のんびり島ぐらし</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="map"></canvas>
+
+<!-- 上部バー -->
+<div id="topbar">
+  <div class="stat" id="st-coins">🪙 <span>0</span></div>
+  <div class="stat" id="st-pop">👤 <span>0</span></div>
+  <div class="stat" id="st-free">未割り当て：<span>0</span>人</div>
+  <div class="stat" id="st-happy">😊 <span>0</span></div>
+  <button class="icon-btn" id="btn-goal" title="目標">🎯</button>
+  <button class="icon-btn" id="btn-store" title="倉庫">📦</button>
+</div>
+
+<!-- 下部ボタン -->
+<div id="bottombar">
+  <button id="btn-build">🔨 建築</button>
+</div>
+
+<!-- 建築メニュー -->
+<div id="buildmenu" class="sheet hidden">
+  <div class="sheet-head">
+    <div class="tabs" id="build-tabs"></div>
+    <button class="close" data-close="buildmenu">✕</button>
+  </div>
+  <div id="build-list"></div>
+  <div class="hint">タップで配置 / 長押しで詳細</div>
+</div>
+
+<!-- 配置プレビュー -->
+<div id="placepanel" class="sheet hidden">
+  <div class="sheet-head"><div class="title" id="place-title"></div></div>
+  <div id="place-cost"></div>
+  <div class="row">
+    <button class="btn" id="place-cancel">キャンセル</button>
+    <button class="btn primary" id="place-ok">建築する</button>
+  </div>
+</div>
+
+<!-- 施設情報パネル -->
+<div id="infopanel" class="sheet hidden">
+  <div class="sheet-head">
+    <div class="title" id="info-title"></div>
+    <button class="close" data-close="infopanel">✕</button>
+  </div>
+  <div id="info-body"></div>
+  <div class="row" id="info-actions"></div>
+</div>
+
+<!-- 土地開放 -->
+<div id="landpanel" class="sheet hidden">
+  <div class="sheet-head"><div class="title">土地を開放</div><button class="close" data-close="landpanel">✕</button></div>
+  <div id="land-cost"></div>
+  <div class="row"><button class="btn primary" id="land-ok">開放する</button></div>
+</div>
+
+<!-- 倉庫パネル -->
+<div id="storepanel" class="sheet hidden">
+  <div class="sheet-head"><div class="title">共通倉庫</div><button class="close" data-close="storepanel">✕</button></div>
+  <div id="store-slots"></div>
+  <div class="hint">スロットをタップして保管するアイテムを指定できます</div>
+</div>
+
+<!-- 目標パネル -->
+<div id="goalpanel" class="sheet hidden">
+  <div class="sheet-head"><div class="title">目標</div><button class="close" data-close="goalpanel">✕</button></div>
+  <div id="goal-body"></div>
+</div>
+
+<!-- 汎用モーダル（施設詳細・オフライン結果など） -->
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="title" id="modal-title"></div>
+    <div id="modal-body"></div>
+    <div class="row"><button class="btn primary" id="modal-ok">OK</button></div>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script src="game.js"></script>
+</body>
+</html>
