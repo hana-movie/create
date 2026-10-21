@@ -7,7 +7,6 @@
 // ---------- 調整用の定数（未確定仕様はここで仮置き） ----------
 const CONFIG = {
   MAP: 15,              // 15×15
-  START_AREA: 5,        // 中央5×5を初期開放
   TILE: 32,             // ワールド座標の1マスのピクセル
   START_COINS: 300,
   START_POP: 3,
@@ -20,14 +19,16 @@ const CONFIG = {
   SLOT_CAP: 100,
   SLOTS_PER_WH: 5,
   REGEN_SEC: 60,        // 資源マスの回復間隔（1個）
-  LAND_BASE: 30, LAND_STEP: 12,   // 土地開放価格 = BASE + STEP×開放済み数
+  BLOCK: 5,                        // エリア開放は5×5単位
+  LAND_BASE: 100, LAND_STEP: 80,   // エリア開放価格 = BASE + STEP×開放済みエリア数（初期エリアを除く）
+  HOUSE_BASE: 5, HOUSE_PER_AREA: 5, // 住居上限 = 初期5 + エリア開放ごとに5
   HOUSE_CAP: 4,         // 住居1棟あたり人口上限
   POP_GROW_SEC: 60,     // 人口+1の間隔
   HAPPY_MIN_FOR_GROW: 60,   // 幸福度(%)がこれ以上で人口増
   DELIVER_BELOW: 30,        // 需要ゲージがこの%を切ったら配達対象
   MAX_GATHER_ITEMS: 3,  // 採集アイテムの種類上限
   MAX_PROD_ITEMS: 5,    // 生産アイテムの種類上限
-  SAVE_KEY: 'nonbiri-island-v3',
+  SAVE_KEY: 'nonbiri-island-v4',
 };
 
 // consume: 住民が1個を消費しきる秒数（作るのに手間がかかる品ほど長い）
@@ -55,7 +56,7 @@ const CATS = [
 ];
 
 const BUILD = {
-  house:     { name: '住居',   cat: 'home',   size: 1, kind: 'house',   cost: { coins: 30, wood: 5 },  desc: '住民が4人まで住めます。人口が増えると作業員を割り当てられます。棟数制限なし。', nolimit: true },
+  house:     { name: '住居',   cat: 'home',   size: 1, kind: 'house',   cost: { coins: 30, wood: 5 },  desc: '住民が4人まで住めます。家ごとに商品の需要があり、市場が届けると幸福度が上がります。建てられる数はエリア開放ごとに5棟増えます。', nolimit: true },
   lumber:    { name: '伐採所', cat: 'gather', size: 1, kind: 'gather',  res: 'wood',  cost: { coins: 20 }, desc: '周囲5×5マスの木から木材を集めます。' },
   quarry:    { name: '採石場', cat: 'gather', size: 1, kind: 'gather',  res: 'stone', cost: { coins: 30 }, desc: '周囲5×5マスの岩から石材を集めます。' },
   farm:      { name: '農場',   cat: 'gather', size: 1, kind: 'gather',  res: 'wheat', cost: { coins: 25 }, desc: '周囲5×5マスの小麦畑から小麦を集めます。' },
@@ -350,6 +351,12 @@ let S = null;          // セーブ対象の状態
 let occ = [];          // マス → 建物id（占有）
 const N = CONFIG.MAP;
 const idx = (x, y) => y * N + x;
+const NB = CONFIG.MAP / CONFIG.BLOCK;            // 3×3 エリア
+const bidx = (bx, by) => by * NB + bx;
+const blockOf = (x, y) => [Math.floor(x / CONFIG.BLOCK), Math.floor(y / CONFIG.BLOCK)];
+function unlockBlock(bx, by) { S.blocks[bidx(bx, by)] = true; for (let y = by * CONFIG.BLOCK; y < (by + 1) * CONFIG.BLOCK; y++) for (let x = bx * CONFIG.BLOCK; x < (bx + 1) * CONFIG.BLOCK; x++) S.tiles[idx(x, y)].unl = true; }
+function blocksOpen() { return S.blocks.filter(Boolean).length; }
+function houseCap() { return CONFIG.HOUSE_BASE + CONFIG.HOUSE_PER_AREA * (blocksOpen() - 1); }
 const inMap = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
 
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
@@ -365,8 +372,7 @@ function newGame() {
     else if (v < 0.44) res = { t: 'wheat', amt: 40 + Math.floor(r() * 60), max: 100 };
     tiles.push({ unl: false, res });
   }
-  const c = Math.floor(N / 2), h = Math.floor(CONFIG.START_AREA / 2);
-  for (let y = c - h; y <= c + h; y++) for (let x = c - h; x <= c + h; x++) tiles[idx(x, y)].unl = true;
+  const c = Math.floor(N / 2);
   // 中央付近に必ず少し資源があるようにする
   const ensure = [[c - 2, c - 2, 'wood'], [c + 2, c - 2, 'wood'], [c - 2, c + 2, 'stone'], [c + 2, c + 2, 'wheat'], [c, c - 2, 'wood']];
   for (const [x, y, t] of ensure) tiles[idx(x, y)].res = { t, amt: 80, max: 100 };
@@ -374,13 +380,14 @@ function newGame() {
 
   S = {
     v: 3, coins: CONFIG.START_COINS, pop: CONFIG.START_POP, happy: 0, demand: {},
-    tiles, buildings: [], nextId: 1, order: 1,
+    tiles, blocks: new Array(NB * NB).fill(false), buildings: [], nextId: 1, order: 1,
     slots: [], unlocked: [...INITIAL_UNLOCK], lastTab: 'gather',
     stats: { built_lumber: 0, built_quarry: 0, built_market: 0, got_wood: 0, got_plank: 0, got_bread: 0, earned: 0, happyMax: 0, slot_set: 0, market_set: 0 },
     goal: 0, goalNotified: false, newTypes: [], notified: {},
     t: 0, timers: { transfer: 0, refill: 0, regen: 0, grow: 0 },
     lastSave: Date.now(),
   };
+  unlockBlock(Math.floor(NB / 2), Math.floor(NB / 2));
   addBuilding('warehouse', c - 1, c, true);
   addBuilding('house', c + 1, c, true);
 }
@@ -392,6 +399,7 @@ function makeBuilding(type, x, y) {
   if (d.kind === 'gather') { b.inv = { out: 0 }; b.prog = 0; }
   if (d.kind === 'prod') { b.recipe = d.recipes[0]; b.inv = { a: 0, b: 0, out: 0 }; b.prog = 0; b.active = false; b.pending = {}; }
   if (d.kind === 'market') { b.items = [null, null, null, null, null]; b.stock = {}; b.prog = 0; }
+  if (d.kind === 'house') { b.demand = {}; }
   return b;
 }
 function addBuilding(type, x, y, free) {
@@ -408,6 +416,11 @@ function rebuildOcc() {
 }
 function forTiles(type, x, y, fn) { const s = BUILD[type].size; for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) fn(x + dx, y + dy); }
 function getB(id) { return S.buildings.find(b => b.id === id); }
+// 表示名：同種が複数あれば建築順の番号を付ける（市場 1 / 市場 2）
+function bname(b) {
+  const same = S.buildings.filter(x => x.type === b.type).sort((p, q) => p.order - q.order);
+  return same.length > 1 ? `${BUILD[b.type].name} ${same.indexOf(b) + 1}` : BUILD[b.type].name;
+}
 function countType(type) { return S.buildings.filter(b => b.type === type).length; }
 function assigned() { return S.buildings.reduce((a, b) => a + (b.workers || 0), 0); }
 function freeWorkers() { return S.pop - assigned(); }
@@ -473,12 +486,12 @@ function sim(dt, acc) {
   while (S.timers.transfer >= CONFIG.TRANSFER_SEC) { S.timers.transfer -= CONFIG.TRANSFER_SEC; doTransfer(acc); }
   S.timers.refill += dt;
   while (S.timers.refill >= CONFIG.REFILL_SEC) { S.timers.refill -= CONFIG.REFILL_SEC; doRefill(); doMarketRefill(); }
-  // 需要：届いた商品は消費時間をかけて100%→0%に減る
-  for (const k in S.demand) { if (S.demand[k] > 0) S.demand[k] = Math.max(0, S.demand[k] - dt / ITEMS[k].consume * 100); }
-  // 幸福度 = 消費中（ゲージ>0）の商品の種類 / 解放済みの商品の種類
+  // 需要：家ごとに、届いた商品は消費時間をかけて100%→0%に減る
+  const houses = S.buildings.filter(b => b.type === 'house');
+  for (const h of houses) for (const k in h.demand) { if (h.demand[k] > 0) h.demand[k] = Math.max(0, h.demand[k] - dt / ITEMS[k].consume * 100); }
+  // 幸福度 = 各家の「届いている商品の種類 / 解放済みの商品の種類」の平均
   const ul = unlockedItems();
-  const sup = ul.filter(k => (S.demand[k] || 0) > 0).length;
-  S.happy = ul.length ? Math.round(sup / ul.length * 100) : 0;
+  S.happy = (ul.length && houses.length) ? Math.round(houses.reduce((a, h) => a + ul.filter(k => (h.demand[k] || 0) > 0).length / ul.length, 0) / houses.length * 100) : 0;
   if (S.happy > S.stats.happyMax) S.stats.happyMax = S.happy;
   const cap = countType('house') * CONFIG.HOUSE_CAP;
   S.timers.grow += dt;
@@ -517,22 +530,24 @@ function stepBuilding(b, dt, acc) {
     b.prog += dt * b.workers / CONFIG.PROD_SEC;
     if (b.prog >= 1) {
       b.prog = 0;
-      const it = marketTarget(b); if (!it) return;
-      b.stock[it]--;
-      const p = ITEMS[it].price; S.coins += p; S.stats.earned += p; if (acc) acc.coins += p;
-      S.demand[it] = 100;
+      const tg = marketTarget(b); if (!tg) return;
+      b.stock[tg.item]--;
+      const p = ITEMS[tg.item].price; S.coins += p; S.stats.earned += p; if (acc) acc.coins += p;
+      tg.house.demand[tg.item] = 100;
     }
   }
 }
 
-// 配達対象：在庫があり需要ゲージが閾値未満の商品のうち、残りが最も少ないもの。同率はランダム
+// 配達対象：（家, 商品）のうち在庫があり需要ゲージが閾値未満で、残りが最も少ない組。同率はランダム
 function marketTarget(b) {
-  const cands = b.items.filter(i => i && (b.stock[i] || 0) > 0 && (S.demand[i] || 0) < CONFIG.DELIVER_BELOW);
+  const cands = [];
+  for (const h of S.buildings) { if (h.type !== 'house') continue; for (const i of b.items) { if (!i || (b.stock[i] || 0) <= 0) continue; const g = h.demand[i] || 0; if (g < CONFIG.DELIVER_BELOW) cands.push({ house: h, item: i, g: Math.round(g) }); } }
   if (!cands.length) return null;
-  const min = Math.min(...cands.map(i => Math.round(S.demand[i] || 0)));
-  const low = cands.filter(i => Math.round(S.demand[i] || 0) === min);
+  const min = Math.min(...cands.map(c => c.g));
+  const low = cands.filter(c => c.g === min);
   return low[Math.floor(Math.random() * low.length)];
 }
+function houseWanting(item) { return S.buildings.filter(h => h.type === 'house' && (h.demand[item] || 0) < CONFIG.DELIVER_BELOW).length; }
 // 採集対象：範囲5×5内で最も近い資源。同距離は上→右→下→左
 function gatherTarget(b) {
   const res = BUILD[b.type].res;
@@ -599,6 +614,7 @@ function setWorkers(b, n) {
 function build(type, x, y) {
   const d = BUILD[type];
   if (!S.unlocked.includes(type) || (!d.nolimit && countType(type) >= CONFIG.MAX_SAME)) return false;
+  if (type === 'house' && countType('house') >= houseCap()) return false;
   if (!canPlace(type, x, y) || !canAfford(d.cost)) return false;
   payCost(d.cost);
   addBuilding(type, x, y, false);
@@ -629,13 +645,13 @@ function changeRecipe(b, rid) {
   b.recipe = rid; b.active = false; b.prog = 0;
 }
 
-// ---------- 土地開放 ----------
-function unlockedCount() { return S.tiles.filter(t => t.unl).length; }
-function landPrice() { return CONFIG.LAND_BASE + CONFIG.LAND_STEP * (unlockedCount() - CONFIG.START_AREA * CONFIG.START_AREA); }
-function canUnlock(x, y) {
-  if (!inMap(x, y) || S.tiles[idx(x, y)].unl) return false;
-  return [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => inMap(x + dx, y + dy) && S.tiles[idx(x + dx, y + dy)].unl);
+// ---------- エリア開放（5×5単位） ----------
+function landPrice() { return CONFIG.LAND_BASE + CONFIG.LAND_STEP * (blocksOpen() - 1); }
+function canUnlockBlock(bx, by) {
+  if (bx < 0 || by < 0 || bx >= NB || by >= NB || S.blocks[bidx(bx, by)]) return false;
+  return [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => bx + dx >= 0 && by + dy >= 0 && bx + dx < NB && by + dy < NB && S.blocks[bidx(bx + dx, by + dy)]);
 }
+function canUnlock(x, y) { const [bx, by] = blockOf(x, y); return canUnlockBlock(bx, by); }
 
 // ---------- セーブ ----------
 function save() { S.lastSave = Date.now(); try { localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(S)); } catch (e) { } }
@@ -703,20 +719,25 @@ function draw() {
   ctx.strokeStyle = 'rgba(0,0,0,.10)'; ctx.lineWidth = 1; ctx.beginPath();
   for (let i = 0; i <= N; i++) { ctx.moveTo(ox + i * ts, oy); ctx.lineTo(ox + i * ts, oy + N * ts); ctx.moveTo(ox, oy + i * ts); ctx.lineTo(ox + N * ts, oy + i * ts); }
   ctx.stroke();
-  // 霧（未開放）：隣接マスは明るめ＋「＋」、それ以外は暗い霧
+  // 霧（未開放エリア）：開放できるエリアは明るく＋中央に「＋」、それ以外は暗い霧
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const t = S.tiles[idx(x, y)]; if (t.unl) continue;
     const sx = ox + x * ts, sy = oy + y * ts; if (sx + ts < 0 || sy + ts < 0 || sx > W || sy > H) continue;
     const edge = canUnlock(x, y);
-    if (edge) {
-      ctx.fillStyle = 'rgba(235,245,255,.55)'; ctx.fillRect(sx, sy, ts + 0.5, ts + 0.5);
-      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.strokeRect(sx + 2, sy + 2, ts - 4, ts - 4); ctx.setLineDash([]);
-      const r = ts * 0.22; ctx.fillStyle = '#f0b63c'; ctx.beginPath(); ctx.arc(sx + ts / 2, sy + ts / 2, r, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#4a2e00'; ctx.font = `bold ${Math.max(10, ts * 0.36)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('+', sx + ts / 2, sy + ts / 2 + 1);
-    } else {
-      ctx.fillStyle = ((x + y) & 1) ? 'rgba(90,110,130,.82)' : 'rgba(80,100,120,.82)'; ctx.fillRect(sx, sy, ts + 0.5, ts + 0.5);
+    ctx.fillStyle = edge ? 'rgba(235,245,255,.5)' : (((x + y) & 1) ? 'rgba(90,110,130,.82)' : 'rgba(80,100,120,.82)');
+    ctx.fillRect(sx, sy, ts + 0.5, ts + 0.5);
+  }
+  const BS = CONFIG.BLOCK * ts;
+  for (let by = 0; by < NB; by++) for (let bx = 0; bx < NB; bx++) {
+    if (S.blocks[bidx(bx, by)]) continue;
+    const sx = ox + bx * BS, sy = oy + by * BS;
+    if (canUnlockBlock(bx, by)) {
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(sx + 3, sy + 3, BS - 6, BS - 6); ctx.setLineDash([]);
+      const r = ts * 0.5; ctx.fillStyle = '#f0b63c'; ctx.beginPath(); ctx.arc(sx + BS / 2, sy + BS / 2, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#4a2e00'; ctx.font = `bold ${Math.max(12, ts * 0.8)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('+', sx + BS / 2, sy + BS / 2 + 1);
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.font = `bold ${Math.max(10, ts * 0.4)}px sans-serif`; ctx.fillText(`🪙${landPrice()}`, sx + BS / 2, sy + BS / 2 + r + ts * 0.35);
     }
-    if (UI.land && UI.land[0] === x && UI.land[1] === y) { ctx.strokeStyle = '#ff6a00'; ctx.lineWidth = 4; ctx.strokeRect(sx + 2, sy + 2, ts - 4, ts - 4); }
+    if (UI.land && UI.land[0] === bx && UI.land[1] === by) { ctx.strokeStyle = '#ff6a00'; ctx.lineWidth = 4; ctx.strokeRect(sx + 2, sy + 2, BS - 4, BS - 4); }
   }
   // 島の外周
   ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2; ctx.strokeRect(ox, oy, N * ts, N * ts);
@@ -790,34 +811,50 @@ function drawVillagers(ox, oy, ts) {
 //  入力（パン・ズーム・タップ）
 // ============================================================
 const ptrs = new Map(); let pinch0 = null, tapInfo = null;
-cv.addEventListener('pointerdown', e => {
-  cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (ptrs.size === 1) tapInfo = { x: e.clientX, y: e.clientY, moved: false, t: Date.now() };
+function onDown(id, x, y) {
+  ptrs.set(id, { x, y });
+  if (ptrs.size === 1) tapInfo = { x, y, moved: false, t: Date.now() };
   if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = { d: Math.hypot(a.x - b.x, a.y - b.y), s: cam.s }; tapInfo = null; }
-});
-cv.addEventListener('pointermove', e => {
-  if (!ptrs.has(e.pointerId)) return;
-  const p = ptrs.get(e.pointerId);
+}
+function onMove(id, x, y) {
+  if (!ptrs.has(id)) return;
+  const p = ptrs.get(id);
   if (ptrs.size === 1) {
-    const dx = e.clientX - p.x, dy = e.clientY - p.y;
-    if (tapInfo && Math.hypot(e.clientX - tapInfo.x, e.clientY - tapInfo.y) > 8) tapInfo.moved = true;
+    const dx = x - p.x, dy = y - p.y;
+    if (tapInfo && Math.hypot(x - tapInfo.x, y - tapInfo.y) > 8) tapInfo.moved = true;
     if (!tapInfo || tapInfo.moved) { cam.x -= dx / cam.s; cam.y -= dy / cam.s; }
   } else if (ptrs.size === 2 && pinch0) {
-    p.x = e.clientX; p.y = e.clientY;
+    p.x = x; p.y = y;
     const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
     cam.s = Math.max(0.6, Math.min(5, pinch0.s * d / pinch0.d));
   }
-  p.x = e.clientX; p.y = e.clientY;
+  p.x = x; p.y = y;
   clampCam();
-});
-function endPtr(e) {
-  if (!ptrs.has(e.pointerId)) return;
-  ptrs.delete(e.pointerId);
+}
+function onUp(id, x, y) {
+  if (!ptrs.has(id)) return;
+  ptrs.delete(id);
   if (ptrs.size < 2) pinch0 = null;
-  if (ptrs.size === 0 && tapInfo && !tapInfo.moved) onTap(e.clientX, e.clientY);
+  if (ptrs.size === 0 && tapInfo && !tapInfo.moved) onTap(x, y);
   if (ptrs.size === 0) tapInfo = null;
 }
-cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
+// Pointer Events が使えれば使い、無ければ（iOS12以前のSafariなど）Touch/Mouse にフォールバック
+if (window.PointerEvent) {
+  cv.addEventListener('pointerdown', e => { try { cv.setPointerCapture(e.pointerId); } catch (x) { } onDown(e.pointerId, e.clientX, e.clientY); });
+  cv.addEventListener('pointermove', e => onMove(e.pointerId, e.clientX, e.clientY));
+  cv.addEventListener('pointerup', e => onUp(e.pointerId, e.clientX, e.clientY));
+  cv.addEventListener('pointercancel', e => onUp(e.pointerId, e.clientX, e.clientY));
+} else {
+  const each = (e, fn) => { for (const t of e.changedTouches) fn(t.identifier, t.clientX, t.clientY); };
+  cv.addEventListener('touchstart', e => { e.preventDefault(); each(e, onDown); }, { passive: false });
+  cv.addEventListener('touchmove', e => { e.preventDefault(); each(e, onMove); }, { passive: false });
+  cv.addEventListener('touchend', e => { e.preventDefault(); each(e, onUp); }, { passive: false });
+  cv.addEventListener('touchcancel', e => each(e, onUp));
+  let mdown = false;
+  cv.addEventListener('mousedown', e => { mdown = true; onDown(1, e.clientX, e.clientY); });
+  window.addEventListener('mousemove', e => { if (mdown) onMove(1, e.clientX, e.clientY); });
+  window.addEventListener('mouseup', e => { if (mdown) { mdown = false; onUp(1, e.clientX, e.clientY); } });
+}
 cv.addEventListener('wheel', e => { cam.s = Math.max(0.6, Math.min(5, cam.s * (e.deltaY < 0 ? 1.1 : 0.9))); clampCam(); }, { passive: true });
 function clampCam() { const m = T * N; cam.x = Math.max(0, Math.min(m, cam.x)); cam.y = Math.max(0, Math.min(m, cam.y)); }
 
@@ -832,7 +869,7 @@ function onTap(sx, sy) {
   }
   if (!inMap(x, y)) { closeAll(); return; }
   const t = S.tiles[idx(x, y)];
-  if (!t.unl) { if (canUnlock(x, y)) { UI.land = [x, y]; closeAll(false); openLand(); } else closeAll(); return; }
+  if (!t.unl) { const [bx, by] = blockOf(x, y); if (canUnlockBlock(bx, by)) { UI.land = [bx, by]; closeAll(false); openLand(); } else closeAll(); return; }
   const id = occ[idx(x, y)];
   if (id) { UI.sel = getB(id); closeAll(false); openInfo(); }
   else { closeAll(); if (t.res) toast(`${ITEMS[t.res.t].name} ${t.res.amt}/${t.res.max}`); }
@@ -880,16 +917,29 @@ function openBuildMenu() {
   const list = $('build-list'); list.innerHTML = '';
   for (const type in BUILD) {
     const d = BUILD[type]; if (d.cat !== S.lastTab || !S.unlocked.includes(type)) continue;
-    const full = !d.nolimit && countType(type) >= CONFIG.MAX_SAME;
+    const full = type === 'house' ? countType('house') >= houseCap() : (!d.nolimit && countType(type) >= CONFIG.MAX_SAME);
     const el = document.createElement('div'); el.className = 'bitem' + (full ? ' disabled' : '');
     el.appendChild(iconCanvas(type));
-    el.insertAdjacentHTML('beforeend', `<div>${d.name}</div><div class="bcost">${d.cost.coins ? '🪙' + d.cost.coins : '無料'}${full ? '<br>上限' : ''}</div>`);
+    el.insertAdjacentHTML('beforeend', `<div>${d.name}${type === 'house' ? `<br><small>${countType('house')}/${houseCap()}棟</small>` : ''}</div><div class="bcost">${d.cost.coins ? '🪙' + d.cost.coins : '無料'}${full ? '<br>上限' : ''}</div>`);
     if (S.newTypes.includes(type)) { el.insertAdjacentHTML('beforeend', '<span class="ribbon">NEW</span>'); shownNew.push(type); }
     let lp = null, fired = false, p0 = null;
-    el.addEventListener('pointerdown', e => { fired = false; p0 = [e.clientX, e.clientY]; lp = setTimeout(() => { fired = true; showDetail(type); }, 500); });
-    el.addEventListener('pointermove', e => { if (p0 && Math.hypot(e.clientX - p0[0], e.clientY - p0[1]) > 10) { clearTimeout(lp); fired = true; } });
-    el.addEventListener('pointercancel', () => { clearTimeout(lp); fired = true; });
-    el.addEventListener('pointerup', () => { clearTimeout(lp); if (!fired && !full) startPlace(type); });
+    const down = (x, y) => { fired = false; p0 = [x, y]; lp = setTimeout(() => { fired = true; showDetail(type); }, 500); };
+    const move = (x, y) => { if (p0 && Math.hypot(x - p0[0], y - p0[1]) > 10) { clearTimeout(lp); fired = true; } };
+    const up = () => { clearTimeout(lp); if (!fired && !full) startPlace(type); fired = true; };
+    if (window.PointerEvent) {
+      el.addEventListener('pointerdown', e => down(e.clientX, e.clientY));
+      el.addEventListener('pointermove', e => move(e.clientX, e.clientY));
+      el.addEventListener('pointercancel', () => { clearTimeout(lp); fired = true; });
+      el.addEventListener('pointerup', up);
+    } else {
+      el.addEventListener('touchstart', e => down(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+      el.addEventListener('touchmove', e => move(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+      el.addEventListener('touchcancel', () => { clearTimeout(lp); fired = true; });
+      el.addEventListener('touchend', e => { e.preventDefault(); up(); });
+      el.addEventListener('mousedown', e => down(e.clientX, e.clientY));
+      el.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+      el.addEventListener('mouseup', up);
+    }
     el.addEventListener('contextmenu', e => e.preventDefault());
     list.appendChild(el);
   }
@@ -899,7 +949,7 @@ function showDetail(type) {
   const d = BUILD[type];
   let extra = '';
   if (d.kind === 'prod') extra += `<div>レシピ: ${d.recipes.map(r => `${Object.entries(RECIPES[r].need).map(([k, v]) => ITEMS[k].name + v).join('＋')} → ${ITEMS[RECIPES[r].out].name}1`).join(' / ')}</div>`;
-  modal(d.name, `<div>${d.desc}</div>${extra}<div style="margin-top:8px"><b>建築費用</b>${costHtml(d.cost, false)}</div><div class="hint">同種は島全体で${d.nolimit ? '無制限' : CONFIG.MAX_SAME + '棟まで'}（現在 ${countType(type)}）</div>`);
+  modal(d.name, `<div>${d.desc}</div>${extra}<div style="margin-top:8px"><b>建築費用</b>${costHtml(d.cost, false)}</div><div class="hint">${type === 'house' ? `住居は${houseCap()}棟まで（エリア開放ごとに+${CONFIG.HOUSE_PER_AREA}）` : '同種は島全体で' + CONFIG.MAX_SAME + '棟まで'}（現在 ${countType(type)}）</div>`);
 }
 function startPlace(type) {
   UI.mode = 'place'; UI.placeType = type; UI.sel = null;
@@ -920,7 +970,7 @@ function showPlacePanel() {
 }
 function showMovePanel() {
   const b = UI.moveB, d = BUILD[b.type];
-  $('place-title').textContent = `${d.name} を移動（タップで移動先を選択）`;
+  $('place-title').textContent = `${bname(b)} を移動（タップで移動先を選択）`;
   $('place-cost').innerHTML = '<div class="hint">移動は無料です</div>';
   $('place-ok').disabled = !canPlace(b.type, UI.px, UI.py, b.id); $('place-ok').textContent = '決定';
   $('place-cancel').onclick = () => { UI.mode = 'normal'; UI.moveB = null; $('placepanel').classList.add('hidden'); };
@@ -934,7 +984,7 @@ function gaugeLine(label, v, max, cls) { return `<div class="line"><span class="
 function renderInfo() {
   const b = UI.sel; if (!b) return;
   const d = BUILD[b.type];
-  $('info-title').textContent = d.name;
+  $('info-title').textContent = bname(b);
   let h = '';
   const workersLine = () => `<div class="line"><span class="lbl">作業員 ${b.workers}/${CONFIG.MAX_WORKERS}人</span><button class="btn small" id="w-minus" ${b.workers === 0 ? 'disabled' : ''}>－</button><button class="btn small" id="w-plus" ${(b.workers >= CONFIG.MAX_WORKERS || freeWorkers() <= 0) ? 'disabled' : ''}>＋</button></div>`;
   if (d.kind === 'gather') {
@@ -957,16 +1007,18 @@ function renderInfo() {
   } else if (d.kind === 'market') {
     h += workersLine();
     h += gaugeLine('配送進捗', b.prog * 100, 100, 'prog');
-    const ul = unlockedItems(), sup = ul.filter(k => (S.demand[k] || 0) > 0);
-    h += `<div class="line"><span class="lbl">届いている商品</span><span class="val">${sup.length}/${ul.length}種 (😊${S.happy}%)</span></div>`;
-    h += `<div class="hint" style="text-align:left">販売商品（タップで変更）。需要ゲージが${CONFIG.DELIVER_BELOW}%を切った商品から配達します</div>`;
+    const nh = countType('house');
+    h += `<div class="line"><span class="lbl">島の幸福度</span><span class="val">😊${S.happy}% <small>(住居${nh}棟の平均)</small></span></div>`;
+    h += `<div class="hint" style="text-align:left">販売商品（タップで変更）。需要が${CONFIG.DELIVER_BELOW}%を切った家から順に届けます</div>`;
     b.items.forEach((it, i) => {
-      const dm = it ? Math.round(S.demand[it] || 0) : 0;
       h += `<div class="line"><span class="lbl"><button class="recipe-btn mk-item" data-i="${i}">${it ? ITEMS[it].name : '（なし）'}</button></span>` +
-        (it ? `<div class="gauge dem"><div style="width:${dm}%"></div></div><span class="val">${dm}%　在庫${b.stock[it] || 0}　🪙${ITEMS[it].price}</span>` : '') + `</div>`;
+        (it ? `<span class="val">欲しい家 ${houseWanting(it)}/${nh}　在庫${b.stock[it] || 0}　🪙${ITEMS[it].price}</span>` : '') + `</div>`;
     });
   } else if (d.kind === 'house') {
-    h += `<div class="line"><span class="lbl">住める人数</span><span class="val">${CONFIG.HOUSE_CAP}人</span></div><div class="line"><span class="lbl">島の人口</span><span class="val">${S.pop}/${countType('house') * CONFIG.HOUSE_CAP}人</span></div><div class="hint" style="text-align:left">幸福度${CONFIG.HAPPY_MIN_FOR_GROW}%以上で${CONFIG.POP_GROW_SEC}秒ごとに1人増えます</div>`;
+    const ul = unlockedItems(), got = ul.filter(k => (b.demand[k] || 0) > 0).length;
+    h += `<div class="line"><span class="lbl">住める人数</span><span class="val">${CONFIG.HOUSE_CAP}人</span></div><div class="line"><span class="lbl">島の人口</span><span class="val">${S.pop}/${countType('house') * CONFIG.HOUSE_CAP}人</span></div>`;
+    h += `<div class="sub">この家の需要　<small>届いている ${got}/${ul.length}種</small></div><div class="chips">` + ul.map(k => { const g = Math.round(b.demand[k] || 0); return `<span class="chip ${g > 0 ? 'on' : ''}">${ITEMS[k].name} ${g}%</span>`; }).join('') + `</div>`;
+    h += `<div class="hint" style="text-align:left">${CONFIG.DELIVER_BELOW}%を切ると市場が届けに来ます。島全体の幸福度${CONFIG.HAPPY_MIN_FOR_GROW}%以上で${CONFIG.POP_GROW_SEC}秒ごとに1人増えます</div>`;
   } else if (d.kind === 'warehouse') {
     h += `<div class="line"><span class="lbl">容量</span><span class="val">${CONFIG.SLOTS_PER_WH}スロット×${CONFIG.SLOT_CAP}個</span></div><div class="line"><span class="lbl">島全体</span><span class="val">${S.slots.length}スロット</span></div>`;
   } else { h += `<div class="hint">${d.desc}</div>`; }
@@ -983,7 +1035,7 @@ function renderInfo() {
   const as = $('a-store'); if (as) as.onclick = () => { $('infopanel').classList.add('hidden'); storeTab = 'slots'; openStore(); };
   $('a-move').onclick = () => { UI.mode = 'move'; UI.moveB = b; UI.px = b.x; UI.py = b.y; $('infopanel').classList.add('hidden'); showMovePanel(); };
   $('a-demo').onclick = () => {
-    let note = `<div>${d.name}を取り壊します。</div><div>🪙 ${d.cost.coins || 0} を返金します（建築に使った材料は戻りません）。</div>`;
+    let note = `<div>${bname(b)}を取り壊します。</div><div>🪙 ${d.cost.coins || 0} を返金します（建築に使った材料は戻りません）。</div>`;
     if (b.workers) note += `<div>作業員 ${b.workers}人は未割り当てに戻ります。</div>`;
     if (b.inv || b.stock) note += `<div>施設内の在庫は倉庫へ返却し、入りきらない分は破棄されます。</div>`;
     modal('取り壊しの確認', note, () => { demolish(b); UI.sel = null; $('infopanel').classList.add('hidden'); toast(`${d.name}を取り壊しました`); save(); }, true);
@@ -1019,15 +1071,19 @@ function renderPeople() {
   h += `<div class="line"><span class="lbl">未割り当て</span><span class="val">${freeWorkers()}人</span></div>`;
   const ok = S.happy >= CONFIG.HAPPY_MIN_FOR_GROW, full = S.pop >= cap;
   h += `<div class="line"><span class="lbl">次の住民まで</span><span class="val">${full ? '<span class="red">住居が足りません</span>' : ok ? Math.ceil(CONFIG.POP_GROW_SEC - S.timers.grow) + '秒' : '<span class="red">😊が' + CONFIG.HAPPY_MIN_FOR_GROW + '%未満</span>'}</span></div>`;
-  h += `<div class="sub">😊 幸福度 ${S.happy}%　<small>作れる商品 ${ul.length}種のうち 届いている ${ul.filter(k => (S.demand[k] || 0) > 0).length}種</small></div>`;
-  h += `<div class="chips">` + ul.map(k => { const d = Math.round(S.demand[k] || 0); return `<span class="chip ${d > 0 ? 'on' : ''}">${ITEMS[k].name} ${d}%</span>`; }).join('') + `</div>`;
+  h += `<div class="sub">😊 幸福度 ${S.happy}%　<small>各家に届いている商品の割合の平均（作れる商品 ${ul.length}種）</small></div>`;
+  for (const hb of S.buildings.filter(b => b.type === 'house').sort((a, b) => a.order - b.order)) {
+    const got = ul.filter(k => (hb.demand[k] || 0) > 0).length;
+    h += `<div class="line"><span class="lbl"><a class="jump" data-id="${hb.id}">${bname(hb)}</a></span><div class="gauge"><div style="width:${ul.length ? got / ul.length * 100 : 0}%"></div></div><span class="val">${got}/${ul.length}種</span></div>`;
+  }
+  h += `<div class="line"><span class="lbl">住居</span><span class="val">${countType('house')} / ${houseCap()}棟 <small>(エリア開放で+${CONFIG.HOUSE_PER_AREA})</small></span></div>`;
   h += `<div class="sub">作業員の割り当て</div>`;
   const work = S.buildings.filter(b => b.workers !== undefined && ['gather', 'prod', 'market'].includes(BUILD[b.type].kind)).sort((a, b) => a.order - b.order);
   if (!work.length) h += `<div class="hint">まだ作業できる施設がありません</div>`;
   for (const b of work) {
     const d = BUILD[b.type];
     const what = d.kind === 'gather' ? ITEMS[d.res].name : d.kind === 'prod' ? ITEMS[RECIPES[b.recipe].out].name : '配達';
-    h += `<div class="line"><span class="lbl"><a class="jump" data-id="${b.id}">${d.name}</a> <small>${what}</small></span><span class="val">${b.workers}人</span><button class="btn small pw-minus" data-id="${b.id}" ${b.workers === 0 ? 'disabled' : ''}>－</button><button class="btn small pw-plus" data-id="${b.id}" ${(b.workers >= CONFIG.MAX_WORKERS || freeWorkers() <= 0) ? 'disabled' : ''}>＋</button></div>`;
+    h += `<div class="line"><span class="lbl"><a class="jump" data-id="${b.id}">${bname(b)}</a> <small>${what}</small></span><span class="val">${b.workers}人</span><button class="btn small pw-minus" data-id="${b.id}" ${b.workers === 0 ? 'disabled' : ''}>－</button><button class="btn small pw-plus" data-id="${b.id}" ${(b.workers >= CONFIG.MAX_WORKERS || freeWorkers() <= 0) ? 'disabled' : ''}>＋</button></div>`;
   }
   $('people-body').innerHTML = h;
   document.querySelectorAll('.pw-minus').forEach(el => el.onclick = () => { const b = getB(+el.dataset.id); setWorkers(b, b.workers - 1); renderPeople(); });
@@ -1095,7 +1151,8 @@ function openLand() {
   const p = landPrice();
   $('land-cost').innerHTML = `<div class="line"><span class="lbl">🪙 コイン</span><span class="val ${S.coins < p ? 'red' : ''}">${p} <small>(所持 ${S.coins})</small></span></div>`;
   $('land-ok').disabled = S.coins < p;
-  $('land-ok').onclick = () => { const [x, y] = UI.land; if (S.coins >= p && canUnlock(x, y)) { S.coins -= p; S.tiles[idx(x, y)].unl = true; UI.land = null; $('landpanel').classList.add('hidden'); toast('土地を開放しました'); save(); } };
+  $('land-cost').innerHTML += `<div class="line"><span class="lbl">広さ</span><span class="val">${CONFIG.BLOCK}×${CONFIG.BLOCK}マス</span></div><div class="line"><span class="lbl">住居の上限</span><span class="val">${houseCap()} → ${houseCap() + CONFIG.HOUSE_PER_AREA}棟</span></div>`;
+  $('land-ok').onclick = () => { const [bx, by] = UI.land; if (S.coins >= p && canUnlockBlock(bx, by)) { S.coins -= p; unlockBlock(bx, by); UI.land = null; $('landpanel').classList.add('hidden'); notify(`🗺 エリアを開放しました（住居の上限 ${houseCap()}棟）`); save(); } };
   $('landpanel').classList.remove('hidden');
 }
 
@@ -1129,13 +1186,13 @@ function checkEvents() {
     const d = BUILD[b.type], key = 'b' + b.id;
     if (d.kind === 'gather') {
       const dead = b.workers > 0 && !gatherTarget(b);
-      if (dead && !S.notified[key + 'res']) { S.notified[key + 'res'] = true; notify(`🪓 ${d.name}の周りの${ITEMS[d.res].name}がなくなりました（回復待ち）`); }
+      if (dead && !S.notified[key + 'res']) { S.notified[key + 'res'] = true; notify(`🪓 ${bname(b)}の周りの${ITEMS[d.res].name}がなくなりました（回復待ち）`); }
       if (!dead) delete S.notified[key + 'res'];
     }
     if (b.inv) {
       const full = b.inv.out >= CONFIG.INV_CAP;
       const item = d.kind === 'gather' ? d.res : RECIPES[b.recipe].out;
-      if (full && !S.notified[key + 'full']) { S.notified[key + 'full'] = true; notify(`📦 ${d.name}の${ITEMS[item].name}が倉庫に入らず満杯です（スロットを確認）`); }
+      if (full && !S.notified[key + 'full']) { S.notified[key + 'full'] = true; notify(`📦 ${bname(b)}の${ITEMS[item].name}が倉庫に入らず満杯です（スロットを確認）`); }
       if (!full) delete S.notified[key + 'full'];
     }
   }

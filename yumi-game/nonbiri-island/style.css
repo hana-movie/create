@@ -2,7 +2,7 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
   font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; color: #2b2b2b;
   -webkit-user-select: none; user-select: none; touch-action: none; }
-#map { position: fixed; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+#map { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 
 #topbar { position: fixed; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top) + 6px) 6px 6px;
   display: flex; gap: 4px; align-items: center; flex-wrap: nowrap;
@@ -65,7 +65,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 
 #place-cost .line { border: 0; padding: 2px 0; }
 
-.modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 9; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); z-index: 9; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal-box { background: #fdf6e3; border-radius: 16px; padding: 16px; max-width: 360px; width: 100%; max-height: 80vh; overflow-y: auto; }
 .modal-box .title { font-weight: bold; font-size: 18px; margin-bottom: 8px; }
 #modal-body { font-size: 15px; line-height: 1.6; }
@@ -93,3 +93,23 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .chip.on { background: #cfe8b8; color: #2a5a1a; }
 .jump { text-decoration: underline; color: #2f6fb8; }
 .stat { cursor: pointer; }
+
+/* flexbox の gap が使えない古い Safari（iOS 14.0 以前）向けの代替 */
+@supports not (inset: 0) {
+  #topbar > * + * { margin-left: 4px; }
+  .sheet-head > * + * { margin-left: 8px; }
+  .tabs > * + * { margin-left: 4px; }
+  .row > * + * { margin-left: 8px; }
+  .line > * + * { margin-left: 8px; }
+  .chips > * { margin: 2px; }
+  .bitem > * + * { margin-top: 4px; }
+  .toast-item + .toast-item { margin-top: 6px; }
+}
+
+/* タブレット・PC：パネルを広げすぎない */
+@media (min-width: 600px) {
+  .sheet { left: 50%; right: auto; width: 520px; margin-left: -260px; }
+  #topbar { padding-left: 12px; padding-right: 12px; }
+  #st-free { flex: 0 0 auto; }
+  #topbar::after { content: ''; flex: 1; }
+}
