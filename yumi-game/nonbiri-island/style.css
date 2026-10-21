@@ -8,7 +8,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
   display: flex; gap: 4px; align-items: center; flex-wrap: nowrap;
   background: rgba(20,40,25,.8); color: #fff; font-size: 13px; z-index: 5; }
 .stat { background: rgba(255,255,255,.12); padding: 5px 7px; border-radius: 10px; white-space: nowrap; flex: 0 0 auto; }
-#st-free { flex: 1 1 auto; text-align: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#st-free { flex: 0 0 auto; }
+#topbar .spacer { flex: 1; }
 .icon-btn { background: rgba(255,255,255,.15); border: 0; color: #fff; font-size: 16px;
   width: 32px; height: 32px; border-radius: 9px; flex: 0 0 auto; padding: 0; }
 
@@ -110,11 +111,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 @media (min-width: 600px) {
   .sheet { left: 50%; right: auto; width: 520px; margin-left: -260px; }
   #topbar { padding-left: 12px; padding-right: 12px; }
-  #st-free { flex: 0 0 auto; }
-  #topbar::after { content: ''; flex: 1; }
 }
 
 .minrow { display: flex; align-items: center; justify-content: center; font-size: 10px; margin-top: 3px; flex-wrap: wrap; }
 .minrow span { color: #888; width: 100%; }
 .minrow b { min-width: 16px; text-align: center; font-size: 11px; }
 .mbtn { background: #e8dcc0; border: 0; border-radius: 6px; width: 18px; height: 18px; font-size: 11px; padding: 0; line-height: 18px; }
+.icon-btn.wide { width: auto; padding: 0 6px; font-size: 12px; font-weight: bold; }
