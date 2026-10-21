@@ -4,6 +4,8 @@
    仕様引き継ぎ書に基づく実装。仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
+const VERSION = '0.7.1';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+
 // ---------- 調整用の定数（未確定仕様はここで仮置き） ----------
 const CONFIG = {
   MAP: 15,              // 15×15
@@ -513,14 +515,21 @@ function canPlace(type, x, y, ignoreId) {
   });
   return ok;
 }
+// 建築費用の所持数：倉庫の在庫 ＋ 各施設の完成品棚（材料棚は加工に回した分なので数えない）
+function shelfCount(item) { return S.buildings.reduce((a, b) => { const d = BUILD[b.type]; if (!b.inv) return a; const out = d.kind === 'gather' ? d.res : (b.recipe ? RECIPES[b.recipe].out : null); return a + (out === item ? b.inv.out : 0); }, 0); }
+function haveCount(item) { return whCount(item) + shelfCount(item); }
 function canAfford(cost) {
   if ((cost.coins || 0) > S.coins) return false;
-  for (const k in cost) if (k !== 'coins' && whCount(k) < cost[k]) return false;
+  for (const k in cost) if (k !== 'coins' && haveCount(k) < cost[k]) return false;
   return true;
 }
 function payCost(cost) {
   S.coins -= cost.coins || 0;
-  for (const k in cost) if (k !== 'coins') whTake(k, cost[k]);
+  for (const k in cost) {
+    if (k === 'coins') continue;
+    let left = cost[k] - whTake(k, cost[k]);
+    for (const b of S.buildings) { if (left <= 0) break; const d = BUILD[b.type]; if (!b.inv) continue; const out = d.kind === 'gather' ? d.res : (b.recipe ? RECIPES[b.recipe].out : null); if (out !== k) continue; const n = Math.min(b.inv.out, left); b.inv.out -= n; left -= n; }
+  }
 }
 
 // レシピ材料の対応（材料A/B）
@@ -1037,7 +1046,7 @@ function modal(title, html, onOk, cancel) {
 function costHtml(cost, check) {
   let h = '';
   for (const k in cost) {
-    const nm = k === 'coins' ? '🪙 コイン' : ITEMS[k].name, have = k === 'coins' ? S.coins : whCount(k);
+    const nm = k === 'coins' ? '🪙 コイン' : ITEMS[k].name, have = k === 'coins' ? S.coins : haveCount(k);
     const ng = check && have < cost[k];
     h += `<div class="line"><span class="lbl">${nm}</span><span class="val ${ng ? 'red' : ''}">${cost[k]}${check ? ` <small>(所持 ${have})</small>` : ''}</span></div>`;
   }
@@ -1380,7 +1389,7 @@ function showWelcome() {
   modal('のんびり島ぐらしへようこそ', '<div>小さな島をのんびり育てる経営ゲームです。</div><div>・下の「🔨 建築」から施設を建てられます<br>・施設をタップして作業員を割り当てましょう（🙋 は手の空いている住民）<br>・霧の「＋」マスをタップすると土地を開放できます<br>・🎯 の目標を進めると新しい施設が解放されます<br>・倉庫のスロットと市場の販売商品は自分で設定します<br>・😊 は「住民に届いている商品の種類」の割合です。60%以上で人口が増えます<br>・⏩ で時間を速められます。離れている間も進みます（最大12時間分）</div>');
 }
 function resetGame() {
-  modal('最初からやり直す', '<div>今の島のデータを消して、新しい島を始めます。元には戻せません。</div>', () => {
+  modal(`最初からやり直す（v${VERSION}）`, `<div>今の島のデータを消して、新しい島を始めます。元には戻せません。</div><div class="hint" style="text-align:left">バージョン ${VERSION}　保存キー ${CONFIG.SAVE_KEY}</div>`, () => {
     try { localStorage.removeItem(CONFIG.SAVE_KEY); } catch (e) { }
     newGame(); villagers.length = 0; UI.mode = 'normal'; UI.sel = null; closeAll();
     cam.x = T * N / 2; cam.y = T * N / 2; save(); showWelcome();
@@ -1388,6 +1397,7 @@ function resetGame() {
 }
 function start() {
   resize();
+  $('ver').textContent = 'v' + VERSION;
   const loaded = load();
   if (!loaded) newGame();
   cam.x = T * N / 2; cam.y = T * N / 2;
