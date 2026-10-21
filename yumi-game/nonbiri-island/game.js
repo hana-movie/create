@@ -21,18 +21,21 @@ const CONFIG = {
   REGEN_SEC: 60,        // 資源マスの回復間隔（1個）
   BLOCK: 5,                        // エリア開放は5×5単位
   LAND_BASE: 100, LAND_STEP: 80,   // エリア開放価格 = BASE + STEP×開放済みエリア数（初期エリアを除く）
-  HOUSE_BASE: 5, HOUSE_PER_AREA: 5, // 住居上限 = 初期5 + エリア開放ごとに5
+  HOUSE_BASE: 5, HOUSE_PER_AREA: 3, // 住居上限 = 初期5 + エリア開放ごとに3
+  GATHER_RANGE: 1,                  // 採集範囲：施設の周り8マス（半径1）
+  SLOT_MIN: 20,                     // 倉庫スロットの最低保管量の初期値（市場・生産への補充はこれを下回らない）
   HOUSE_CAP: 4,         // 住居1棟あたり人口上限
   POP_GROW_SEC: 60,     // 人口+1の間隔
   HAPPY_MIN_FOR_GROW: 60,   // 幸福度(%)がこれ以上で人口増
   DELIVER_BELOW: 30,        // 需要ゲージがこの%を切ったら配達対象
-  MAX_GATHER_ITEMS: 3,  // 採集アイテムの種類上限
+  MAX_GATHER_ITEMS: 4,  // 採集アイテムの種類上限（木材・石材・小麦・水）
   MAX_PROD_ITEMS: 5,    // 生産アイテムの種類上限
-  SAVE_KEY: 'nonbiri-island-v4',
+  SAVE_KEY: 'nonbiri-island-v5',
 };
 
 // consume: 住民が1個を消費しきる秒数（作るのに手間がかかる品ほど長い）
 const ITEMS = {
+  water: { name: '水',     color: '#4a90e2', price: 1,  consume: 60 },
   wood:  { name: '木材',   color: '#8b5a2b', price: 3,  consume: 90 },
   stone: { name: '石材',   color: '#8a8a8a', price: 3,  consume: 90 },
   wheat: { name: '小麦',   color: '#d4b24a', price: 2,  consume: 90 },
@@ -57,9 +60,10 @@ const CATS = [
 
 const BUILD = {
   house:     { name: '住居',   cat: 'home',   size: 1, kind: 'house',   cost: { coins: 30, wood: 5 },  desc: '住民が4人まで住めます。家ごとに商品の需要があり、市場が届けると幸福度が上がります。建てられる数はエリア開放ごとに5棟増えます。', nolimit: true },
-  lumber:    { name: '伐採所', cat: 'gather', size: 1, kind: 'gather',  res: 'wood',  cost: { coins: 20 }, desc: '周囲5×5マスの木から木材を集めます。' },
-  quarry:    { name: '採石場', cat: 'gather', size: 1, kind: 'gather',  res: 'stone', cost: { coins: 30 }, desc: '周囲5×5マスの岩から石材を集めます。' },
-  farm:      { name: '農場',   cat: 'gather', size: 1, kind: 'gather',  res: 'wheat', cost: { coins: 25 }, desc: '周囲5×5マスの小麦畑から小麦を集めます。' },
+  well:      { name: '井戸',   cat: 'gather', size: 1, kind: 'gather',  res: 'water', cost: { coins: 20 }, nores: true, desc: '水を汲みます。資源マスは不要で、枯れません。' },
+  lumber:    { name: '伐採所', cat: 'gather', size: 1, kind: 'gather',  res: 'wood',  cost: { coins: 20 }, desc: '周り8マスの木から木材を集めます。' },
+  quarry:    { name: '採石場', cat: 'gather', size: 1, kind: 'gather',  res: 'stone', cost: { coins: 30 }, desc: '周り8マスの岩から石材を集めます。' },
+  farm:      { name: '農場',   cat: 'gather', size: 1, kind: 'gather',  res: 'wheat', cost: { coins: 25 }, desc: '周り8マスの小麦畑から小麦を集めます。' },
   sawmill:   { name: '製材所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['plank'], cost: { coins: 60, wood: 10 }, desc: '木材2 → 板材1' },
   mason:     { name: '石工所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['brick'], cost: { coins: 60, stone: 10 }, desc: '石材2 → レンガ1' },
   mill:      { name: '製粉所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['flour'], cost: { coins: 80, plank: 5, stone: 5 }, desc: '小麦2 → 小麦粉1' },
@@ -81,7 +85,7 @@ const GOALS = [
   { id: 'g9',  text: '住民を6人にする',            stat: 'pop',          n: 6,  reward: 100, unlock: ['bakery'] },
   { id: 'g10', text: 'パンを10個つくる',           stat: 'got_bread',    n: 10, reward: 200, unlock: [] },
 ];
-const INITIAL_UNLOCK = ['market', 'house', 'lumber', 'warehouse'];
+const INITIAL_UNLOCK = ['market', 'house', 'well', 'lumber', 'warehouse'];
 
 // ---------- ドット絵スプライト（16×16） ----------
 const PAL = {
@@ -177,6 +181,24 @@ const SPR = {
     '..cCCCccBBcCCc..',
     '..ccccccBBcccc..',
     '..CCCCCCBBCCCC..',
+    '................',
+  ],
+  well: [
+    '................',
+    '....BBBBBBBB....',
+    '...BnnnnnnnnB...',
+    '..BnnnnnnnnnnB..',
+    '..BBBBBBBBBBBB..',
+    '...B........B...',
+    '...B........B...',
+    '...B..dddd..B...',
+    '...BddssssddB...',
+    '..ddsSlllLSsdd..',
+    '..dsSlleelLSsd..',
+    '..dsSllllllSsd..',
+    '..dsSSSSSSSSsd..',
+    '..ddddddddddd...',
+    '................',
     '................',
   ],
   lumber: [
@@ -405,7 +427,7 @@ function makeBuilding(type, x, y) {
 function addBuilding(type, x, y, free) {
   const b = makeBuilding(type, x, y);
   S.buildings.push(b);
-  if (BUILD[type].kind === 'warehouse') for (let i = 0; i < CONFIG.SLOTS_PER_WH; i++) S.slots.push({ cfg: null, item: null, qty: 0 });
+  if (BUILD[type].kind === 'warehouse') for (let i = 0; i < CONFIG.SLOTS_PER_WH; i++) S.slots.push({ cfg: null, item: null, qty: 0, min: CONFIG.SLOT_MIN });
   rebuildOcc();
   if (!free) { const k = 'built_' + type; if (k in S.stats) S.stats[k]++; }
   return b;
@@ -463,14 +485,17 @@ function unlockedItems() {
   return Object.keys(ITEMS).filter(k => set.has(k));
 }
 function putSlot(s, item, n) { const room = CONFIG.SLOT_CAP - s.qty; const k = Math.min(room, n); if (k > 0) { s.item = item; s.qty += k; } return k; }
-function whTake(item, qty) {
+// keepMin=true のとき各スロットの最低保管量を下回らない範囲で取り出す（市場・生産への補充用）。建築費用は keepMin なし
+function whTake(item, qty, keepMin) {
   let left = qty;
   for (let i = S.slots.length - 1; i >= 0 && left > 0; i--) {
     const s = S.slots[i]; if (s.item !== item || s.qty === 0) continue;
-    const k = Math.min(s.qty, left); s.qty -= k; left -= k; if (s.qty === 0) s.item = null;
+    const avail = keepMin ? Math.max(0, s.qty - (s.min || 0)) : s.qty;
+    const k = Math.min(avail, left); s.qty -= k; left -= k; if (s.qty === 0) s.item = null;
   }
   return qty - left;
 }
+function whAvail(item) { return S.slots.reduce((a, s) => a + (s.item === item ? Math.max(0, s.qty - (s.min || 0)) : 0), 0); }
 
 // ---------- シミュレーション ----------
 function sim(dt, acc) {
@@ -510,7 +535,7 @@ function stepBuilding(b, dt, acc) {
     const tgt = gatherTarget(b);
     if (!tgt) return;
     b.prog += dt * b.workers / CONFIG.PROD_SEC;
-    if (b.prog >= 1) { b.prog = 0; tgt.amt--; b.inv.out++; }
+    if (b.prog >= 1) { b.prog = 0; if (!tgt.infinite) tgt.amt--; b.inv.out++; }
   } else if (d.kind === 'prod') {
     if (b.workers === 0) return;
     const r = RECIPES[b.recipe];
@@ -550,9 +575,10 @@ function marketTarget(b) {
 function houseWanting(item) { return S.buildings.filter(h => h.type === 'house' && (h.demand[item] || 0) < CONFIG.DELIVER_BELOW).length; }
 // 採集対象：範囲5×5内で最も近い資源。同距離は上→右→下→左
 function gatherTarget(b) {
-  const res = BUILD[b.type].res;
+  const res = BUILD[b.type].res, R = CONFIG.GATHER_RANGE;
+  if (BUILD[b.type].nores) return { amt: Infinity, infinite: true };
   let best = null, bestD = 1e9, bestP = 9;
-  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
     const x = b.x + dx, y = b.y + dy; if (!inMap(x, y)) continue;
     const i = idx(x, y), t = S.tiles[i];
     if (!t.unl || !t.res || t.res.t !== res || t.res.amt <= 0 || occ[i]) continue;
@@ -588,9 +614,9 @@ function doRefill() {
     let guard = 10000;
     while (guard-- > 0) {
       const cands = list.filter(e => e.b.inv[e.key] < CONFIG.INV_CAP);
-      if (!cands.length || whCount(m) === 0) break;
+      if (!cands.length || whAvail(m) === 0) break;
       cands.sort((p, q) => (p.b.inv[p.key] - q.b.inv[q.key]) || (p.b.order - q.b.order));
-      if (whTake(m, 1) === 0) break;
+      if (whTake(m, 1, true) === 0) break;
       cands[0].b.inv[cands[0].key]++;
     }
   }
@@ -598,7 +624,7 @@ function doRefill() {
 function doMarketRefill() {
   for (const b of S.buildings) {
     if (BUILD[b.type].kind !== 'market') continue;
-    for (const it of b.items) { if (!it) continue; const cur = b.stock[it] || 0; const need = CONFIG.INV_CAP - cur; if (need > 0) b.stock[it] = cur + whTake(it, need); }
+    for (const it of b.items) { if (!it) continue; const cur = b.stock[it] || 0; const need = CONFIG.INV_CAP - cur; if (need > 0) b.stock[it] = cur + whTake(it, need, true); }
   }
 }
 
@@ -656,7 +682,7 @@ function canUnlock(x, y) { const [bx, by] = blockOf(x, y); return canUnlockBlock
 // ---------- セーブ ----------
 function save() { S.lastSave = Date.now(); try { localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(S)); } catch (e) { } }
 function load() {
-  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; rebuildOcc(); return true; } catch (e) { return false; }
+  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; for (const sl of S.slots) if (sl.min === undefined) sl.min = CONFIG.SLOT_MIN; rebuildOcc(); return true; } catch (e) { return false; }
 }
 
 // ============================================================
@@ -706,9 +732,9 @@ function draw() {
   }
   // 採集範囲
   if (UI.sel && BUILD[UI.sel.type].kind === 'gather' && UI.mode === 'normal') {
-    const [rx, ry] = toScreen((UI.sel.x - 2) * T, (UI.sel.y - 2) * T);
-    ctx.fillStyle = 'rgba(255,255,120,.25)'; ctx.fillRect(rx, ry, ts * 5, ts * 5);
-    ctx.strokeStyle = 'rgba(255,230,80,.9)'; ctx.lineWidth = 2; ctx.strokeRect(rx, ry, ts * 5, ts * 5);
+    const R = CONFIG.GATHER_RANGE, [rx, ry] = toScreen((UI.sel.x - R) * T, (UI.sel.y - R) * T), rs = ts * (R * 2 + 1);
+    if (!BUILD[UI.sel.type].nores) { ctx.fillStyle = 'rgba(255,255,120,.25)'; ctx.fillRect(rx, ry, rs, rs);
+    ctx.strokeStyle = 'rgba(255,230,80,.9)'; ctx.lineWidth = 2; ctx.strokeRect(rx, ry, rs, rs); }
   }
   // 建物
   for (const b of S.buildings) {
@@ -761,8 +787,9 @@ function drawBuilding(type, x, y, ox, oy, ts, mark) {
 const villagers = [];
 // 採集対象マスの座標版
 function gatherTargetPos(b) {
-  const res = BUILD[b.type].res; let best = null, bestD = 1e9, bestP = 9;
-  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+  const res = BUILD[b.type].res, R = CONFIG.GATHER_RANGE; let best = null, bestD = 1e9, bestP = 9;
+  if (BUILD[b.type].nores) return null;
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
     const x = b.x + dx, y = b.y + dy; if (!inMap(x, y)) continue;
     const i = idx(x, y), t = S.tiles[i];
     if (!t.unl || !t.res || t.res.t !== res || t.res.amt <= 0 || occ[i]) continue;
@@ -989,12 +1016,13 @@ function renderInfo() {
   const workersLine = () => `<div class="line"><span class="lbl">作業員 ${b.workers}/${CONFIG.MAX_WORKERS}人</span><button class="btn small" id="w-minus" ${b.workers === 0 ? 'disabled' : ''}>－</button><button class="btn small" id="w-plus" ${(b.workers >= CONFIG.MAX_WORKERS || freeWorkers() <= 0) ? 'disabled' : ''}>＋</button></div>`;
   if (d.kind === 'gather') {
     const tgt = gatherTarget(b);
-    const sum = (() => { let a = 0, m = 0; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const x = b.x + dx, y = b.y + dy; if (!inMap(x, y)) continue; const t = S.tiles[idx(x, y)]; if (t.unl && t.res && t.res.t === d.res && !occ[idx(x, y)]) { a += t.res.amt; m += t.res.max; } } return [a, m]; })();
+    const R = CONFIG.GATHER_RANGE;
+    const sum = (() => { let a = 0, m = 0; for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) { const x = b.x + dx, y = b.y + dy; if (!inMap(x, y)) continue; const t = S.tiles[idx(x, y)]; if (t.unl && t.res && t.res.t === d.res && !occ[idx(x, y)]) { a += t.res.amt; m += t.res.max; } } return [a, m]; })();
     h += `<div class="line"><span class="lbl">対象資源</span><span class="val">${ITEMS[d.res].name}</span></div>`;
-    h += `<div class="line"><span class="lbl">範囲内の資源量</span><span class="val">${sum[0]}/${sum[1]}${tgt ? '' : ' <small>(採集できる資源なし)</small>'}</span></div>`;
+    if (!d.nores) h += `<div class="line"><span class="lbl">範囲内の資源量</span><span class="val">${sum[0]}/${sum[1]}${tgt ? '' : ' <small>(採集できる資源なし)</small>'}</span></div>`;
     h += workersLine();
     h += `<div class="line"><span class="lbl">採集速度</span><span class="val">${b.workers ? (CONFIG.PROD_SEC / b.workers).toFixed(0) + '秒/個' : '停止'}</span></div>`;
-    h += `<div class="line"><span class="lbl">採集範囲</span><span class="val">5×5マス</span></div>`;
+    if (!d.nores) h += `<div class="line"><span class="lbl">採集範囲</span><span class="val">周り${(R * 2 + 1) ** 2 - 1}マス</span></div>`;
     h += gaugeLine(`完成品 ${ITEMS[d.res].name}`, b.inv.out, CONFIG.INV_CAP);
   } else if (d.kind === 'prod') {
     const r = RECIPES[b.recipe], mats = Object.keys(r.need);
@@ -1113,14 +1141,14 @@ function renderItems() {
   for (const k of Object.keys(ITEMS)) {
     const v = o[k]; if (!v && !unlockedItems().includes(k)) continue;
     const t = v ? v.wh + v.fac + v.mk : 0;
-    h += `<div class="line"><span class="lbl"><b>${ITEMS[k].name}</b> <small>🪙${ITEMS[k].price}</small></span><span class="val"><b>${t}</b> <small>倉庫${v ? v.wh : 0}・施設${v ? v.fac : 0}・市場${v ? v.mk : 0}</small></span></div>`;
+    h += `<div class="line"><span class="lbl"><b>${ITEMS[k].name}</b> <small>🪙${ITEMS[k].price}</small></span><span class="val"><b>${t}</b> <small>倉庫${v ? v.wh : 0}(確保${v ? v.wh - whAvail(k) : 0})・施設${v ? v.fac : 0}・市場${v ? v.mk : 0}</small></span></div>`;
   }
   el.innerHTML = h || '<div class="hint">まだ品物がありません</div>';
 }
 function slotHtml(s) {
   const cfgName = s.cfg === 'block' ? '🚫' : s.cfg ? ITEMS[s.cfg].name : '未設定';
   const col = s.item ? (ITEMS[s.item].color === '#f2eee0' ? '#999' : ITEMS[s.item].color) : '#bbb';
-  return `<div class="sq" style="color:${col}">${s.item ? ITEMS[s.item].name : '－'}</div><div>${s.qty}/${CONFIG.SLOT_CAP}</div><div class="cfg">設定: ${cfgName}</div>`;
+  return `<div class="sq" style="color:${col}">${s.item ? ITEMS[s.item].name : '－'}</div><div>${s.qty}/${CONFIG.SLOT_CAP}</div><div class="cfg">${cfgName}</div>`;
 }
 function renderStore() {
   document.querySelectorAll('#store-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === storeTab));
@@ -1136,7 +1164,11 @@ function renderStore() {
     sel.innerHTML = `<option value="">未設定</option>` + unlockedItems().map(k => `<option value="${k}">${ITEMS[k].name}</option>`).join('') + `<option value="block">🚫 搬入停止</option>`;
     sel.value = s.cfg || '';
     sel.onchange = () => { s.cfg = sel.value === '' ? null : sel.value; if (s.cfg && s.cfg !== 'block') S.stats.slot_set++; info.innerHTML = slotHtml(s); save(); };
-    d.appendChild(sel); el.appendChild(d);
+    d.appendChild(sel);
+    const mn = document.createElement('div'); mn.className = 'minrow';
+    mn.innerHTML = `<span>確保</span><button class="mbtn" data-d="-5">－</button><b>${s.min || 0}</b><button class="mbtn" data-d="5">＋</button>`;
+    mn.querySelectorAll('.mbtn').forEach(bt => bt.onclick = () => { s.min = Math.max(0, Math.min(CONFIG.SLOT_CAP, (s.min || 0) + (+bt.dataset.d))); mn.querySelector('b').textContent = s.min; save(); });
+    d.appendChild(mn); el.appendChild(d);
   });
 }
 function updateStore() {
@@ -1185,7 +1217,7 @@ function checkEvents() {
   for (const b of S.buildings) {
     const d = BUILD[b.type], key = 'b' + b.id;
     if (d.kind === 'gather') {
-      const dead = b.workers > 0 && !gatherTarget(b);
+      const dead = !d.nores && b.workers > 0 && !gatherTarget(b);
       if (dead && !S.notified[key + 'res']) { S.notified[key + 'res'] = true; notify(`🪓 ${bname(b)}の周りの${ITEMS[d.res].name}がなくなりました（回復待ち）`); }
       if (!dead) delete S.notified[key + 'res'];
     }

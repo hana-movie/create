@@ -57,11 +57,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .red { color: #d33; font-weight: bold; }
 .recipe-btn { background: #fff; border: 2px solid #e8dcc0; border-radius: 10px; padding: 6px 10px; font-size: 14px; }
 
-#store-slots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.slot { background: #fff; border: 2px solid #e8dcc0; border-radius: 10px; padding: 6px 2px; text-align: center; font-size: 12px; min-height: 58px; }
+#store-slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.slot { background: #fff; border: 2px solid #e8dcc0; border-radius: 10px; padding: 6px 1px; text-align: center; font-size: 11px; min-height: 58px; min-width: 0; overflow: hidden; }
 .slot .sq { font-size: 15px; font-weight: bold; }
 .slot .cfg { font-size: 10px; color: #888; }
-.slot select { width: 100%; font-size: 12px; margin-top: 2px; }
+.slot select { width: 100%; font-size: 11px; margin-top: 2px; padding: 0; }
 
 #place-cost .line { border: 0; padding: 2px 0; }
 
@@ -113,3 +113,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
   #st-free { flex: 0 0 auto; }
   #topbar::after { content: ''; flex: 1; }
 }
+
+.minrow { display: flex; align-items: center; justify-content: center; font-size: 10px; margin-top: 3px; flex-wrap: wrap; }
+.minrow span { color: #888; width: 100%; }
+.minrow b { min-width: 16px; text-align: center; font-size: 11px; }
+.mbtn { background: #e8dcc0; border: 0; border-radius: 6px; width: 18px; height: 18px; font-size: 11px; padding: 0; line-height: 18px; }
