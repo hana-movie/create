@@ -4,7 +4,7 @@
    仕様引き継ぎ書に基づく実装。仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.7.5';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.8.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数（未確定仕様はここで仮置き） ----------
 const CONFIG = {
@@ -23,25 +23,27 @@ const CONFIG = {
   CARRY: [1, 2, 5],     // 施設レベル1/2/3で一度に持てる材料数
   LEVEL_COST: [{ coins: 50, basket: 1 }, { coins: 150, cart: 1 }],  // Lv1→2, Lv2→3
   SPEEDS: [1, 2, 4],    // 時間加速の倍率
+  DEBUG_SPEED: true,    // 時間加速ボタン（テスト用）。本番では false
   INV_CAP: 20,          // 施設内在庫の上限
   TRANSFER_SEC: 30,     // 完成品→倉庫の搬送間隔
   REFILL_SEC: 60,       // 倉庫→施設の材料補充間隔
   SLOT_CAP: 100,
-  SLOTS_PER_WH: 5,
+  SLOTS_PER_WH: 10,     // 倉庫1棟あたりのスロット数
+  MARKET_SLOTS: 10,     // 市場1棟あたりの販売枠
   REGEN_SEC: 60,        // 資源マスの回復間隔（1個）
   BLOCK: 5,                        // エリア開放は5×5単位
   LAND_BASE: 100, LAND_STEP: 80,   // エリア開放価格 = BASE + STEP×開放済みエリア数（初期エリアを除く）
   HOUSE_BASE: 5, HOUSE_PER_AREA: 3, // 住居上限 = 初期5 + エリア開放ごとに3
   FIRST_AREA: [1, 2],               // 最初に開放できるエリア（初期マップの下）
   GATHER_RANGE: 1,                  // 採集範囲：施設の周り8マス（半径1）
-  SLOT_MIN: 20,                     // 倉庫スロットの最低保管量の初期値（市場・生産への補充はこれを下回らない）
-  HOUSE_CAP: 4,         // 住居1棟あたり人口上限
-  POP_GROW_SEC: 60,     // 人口+1の間隔
+  SLOT_MIN: 0,                      // 倉庫スロットの「確保」初期値（市場・生産への補充はこれを下回らない）
+  HOUSE_CAP: 3,         // 住居1棟あたり人口上限
+  POP_GROW_SEC: 180,    // 人口+1の間隔
   HAPPY_MIN_FOR_GROW: 60,   // 幸福度(%)がこれ以上で人口増
   DELIVER_BELOW: 30,        // 需要ゲージがこの%を切ったら配達対象
   MAX_GATHER_ITEMS: 4,  // 採集アイテムの種類上限（木材・石材・小麦・水）
   MAX_PROD_ITEMS: 5,    // 生産アイテムの種類上限
-  SAVE_KEY: 'nonbiri-island-v7',
+  SAVE_KEY: 'nonbiri-island-v8',
 };
 
 // consume: 住民が1個を消費しきる秒数（作るのに手間がかかる品ほど長い）
@@ -54,10 +56,10 @@ const ITEMS = {
   brick: { name: 'レンガ', color: '#b5533c', price: 6,  consume: 180, time: 20 },
   flour: { name: '小麦粉', color: '#f2eee0', price: 6,  consume: 180, time: 20 },
   bread: { name: 'パン',   color: '#d9893b', price: 16, consume: 360, time: 40 },
-  // 道具（需要・幸福度には入らない）
-  basket:{ name: 'カゴ',   color: '#b8893a', price: 15, time: 40,  tool: true },
-  wheel: { name: '車輪',   color: '#7a5a3a', price: 15, time: 40,  tool: true },
-  cart:  { name: '台車',   color: '#6a4a2a', price: 50, time: 120, tool: true },
+  // 道具（施設レベル上げに使うほか、商品としても販売・需要の対象。レシピ購入後に解放）
+  basket:{ name: 'カゴ',   color: '#b8893a', price: 15, consume: 360, time: 40 },
+  wheel: { name: '車輪',   color: '#7a5a3a', price: 15, consume: 360, time: 40 },
+  cart:  { name: '台車',   color: '#6a4a2a', price: 50, consume: 720, time: 120 },
 };
 
 // fuel: 火として使う木材（生産時間には加算しない）
@@ -93,7 +95,7 @@ const BUILD = {
   sawmill:   { name: '製材所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['plank'], cost: { coins: 60, wood: 10 }, desc: '木材2 → 板材1' },
   mason:     { name: '石工所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['brick'], cost: { coins: 60, stone: 10 }, desc: '石材2 → レンガ1' },
   mill:      { name: '製粉所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['flour'], cost: { coins: 80, plank: 5, stone: 5 }, desc: '小麦2 → 小麦粉1' },
-  workshop:  { name: '加工所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['basket', 'wheel', 'cart'], shop: true, cost: { coins: 150, plank: 10 }, desc: '板材から道具（カゴ・車輪・台車）をつくります。レシピはコインで購入します。道具で施設のレベルを上げると、一度に運べる材料が増えます。' },
+  workshop:  { name: '加工所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['basket', 'wheel', 'cart'], shop: true, cost: { coins: 150, plank: 10 }, desc: '板材から道具（カゴ・車輪・台車）をつくります。レシピはコインで購入します。道具は商品として売れるほか、施設のレベル上げに使うと一度に運べる材料が増えます。' },
   bakery:    { name: 'パン屋', cat: 'prod',   size: 1, kind: 'prod', recipes: ['bread'], cost: { coins: 120, plank: 10, brick: 5 }, desc: '小麦粉2＋木材1（火） → パン1' },
   warehouse: { name: '倉庫',   cat: 'home',   size: 1, kind: 'warehouse', cost: { coins: 80 }, desc: '共通倉庫の容量が5スロット（各100個）増えます。' },
   market:    { name: '市場',   cat: 'home',   size: 1, kind: 'market', cost: {}, desc: '作業員が住民に商品を届け、コインを得ます。販売商品は自分で選びます。届いている商品の種類が多いほど幸福度が上がります。' },
@@ -105,7 +107,8 @@ const GOALS = [
   { id: 'g2', text: '井戸を建てて水を5個採集',       stat: 'made_water',  n: 5,  reward: 30,  unlock: ['warehouse'] },
   { id: 'g3', text: '倉庫を建ててスロットを設定',    stat: 'slot_set',    n: 1,  reward: 60,  unlock: ['market'] },
   { id: 'g4', text: '市場を建てて販売商品を設定',    stat: 'market_set',  n: 1,  reward: 60,  unlock: [] },
-  { id: 'g4b', text: '販売で100コイン稼ぐ',          stat: 'earned',      n: 100, reward: 60, unlock: [], area: 1 },
+  { id: 'g4b', text: '販売で20コイン稼ぐ',           stat: 'earned',      n: 20,  reward: 40, unlock: [] },
+  { id: 'g4c', text: '住居を1つ建てる',              stat: 'built_house', n: 1,   reward: 40, unlock: [], area: 1 },
   { id: 'g5', text: '下のエリアを開放する',          stat: 'areas',       n: 2,  reward: 60,  unlock: ['quarry'], area: 2 },
   { id: 'g6', text: '採石場で石材を5個採集',         stat: 'made_stone',  n: 5,  reward: 80,  unlock: ['sawmill', 'mason'] },
   { id: 'g7', text: '小麦を見つけて5個採集',         stat: 'made_wheat',  n: 5,  reward: 80,  unlock: ['mill'], hint: '小麦のあるエリアを開放すると農場が建てられます' },
@@ -465,7 +468,7 @@ function newGame() {
     v: 6, coins: CONFIG.START_COINS, pop: CONFIG.START_POP, happy: 0,
     tiles, blocks: new Array(NB * NB).fill(false), areaStage: 0, buildings: [], nextId: 1, order: 1,
     slots: [], unlocked: [...INITIAL_UNLOCK], lastTab: 'gather',
-    stats: { made_water: 0, made_wood: 0, made_stone: 0, made_wheat: 0, made_plank: 0, made_brick: 0, made_flour: 0, made_bread: 0, made_basket: 0, made_wheel: 0, made_cart: 0, slot_set: 0, market_set: 0, earned: 0, happyMax: 0, areas: 1 },
+    stats: { made_water: 0, made_wood: 0, made_stone: 0, made_wheat: 0, made_plank: 0, made_brick: 0, made_flour: 0, made_bread: 0, made_basket: 0, made_wheel: 0, made_cart: 0, built_house: 0, slot_set: 0, market_set: 0, earned: 0, happyMax: 0, areas: 1 },
     goal: 0, goalNotified: false, newTypes: [], notified: {},
     t: 0, timers: { transfer: 0, refill: 0, regen: 0, grow: 0 },
     speed: 1, recipes: [], lastSave: Date.now(),
@@ -480,7 +483,7 @@ function makeBuilding(type, x, y) {
   const b = { id: S.nextId++, type, x, y, order: S.order++, workers: 0 };
   if (d.kind === 'gather') { b.inv = { out: 0 }; b.prog = 0; }
   if (d.kind === 'prod') { b.recipe = d.shop ? null : d.recipes[0]; b.inv = { a: 0, b: 0, out: 0 }; b.prog = 0; b.active = false; b.pending = {}; b.lv = 1; b.fetch = null; }
-  if (d.kind === 'market') { b.items = [null, null, null, null, null]; b.stock = {}; b.prog = 0; }
+  if (d.kind === 'market') { b.items = new Array(CONFIG.MARKET_SLOTS).fill(null); b.stock = {}; b.prog = 0; }
   if (d.kind === 'house') { b.demand = {}; }
   return b;
 }
@@ -549,7 +552,7 @@ function whAdd(item, qty) {
 function unlockedItems(all) {
   const set = new Set();
   for (const t of S.unlocked) { const d = BUILD[t]; if (d.kind === 'gather') set.add(d.res); if (d.kind === 'prod') d.recipes.forEach(r => { if (!RECIPES[r].buy || S.recipes.includes(r)) set.add(RECIPES[r].out); }); }
-  return Object.keys(ITEMS).filter(k => set.has(k) && (all || !ITEMS[k].tool));
+  return Object.keys(ITEMS).filter(k => set.has(k));
 }
 function carryOf(b) { return CONFIG.CARRY[Math.min(CONFIG.CARRY.length, b.lv || 1) - 1]; }
 function dist(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
@@ -1404,7 +1407,7 @@ function renderTop() {
 //  起動・ループ
 // ============================================================
 function showWelcome() {
-  modal('のんびり島ぐらしへようこそ', '<div>小さな島をのんびり育てる経営ゲームです。</div><div>・下の「🔨 建築」から施設を建てられます<br>・施設をタップして作業員を割り当てましょう（🙋 は手の空いている住民）<br>・霧の「＋」マスをタップすると土地を開放できます<br>・🎯 の目標を進めると新しい施設が解放されます<br>・倉庫のスロットと市場の販売商品は自分で設定します<br>・😊 は「住民に届いている商品の種類」の割合です。60%以上で人口が増えます<br>・⏩ で時間を速められます。離れている間も進みます（最大12時間分）</div>');
+  modal('のんびり島ぐらしへようこそ', '<div>小さな島をのんびり育てる経営ゲームです。</div><div>・下の「🔨 建築」から施設を建てられます<br>・施設をタップして作業員を割り当てましょう（🙋 は手の空いている住民）<br>・霧の「＋」マスをタップすると土地を開放できます<br>・🎯 の目標を進めると新しい施設が解放されます<br>・倉庫のスロットと市場の販売商品は自分で設定します<br>・😊 は「住民に届いている商品の種類」の割合です。60%以上で人口が増えます<br>・離れている間も進みます（最大12時間分）</div>');
 }
 function resetGame() {
   modal(`最初からやり直す（v${VERSION}）`, `<div>今の島のデータを消して、新しい島を始めます。元には戻せません。</div><div class="hint" style="text-align:left">バージョン ${VERSION}　保存キー ${CONFIG.SAVE_KEY}</div>`, () => {
@@ -1423,6 +1426,7 @@ function start() {
   if (!loaded) showWelcome(); else { const acc = offlineProgress(); if (acc) showWelcomeBack(acc); }
   $('btn-speed').onclick = () => { const i = CONFIG.SPEEDS.indexOf(S.speed || 1); S.speed = CONFIG.SPEEDS[(i + 1) % CONFIG.SPEEDS.length]; $('btn-speed').textContent = '⏩×' + S.speed; save(); };
   $('btn-speed').textContent = '⏩×' + (S.speed || 1);
+  if (!CONFIG.DEBUG_SPEED) { S.speed = 1; $('btn-speed').classList.add('hidden'); }
   let last = performance.now(), saveT = 0, uiT = 0;
   function loop(now) {
     const dt = Math.min(0.25, (now - last) / 1000); last = now;
