@@ -122,3 +122,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 #ver { position: fixed; left: 8px; bottom: calc(env(safe-area-inset-bottom) + 6px); font-size: 11px; color: rgba(255,255,255,.75); z-index: 5; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
 .line.status { min-height: 34px; }
 .line.status .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mkrow { display: grid; grid-template-columns: 76px 42px 1fr 52px 56px; gap: 4px; align-items: center; font-size: 13px; }
+.mkrow .recipe-btn { padding: 6px 4px; white-space: nowrap; }
+.mkrow .mkc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bitem .bcnt { font-size: 11px; color: #666; }

@@ -4,7 +4,7 @@
    仕様引き継ぎ書に基づく実装。仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.7.2';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.7.5';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数（未確定仕様はここで仮置き） ----------
 const CONFIG = {
@@ -1068,7 +1068,8 @@ function openBuildMenu() {
     const full = type === 'house' ? countType('house') >= houseCap() : (!d.nolimit && countType(type) >= CONFIG.MAX_SAME);
     const el = document.createElement('div'); el.className = 'bitem' + (full ? ' disabled' : '');
     el.appendChild(iconCanvas(type));
-    el.insertAdjacentHTML('beforeend', `<div>${d.name}${type === 'house' ? `<br><small>${countType('house')}/${houseCap()}棟</small>` : ''}</div><div class="bcost">${d.cost.coins ? '🪙' + d.cost.coins : '無料'}${full ? '<br>上限' : ''}</div>`);
+    const lim = type === 'house' ? houseCap() : (d.nolimit ? null : CONFIG.MAX_SAME);
+    el.insertAdjacentHTML('beforeend', `<div>${d.name}</div><div class="bcost">${d.cost.coins ? '🪙' + d.cost.coins : '無料'}</div><div class="bcnt ${full ? 'red' : ''}">${lim === null ? `${countType(type)}棟` : `${countType(type)}/${lim}棟`}</div>`);
     if (S.newTypes.includes(type)) { el.insertAdjacentHTML('beforeend', '<span class="ribbon">NEW</span>'); shownNew.push(type); }
     let lp = null, fired = false, p0 = null;
     const down = (x, y) => { fired = false; p0 = [x, y]; lp = setTimeout(() => { fired = true; showDetail(type); }, 500); };
@@ -1178,7 +1179,7 @@ function renderInfo() {
     h += `<div class="hint" style="text-align:left">販売商品（タップで変更）。需要が${CONFIG.DELIVER_BELOW}%を切った家から順に届けます</div>`;
     b.items.forEach((it, i) => {
       h += `<div class="line"><span class="lbl"><button class="recipe-btn mk-item" data-i="${i}">${it ? ITEMS[it].name : '（なし）'}</button></span>` +
-        (it ? `<span class="val">欲しい家 ${houseWanting(it)}/${nh}　在庫${b.stock[it] || 0}　🪙${ITEMS[it].price}</span>` : '') + `</div>`;
+        (it ? `<span class="val">欲しい家 ${houseWanting(it)}/${nh}　${(b.stock[it] || 0) === 0 && whCount(it) > 0 && whAvail(it) === 0 ? '<span class="red">確保で出せません</span>' : '在庫' + (b.stock[it] || 0)}　🪙${ITEMS[it].price}</span>` : '') + `</div>`;
     });
   } else if (d.kind === 'house') {
     const ul = unlockedItems(), got = ul.filter(k => (b.demand[k] || 0) > 0).length;
@@ -1224,7 +1225,12 @@ function pickRecipe(b) {
 }
 function pickMarketItem(b, i) {
   let h = `<div class="line"><button class="recipe-btn pick" data-it="">（なし）</button></div>`;
-  for (const k of unlockedItems()) if (!b.items.includes(k) || b.items[i] === k) h += `<div class="line"><button class="recipe-btn pick" data-it="${k}">${ITEMS[k].name}　🪙${ITEMS[k].price}　消費${ITEMS[k].consume}秒</button></div>`;
+  const nh = countType('house');
+  for (const k of unlockedItems()) if (!b.items.includes(k) || b.items[i] === k) {
+    const wh = whCount(k), av = whAvail(k), sh = shelfCount(k);
+    h += `<div class="line mkrow"><button class="recipe-btn pick" data-it="${k}">${ITEMS[k].name}</button><span class="mkc">🪙${ITEMS[k].price}</span><span class="mkc">倉庫 <b>${av}</b>${wh - av ? `<small>(+${wh - av})</small>` : ''}</span><span class="mkc">施設 ${sh}</span><span class="mkc">家 ${houseWanting(k)}/${nh}</span></div>`;
+  }
+  h += `<div class="hint">倉庫＝市場に出せる数（カッコ内は確保分で出ません）　施設＝完成品棚　家＝欲しがっている家</div>`;
   modal('販売商品を選択', h);
   document.querySelectorAll('.pick').forEach(el => el.onclick = () => {
     const it = el.dataset.it || null;
@@ -1293,7 +1299,8 @@ function renderItems() {
 function slotHtml(s) {
   const cfgName = s.cfg === 'block' ? '🚫' : s.cfg ? ITEMS[s.cfg].name : '未設定';
   const col = s.item ? (ITEMS[s.item].color === '#f2eee0' ? '#999' : ITEMS[s.item].color) : '#bbb';
-  return `<div class="sq" style="color:${col}">${s.item ? ITEMS[s.item].name : '－'}</div><div>${s.qty}/${CONFIG.SLOT_CAP}</div><div class="cfg">${cfgName}</div>`;
+  const out = Math.max(0, s.qty - (s.min || 0));
+  return `<div class="sq" style="color:${col}">${s.item ? ITEMS[s.item].name : '－'}</div><div>${s.qty}/${CONFIG.SLOT_CAP}</div><div class="cfg">${cfgName}</div><div class="cfg ${s.qty > 0 && out === 0 ? 'red' : ''}">出せる ${out}</div>`;
 }
 function renderStore() {
   document.querySelectorAll('#store-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === storeTab));
@@ -1312,7 +1319,7 @@ function renderStore() {
     d.appendChild(sel);
     const mn = document.createElement('div'); mn.className = 'minrow';
     mn.innerHTML = `<span>確保</span><button class="mbtn" data-d="-5">－</button><b>${s.min || 0}</b><button class="mbtn" data-d="5">＋</button>`;
-    mn.querySelectorAll('.mbtn').forEach(bt => bt.onclick = () => { s.min = Math.max(0, Math.min(CONFIG.SLOT_CAP, (s.min || 0) + (+bt.dataset.d))); mn.querySelector('b').textContent = s.min; save(); });
+    mn.querySelectorAll('.mbtn').forEach(bt => bt.onclick = () => { s.min = Math.max(0, Math.min(CONFIG.SLOT_CAP, (s.min || 0) + (+bt.dataset.d))); mn.querySelector('b').textContent = s.min; info.innerHTML = slotHtml(s); save(); });
     d.appendChild(mn); el.appendChild(d);
   });
 }
@@ -1362,6 +1369,10 @@ function checkEvents() {
   if (g && !S.goalNotified && goalProgress(g) >= g.n) { S.goalNotified = true; notify(`🎁 目標達成「${g.text}」 🎯で報酬を受け取れます`); }
   if (prevPop !== null && S.pop > prevPop) notify(`👤 住民が増えました（${S.pop}人）`);
   prevPop = S.pop;
+  // 倉庫にはあるのに確保で市場に出せない商品がある
+  const blocked = S.buildings.some(m => m.type === 'market' && m.workers > 0 && m.items.some(it => it && (m.stock[it] || 0) === 0 && whCount(it) > 0 && whAvail(it) === 0));
+  if (blocked && !S.notified.reserve) { S.notified.reserve = true; notify('📦 倉庫の「確保」が多くて市場に出せない商品があります（倉庫スロットで確保を下げてください）'); }
+  if (!blocked) delete S.notified.reserve;
   for (const b of S.buildings) {
     const d = BUILD[b.type], key = 'b' + b.id;
     if (d.kind === 'gather') {
