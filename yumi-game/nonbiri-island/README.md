@@ -69,6 +69,7 @@ iPhoneの Safari で開き「ホーム画面に追加」するとフルスクリ
 画面左下と ⚙️ の画面に `vX.Y.Z` を表示します。`game.js` 冒頭の `VERSION` を更新してください。
 
 - v0.7.1：建築費用の所持数に施設の完成品棚を含める。バージョン表示を追加
+- v0.7.2：生産施設パネルの「運搬中」行を常設の状態行にして、ボタン位置が動かないように
 
 ## 対応ブラウザ
 - iOS 12 以降の Safari（iPad mini 2 / iPhone 5s 世代まで）、Android Chrome、PC の Chrome / Edge / Firefox / Safari

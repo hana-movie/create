@@ -4,7 +4,7 @@
    仕様引き継ぎ書に基づく実装。仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.7.1';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.7.2';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数（未確定仕様はここで仮置き） ----------
 const CONFIG = {
@@ -1155,8 +1155,15 @@ function renderInfo() {
     if (CONFIG.FETCH_MODE) {
       const lc = levelCost(b);
       h += `<div class="line"><span class="lbl">レベル ${b.lv || 1} <small>一度に${carryOf(b)}個運ぶ</small></span>` + (lc ? `<button class="btn small" id="lv-up" ${canAfford(lc) ? '' : 'disabled'}>⬆ ${Object.entries(lc).map(([k, v]) => (k === 'coins' ? '🪙' : ITEMS[k].name) + v).join('+')}</button>` : '<span class="val">最大</span>') + `</div>`;
-      if (b.fetch) { const fo = getB(b.fetch.from); h += `<div class="line"><span class="lbl">🚶 ${ITEMS[b.fetch.item].name}×${b.fetch.qty} を ${fo ? bname(fo) : '?'} から運搬中</span><div class="gauge prog"><div style="width:${Math.min(100, b.fetch.prog / b.fetch.time * 100)}%"></div></div><span class="val">${Math.max(0, Math.ceil((b.fetch.time - b.fetch.prog) / Math.max(1, b.workers)))}秒</span></div>`; }
-      else if (!b.active && b.workers > 0 && !mats.every((m, i) => b.inv[i === 0 ? 'a' : 'b'] >= r.need[m])) h += `<div class="hint" style="text-align:left">材料の在庫がどこにもありません</div>`;
+      // 状態行：常に1行だけ表示して高さを変えない（出し入れすると±ボタンの位置がずれるため）
+      let st;
+      if (b.workers === 0) st = `<span class="lbl">⏸ 停止（作業員なし）</span>`;
+      else if (b.fetch) { const fo = getB(b.fetch.from); st = `<span class="lbl">🚶 ${ITEMS[b.fetch.item].name}×${b.fetch.qty} ← ${fo ? bname(fo) : '?'}</span><div class="gauge prog"><div style="width:${Math.min(100, b.fetch.prog / b.fetch.time * 100)}%"></div></div><span class="val">${Math.max(0, Math.ceil((b.fetch.time - b.fetch.prog) / Math.max(1, b.workers)))}秒</span>`; }
+      else if (b.active) st = `<span class="lbl">⚙️ 生産中</span>`;
+      else if (b.inv.out >= CONFIG.INV_CAP) st = `<span class="lbl">📦 完成品が満杯</span>`;
+      else if (!mats.every((m, i) => b.inv[i === 0 ? 'a' : 'b'] >= r.need[m])) st = `<span class="lbl">🔍 材料待ち（在庫なし）</span>`;
+      else st = `<span class="lbl">…</span>`;
+      h += `<div class="line status">${st}</div>`;
     }
     h += `<div class="line"><span class="lbl">生産速度</span><span class="val">${b.workers ? (workSec(b) / b.workers).toFixed(0) + '秒/個' : '停止'}${r.fuel ? ' <small>(' + ITEMS[r.fuel].name + 'は火)</small>' : ''}</span></div>`;
     h += gaugeLine('生産進捗', b.active ? b.prog * 100 : 0, 100, 'prog');

@@ -120,3 +120,5 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .icon-btn.wide { width: auto; padding: 0 6px; font-size: 12px; font-weight: bold; }
 .line .btn.small { flex: 0 0 auto; white-space: nowrap; }
 #ver { position: fixed; left: 8px; bottom: calc(env(safe-area-inset-bottom) + 6px); font-size: 11px; color: rgba(255,255,255,.75); z-index: 5; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.line.status { min-height: 34px; }
+.line.status .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
