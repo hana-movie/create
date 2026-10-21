@@ -14,6 +14,12 @@ const CONFIG = {
   MAX_SAME: 3,          // 同種施設の上限
   BASE_SEC: 10,         // 原材料1個の採集時間（作業員1人）。生産時間は材料の時間の合計（燃料の木材は加算しない）
   OFFLINE_MAX_SEC: 12 * 3600,
+  // ---- 材料を取りに行くモデル（v0.7）。false にすると v0.6 の挙動（毎分の材料配分・採集10秒）に戻る ----
+  FETCH_MODE: true,
+  TILE_SEC: 1,          // 1マス1秒
+  GATHER_TRIP: 2,       // 原材料は隣のマスなので往復2秒を加算
+  CARRY: [1, 2, 5],     // 施設レベル1/2/3で一度に持てる材料数
+  LEVEL_COST: [{ coins: 50, basket: 1 }, { coins: 150, cart: 1 }],  // Lv1→2, Lv2→3
   SPEEDS: [1, 2, 4],    // 時間加速の倍率
   INV_CAP: 20,          // 施設内在庫の上限
   TRANSFER_SEC: 30,     // 完成品→倉庫の搬送間隔
@@ -33,7 +39,7 @@ const CONFIG = {
   DELIVER_BELOW: 30,        // 需要ゲージがこの%を切ったら配達対象
   MAX_GATHER_ITEMS: 4,  // 採集アイテムの種類上限（木材・石材・小麦・水）
   MAX_PROD_ITEMS: 5,    // 生産アイテムの種類上限
-  SAVE_KEY: 'nonbiri-island-v6',
+  SAVE_KEY: 'nonbiri-island-v7',
 };
 
 // consume: 住民が1個を消費しきる秒数（作るのに手間がかかる品ほど長い）
@@ -46,6 +52,10 @@ const ITEMS = {
   brick: { name: 'レンガ', color: '#b5533c', price: 6,  consume: 180, time: 20 },
   flour: { name: '小麦粉', color: '#f2eee0', price: 6,  consume: 180, time: 20 },
   bread: { name: 'パン',   color: '#d9893b', price: 16, consume: 360, time: 40 },
+  // 道具（需要・幸福度には入らない）
+  basket:{ name: 'カゴ',   color: '#b8893a', price: 15, time: 40,  tool: true },
+  wheel: { name: '車輪',   color: '#7a5a3a', price: 15, time: 40,  tool: true },
+  cart:  { name: '台車',   color: '#6a4a2a', price: 50, time: 120, tool: true },
 };
 
 // fuel: 火として使う木材（生産時間には加算しない）
@@ -54,12 +64,15 @@ const RECIPES = {
   brick: { out: 'brick', need: { stone: 2 } },
   flour: { out: 'flour', need: { wheat: 2 } },
   bread: { out: 'bread', need: { flour: 2, wood: 1 }, fuel: 'wood' },
+  basket: { out: 'basket', need: { plank: 2 }, buy: 100 },            // buy: レシピ購入価格（加工所）
+  wheel:  { out: 'wheel',  need: { plank: 2 }, buy: 150 },
+  cart:   { out: 'cart',   need: { wheel: 2, basket: 1 }, buy: 250 },
 };
 // 1個あたりの作業時間（作業員1人）：採集は10秒、生産は材料の時間の合計
 function workSec(b) {
   const d = BUILD[b.type];
-  if (d.kind === 'gather') return ITEMS[d.res].time;
-  if (d.kind === 'prod') { const r = RECIPES[b.recipe]; let t = 0; for (const m in r.need) if (m !== r.fuel) t += ITEMS[m].time * r.need[m]; return t; }
+  if (d.kind === 'gather') return ITEMS[d.res].time + (CONFIG.FETCH_MODE && !d.nores ? CONFIG.GATHER_TRIP : 0);
+  if (d.kind === 'prod') { if (!b.recipe) return CONFIG.BASE_SEC; const r = RECIPES[b.recipe]; let t = 0; for (const m in r.need) if (m !== r.fuel) t += ITEMS[m].time * r.need[m]; return t; }
   return CONFIG.BASE_SEC;
 }
 
@@ -78,6 +91,7 @@ const BUILD = {
   sawmill:   { name: '製材所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['plank'], cost: { coins: 60, wood: 10 }, desc: '木材2 → 板材1' },
   mason:     { name: '石工所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['brick'], cost: { coins: 60, stone: 10 }, desc: '石材2 → レンガ1' },
   mill:      { name: '製粉所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['flour'], cost: { coins: 80, plank: 5, stone: 5 }, desc: '小麦2 → 小麦粉1' },
+  workshop:  { name: '加工所', cat: 'prod',   size: 1, kind: 'prod', recipes: ['basket', 'wheel', 'cart'], shop: true, cost: { coins: 150, plank: 10 }, desc: '板材から道具（カゴ・車輪・台車）をつくります。レシピはコインで購入します。道具で施設のレベルを上げると、一度に運べる材料が増えます。' },
   bakery:    { name: 'パン屋', cat: 'prod',   size: 1, kind: 'prod', recipes: ['bread'], cost: { coins: 120, plank: 10, brick: 5 }, desc: '小麦粉2＋木材1（火） → パン1' },
   warehouse: { name: '倉庫',   cat: 'home',   size: 1, kind: 'warehouse', cost: { coins: 80 }, desc: '共通倉庫の容量が5スロット（各100個）増えます。' },
   market:    { name: '市場',   cat: 'home',   size: 1, kind: 'market', cost: {}, desc: '作業員が住民に商品を届け、コインを得ます。販売商品は自分で選びます。届いている商品の種類が多いほど幸福度が上がります。' },
@@ -88,12 +102,13 @@ const GOALS = [
   { id: 'g1', text: '伐採所を建てて木材を5個採集',   stat: 'made_wood',   n: 5,  reward: 30,  unlock: ['well'] },
   { id: 'g2', text: '井戸を建てて水を5個採集',       stat: 'made_water',  n: 5,  reward: 30,  unlock: ['warehouse'] },
   { id: 'g3', text: '倉庫を建ててスロットを設定',    stat: 'slot_set',    n: 1,  reward: 60,  unlock: ['market'] },
-  { id: 'g4', text: '市場を建てて販売商品を設定',    stat: 'market_set',  n: 1,  reward: 60,  unlock: [], area: 1 },
+  { id: 'g4', text: '市場を建てて販売商品を設定',    stat: 'market_set',  n: 1,  reward: 60,  unlock: [] },
+  { id: 'g4b', text: '販売で100コイン稼ぐ',          stat: 'earned',      n: 100, reward: 60, unlock: [], area: 1 },
   { id: 'g5', text: '下のエリアを開放する',          stat: 'areas',       n: 2,  reward: 60,  unlock: ['quarry'], area: 2 },
   { id: 'g6', text: '採石場で石材を5個採集',         stat: 'made_stone',  n: 5,  reward: 80,  unlock: ['sawmill', 'mason'] },
   { id: 'g7', text: '小麦を見つけて5個採集',         stat: 'made_wheat',  n: 5,  reward: 80,  unlock: ['mill'], hint: '小麦のあるエリアを開放すると農場が建てられます' },
   { id: 'g8', text: '小麦粉を5個つくる',             stat: 'made_flour',  n: 5,  reward: 100, unlock: ['bakery'] },
-  { id: 'g9', text: 'パンを5個つくる',               stat: 'made_bread',  n: 5,  reward: 200, unlock: [] },
+  { id: 'g9', text: 'パンを5個つくる',               stat: 'made_bread',  n: 5,  reward: 200, unlock: ['workshop'], hint: '達成すると自由モード。加工所が建てられます' },
 ];
 const INITIAL_UNLOCK = ['house', 'lumber'];
 
@@ -319,6 +334,24 @@ const SPR = {
     '......CCCCCCC...',
     '................',
   ],
+  workshop: [
+    '................',
+    '..BBBBBBBBBBBB..',
+    '.BNNNNNNNNNNNNB.',
+    '.BnnnnnnnnnnnnB.',
+    '.BBBBBBBBBBBBBB.',
+    '.BccccccccccccB.',
+    '.BcyyyyccnnnncB.',
+    '.BcyYYyccnBBncB.',
+    '.BcyyyyccnnnncB.',
+    '.BccccccccccccB.',
+    '.BcCCCCccCCCCcB.',
+    '.BccccccccccccB.',
+    '.BcCkkCccdxxdcB.',
+    '.BcCkkCccdxxdcB.',
+    '.BBBBBBBBBBBBBB.',
+    '................',
+  ],
   bakery: [
     '................',
     '..OOOOOOOOOOOO..',
@@ -430,10 +463,10 @@ function newGame() {
     v: 6, coins: CONFIG.START_COINS, pop: CONFIG.START_POP, happy: 0,
     tiles, blocks: new Array(NB * NB).fill(false), areaStage: 0, buildings: [], nextId: 1, order: 1,
     slots: [], unlocked: [...INITIAL_UNLOCK], lastTab: 'gather',
-    stats: { made_water: 0, made_wood: 0, made_stone: 0, made_wheat: 0, made_plank: 0, made_brick: 0, made_flour: 0, made_bread: 0, slot_set: 0, market_set: 0, earned: 0, happyMax: 0, areas: 1 },
+    stats: { made_water: 0, made_wood: 0, made_stone: 0, made_wheat: 0, made_plank: 0, made_brick: 0, made_flour: 0, made_bread: 0, made_basket: 0, made_wheel: 0, made_cart: 0, slot_set: 0, market_set: 0, earned: 0, happyMax: 0, areas: 1 },
     goal: 0, goalNotified: false, newTypes: [], notified: {},
     t: 0, timers: { transfer: 0, refill: 0, regen: 0, grow: 0 },
-    speed: 1, lastSave: Date.now(),
+    speed: 1, recipes: [], lastSave: Date.now(),
   };
   unlockBlock(cb, cb);
   addBuilding('house', c, c, true);
@@ -444,7 +477,7 @@ function makeBuilding(type, x, y) {
   const d = BUILD[type];
   const b = { id: S.nextId++, type, x, y, order: S.order++, workers: 0 };
   if (d.kind === 'gather') { b.inv = { out: 0 }; b.prog = 0; }
-  if (d.kind === 'prod') { b.recipe = d.recipes[0]; b.inv = { a: 0, b: 0, out: 0 }; b.prog = 0; b.active = false; b.pending = {}; }
+  if (d.kind === 'prod') { b.recipe = d.shop ? null : d.recipes[0]; b.inv = { a: 0, b: 0, out: 0 }; b.prog = 0; b.active = false; b.pending = {}; b.lv = 1; b.fetch = null; }
   if (d.kind === 'market') { b.items = [null, null, null, null, null]; b.stock = {}; b.prog = 0; }
   if (d.kind === 'house') { b.demand = {}; }
   return b;
@@ -491,7 +524,7 @@ function payCost(cost) {
 }
 
 // レシピ材料の対応（材料A/B）
-function recipeMats(b) { return Object.keys(RECIPES[b.recipe].need); }
+function recipeMats(b) { return b.recipe ? Object.keys(RECIPES[b.recipe].need) : []; }
 
 // ---------- 共通倉庫 ----------
 function whCount(item) { return S.slots.reduce((a, s) => a + (s.item === item ? s.qty : 0), 0); }
@@ -504,11 +537,13 @@ function whAdd(item, qty) {
   return qty - left;
 }
 // 解放済み施設から作れるアイテム一覧（幸福度の分母）
-function unlockedItems() {
+function unlockedItems(all) {
   const set = new Set();
-  for (const t of S.unlocked) { const d = BUILD[t]; if (d.kind === 'gather') set.add(d.res); if (d.kind === 'prod') d.recipes.forEach(r => set.add(RECIPES[r].out)); }
-  return Object.keys(ITEMS).filter(k => set.has(k));
+  for (const t of S.unlocked) { const d = BUILD[t]; if (d.kind === 'gather') set.add(d.res); if (d.kind === 'prod') d.recipes.forEach(r => { if (!RECIPES[r].buy || S.recipes.includes(r)) set.add(RECIPES[r].out); }); }
+  return Object.keys(ITEMS).filter(k => set.has(k) && (all || !ITEMS[k].tool));
 }
+function carryOf(b) { return CONFIG.CARRY[Math.min(CONFIG.CARRY.length, b.lv || 1) - 1]; }
+function dist(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
 function putSlot(s, item, n) { const room = CONFIG.SLOT_CAP - s.qty; const k = Math.min(room, n); if (k > 0) { s.item = item; s.qty += k; } return k; }
 // keepMin=true のとき各スロットの最低保管量を下回らない範囲で取り出す（市場・生産への補充用）。建築費用は keepMin なし
 function whTake(item, qty, keepMin) {
@@ -535,7 +570,7 @@ function sim(dt, acc) {
   S.timers.transfer += dt;
   while (S.timers.transfer >= CONFIG.TRANSFER_SEC) { S.timers.transfer -= CONFIG.TRANSFER_SEC; doTransfer(acc); }
   S.timers.refill += dt;
-  while (S.timers.refill >= CONFIG.REFILL_SEC) { S.timers.refill -= CONFIG.REFILL_SEC; doRefill(); doMarketRefill(); }
+  while (S.timers.refill >= CONFIG.REFILL_SEC) { S.timers.refill -= CONFIG.REFILL_SEC; if (!CONFIG.FETCH_MODE) doRefill(); doMarketRefill(); }
   // 需要：家ごとに、届いた商品は消費時間をかけて100%→0%に減る
   const houses = S.buildings.filter(b => b.type === 'house');
   for (const h of houses) for (const k in h.demand) { if (h.demand[k] > 0) h.demand[k] = Math.max(0, h.demand[k] - dt / ITEMS[k].consume * 100); }
@@ -562,13 +597,13 @@ function stepBuilding(b, dt, acc) {
     b.prog += dt * b.workers / workSec(b);
     if (b.prog >= 1) { b.prog = 0; if (!tgt.infinite) tgt.amt--; b.inv.out++; S.stats['made_' + d.res]++; if (acc) acc.items[d.res] = (acc.items[d.res] || 0) + 1; }
   } else if (d.kind === 'prod') {
-    if (b.workers === 0) return;
+    if (b.workers === 0 || !b.recipe) return;
     const r = RECIPES[b.recipe];
     if (!b.active) {
       if (b.inv.out >= CONFIG.INV_CAP) return;
       const mats = Object.keys(r.need);
       const has = mats.every((m, i) => b.inv[i === 0 ? 'a' : 'b'] >= r.need[m]);
-      if (!has) return;
+      if (!has) { if (CONFIG.FETCH_MODE) stepFetch(b, dt); return; }
       mats.forEach((m, i) => { b.inv[i === 0 ? 'a' : 'b'] -= r.need[m]; });
       b.active = true; b.prog = 0;
     }
@@ -588,6 +623,39 @@ function stepBuilding(b, dt, acc) {
   }
 }
 
+// ---- 材料を取りに行く（FETCH_MODE）----
+// 足りない材料を、在庫のある最も近い場所（倉庫 or その材料をつくる施設）へ1回に carry 個まで取りに行く。往復 = 距離×2 ×1秒
+function fetchSource(b, m) {
+  let best = null, bestD = 1e9;
+  for (const o of S.buildings) {
+    if (o === b) continue;
+    const od = BUILD[o.type]; let avail = 0;
+    if (od.kind === 'warehouse') avail = whAvail(m);
+    else if (od.kind === 'gather' && od.res === m) avail = o.inv.out;
+    else if (od.kind === 'prod' && o.recipe && RECIPES[o.recipe].out === m) avail = o.inv.out;
+    if (avail <= 0) continue;
+    const dd = dist(b, o); if (dd < bestD) { bestD = dd; best = { o, avail, d: dd }; }
+  }
+  return best;
+}
+function stepFetch(b, dt) {
+  if (b.fetch) {
+    b.fetch.prog += dt * b.workers;
+    if (b.fetch.prog >= b.fetch.time) { const k = b.fetch.key; b.inv[k] = Math.min(CONFIG.INV_CAP, b.inv[k] + b.fetch.qty); b.fetch = null; }
+    return;
+  }
+  const r = RECIPES[b.recipe], mats = Object.keys(r.need);
+  for (let i = 0; i < mats.length; i++) {
+    const m = mats[i], key = i === 0 ? 'a' : 'b';
+    if (b.inv[key] >= r.need[m]) continue;
+    const src = fetchSource(b, m); if (!src) continue;
+    const qty = Math.min(carryOf(b), src.avail, CONFIG.INV_CAP - b.inv[key]); if (qty <= 0) continue;
+    const od = BUILD[src.o.type];
+    if (od.kind === 'warehouse') whTake(m, qty, true); else src.o.inv.out -= qty;
+    b.fetch = { item: m, key, qty, from: src.o.id, time: src.d * 2 * CONFIG.TILE_SEC, prog: 0 };
+    return;
+  }
+}
 // 配達対象：（家, 商品）のうち在庫があり需要ゲージが閾値未満で、残りが最も少ない組。同率はランダム
 function marketTarget(b) {
   const cands = [];
@@ -617,7 +685,7 @@ function gatherTarget(b) {
 function doTransfer(acc) {
   for (const b of S.buildings) {
     if (!b.inv) continue;
-    if (b.inv.out > 0) {
+    if (b.inv.out > 0 && (BUILD[b.type].kind === 'gather' || b.recipe)) {
       const item = BUILD[b.type].kind === 'gather' ? BUILD[b.type].res : RECIPES[b.recipe].out;
       const n = whAdd(item, b.inv.out);
       b.inv.out -= n;
@@ -682,7 +750,7 @@ function demolish(b) {
   } else {
     if (b.inv) {
       if (d.kind === 'gather') whAdd(d.res, b.inv.out);
-      else { whAdd(RECIPES[b.recipe].out, b.inv.out); recipeMats(b).forEach((m, i) => whAdd(m, b.inv[i === 0 ? 'a' : 'b'])); for (const k in b.pending) whAdd(k, b.pending[k]); }
+      else { if (b.recipe) { whAdd(RECIPES[b.recipe].out, b.inv.out); recipeMats(b).forEach((m, i) => whAdd(m, b.inv[i === 0 ? 'a' : 'b'])); } for (const k in b.pending) whAdd(k, b.pending[k]); if (b.fetch) whAdd(b.fetch.item, b.fetch.qty); }
     }
     if (b.stock) for (const k in b.stock) whAdd(k, b.stock[k]);
     S.buildings = S.buildings.filter(x => x !== b); rebuildOcc();
@@ -691,11 +759,15 @@ function demolish(b) {
 }
 function changeRecipe(b, rid) {
   if (b.recipe === rid) return;
-  const old = recipeMats(b);
+  if (b.fetch) { const left = b.fetch.qty - whAdd(b.fetch.item, b.fetch.qty); if (left) b.pending[b.fetch.item] = (b.pending[b.fetch.item] || 0) + left; b.fetch = null; }
+  const old = b.recipe ? recipeMats(b) : [];
   old.forEach((m, i) => { const k = i === 0 ? 'a' : 'b'; const q = b.inv[k]; b.inv[k] = 0; if (q) { const left = q - whAdd(m, q); if (left) b.pending[m] = (b.pending[m] || 0) + left; } });
   b.recipe = rid; b.active = false; b.prog = 0;
 }
 
+// ---------- 施設レベル（一度に運べる材料数） ----------
+function levelCost(b) { return CONFIG.LEVEL_COST[(b.lv || 1) - 1] || null; }
+function levelUp(b) { const c = levelCost(b); if (!c || !canAfford(c)) return false; payCost(c); b.lv = (b.lv || 1) + 1; return true; }
 // ---------- エリア開放（5×5単位） ----------
 function landPrice() { return CONFIG.LAND_BASE + CONFIG.LAND_STEP * (blocksOpen() - 1); }
 function canUnlockBlock(bx, by) {
@@ -722,7 +794,7 @@ function showWelcomeBack(acc) {
   modal('おかえりなさい', `<div>留守の間：約 ${hrs ? hrs + '時間' : ''}${mins}分${acc.elapsed >= CONFIG.OFFLINE_MAX_SEC ? '（上限12時間分）' : ''}</div><div>🪙 販売収入 +${acc.coins}</div><div>👤 住民 +${acc.pop}</div><div>📦 つくった品：${items}</div><div class="hint" style="text-align:left">倉庫に入りきらない完成品は施設内に残っています。</div>`);
 }
 function load() {
-  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; for (const sl of S.slots) if (sl.min === undefined) sl.min = CONFIG.SLOT_MIN; if (S.areaStage === undefined) S.areaStage = 2; rebuildOcc(); return true; } catch (e) { return false; }
+  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; for (const sl of S.slots) if (sl.min === undefined) sl.min = CONFIG.SLOT_MIN; if (S.areaStage === undefined) S.areaStage = 2; S.recipes = S.recipes || []; for (const b of S.buildings) { if (b.inv && b.lv === undefined) b.lv = 1; } rebuildOcc(); return true; } catch (e) { return false; }
 }
 
 // ============================================================
@@ -1064,10 +1136,19 @@ function renderInfo() {
     h += `<div class="line"><span class="lbl">採集速度</span><span class="val">${b.workers ? (workSec(b) / b.workers).toFixed(0) + '秒/個' : '停止'}</span></div>`;
     if (!d.nores) h += `<div class="line"><span class="lbl">採集範囲</span><span class="val">周り${(R * 2 + 1) ** 2 - 1}マス</span></div>`;
     h += gaugeLine(`完成品 ${ITEMS[d.res].name}`, b.inv.out, CONFIG.INV_CAP);
+  } else if (d.kind === 'prod' && !b.recipe) {
+    h += `<div class="line"><span class="lbl">レシピ</span><button class="recipe-btn" id="recipe-btn">レシピを選ぶ／買う</button></div>`;
+    h += workersLine();
   } else if (d.kind === 'prod') {
     const r = RECIPES[b.recipe], mats = Object.keys(r.need);
     h += `<div class="line"><span class="lbl">レシピ</span><button class="recipe-btn" id="recipe-btn">${mats.map(m => ITEMS[m].name + r.need[m]).join('＋')} → ${ITEMS[r.out].name}</button></div>`;
     h += workersLine();
+    if (CONFIG.FETCH_MODE) {
+      const lc = levelCost(b);
+      h += `<div class="line"><span class="lbl">レベル ${b.lv || 1} <small>一度に${carryOf(b)}個運ぶ</small></span>` + (lc ? `<button class="btn small" id="lv-up" ${canAfford(lc) ? '' : 'disabled'}>⬆ ${Object.entries(lc).map(([k, v]) => (k === 'coins' ? '🪙' : ITEMS[k].name) + v).join('+')}</button>` : '<span class="val">最大</span>') + `</div>`;
+      if (b.fetch) { const fo = getB(b.fetch.from); h += `<div class="line"><span class="lbl">🚶 ${ITEMS[b.fetch.item].name}×${b.fetch.qty} を ${fo ? bname(fo) : '?'} から運搬中</span><div class="gauge prog"><div style="width:${Math.min(100, b.fetch.prog / b.fetch.time * 100)}%"></div></div><span class="val">${Math.max(0, Math.ceil((b.fetch.time - b.fetch.prog) / Math.max(1, b.workers)))}秒</span></div>`; }
+      else if (!b.active && b.workers > 0 && !mats.every((m, i) => b.inv[i === 0 ? 'a' : 'b'] >= r.need[m])) h += `<div class="hint" style="text-align:left">材料の在庫がどこにもありません</div>`;
+    }
     h += `<div class="line"><span class="lbl">生産速度</span><span class="val">${b.workers ? (workSec(b) / b.workers).toFixed(0) + '秒/個' : '停止'}${r.fuel ? ' <small>(' + ITEMS[r.fuel].name + 'は火)</small>' : ''}</span></div>`;
     h += gaugeLine('生産進捗', b.active ? b.prog * 100 : 0, 100, 'prog');
     h += gaugeLine(ITEMS[mats[0]].name, b.inv.a, CONFIG.INV_CAP);
@@ -1100,6 +1181,7 @@ function renderInfo() {
   if (wm) wm.onclick = () => { setWorkers(b, b.workers - 1); renderInfo(); };
   if (wp) wp.onclick = () => { setWorkers(b, b.workers + 1); renderInfo(); };
   const rb = $('recipe-btn'); if (rb) rb.onclick = () => pickRecipe(b);
+  const lu = $('lv-up'); if (lu) lu.onclick = () => { if (levelUp(b)) { toast(`${bname(b)}が Lv${b.lv} になりました`); save(); } renderInfo(); };
   document.querySelectorAll('.mk-item').forEach(el => el.onclick = () => pickMarketItem(b, +el.dataset.i));
   const as = $('a-store'); if (as) as.onclick = () => { $('infopanel').classList.add('hidden'); storeTab = 'slots'; openStore(); };
   $('a-move').onclick = () => { UI.mode = 'move'; UI.moveB = b; UI.px = b.x; UI.py = b.y; $('infopanel').classList.add('hidden'); showMovePanel(); };
@@ -1111,12 +1193,18 @@ function renderInfo() {
   };
 }
 function pickRecipe(b) {
-  const list = BUILD[b.type].recipes;
-  if (list.length === 1) { toast('このレシピのみです'); return; }
+  const d = BUILD[b.type], list = d.recipes;
+  if (!d.shop && list.length === 1) { toast('このレシピのみです'); return; }
   let h = '';
-  for (const r of list) { const rc = RECIPES[r]; h += `<div class="line"><button class="recipe-btn pick" data-r="${r}">${Object.entries(rc.need).map(([k, v]) => ITEMS[k].name + v).join('＋')} → ${ITEMS[rc.out].name}</button></div>`; }
-  modal('レシピを選択', h);
-  document.querySelectorAll('.pick').forEach(el => el.onclick = () => { changeRecipe(b, el.dataset.r); $('modal').classList.add('hidden'); renderInfo(); });
+  for (const r of list) {
+    const rc = RECIPES[r], owned = !rc.buy || S.recipes.includes(r);
+    const label = `${Object.entries(rc.need).map(([k, v]) => ITEMS[k].name + v).join('＋')} → ${ITEMS[rc.out].name}`;
+    if (owned) h += `<div class="line"><button class="recipe-btn pick" data-r="${r}">${label}${b.recipe === r ? '　✔' : ''}</button></div>`;
+    else h += `<div class="line"><span class="lbl">${label}</span><button class="btn small buy" data-r="${r}" ${S.coins >= rc.buy ? '' : 'disabled'}>🪙${rc.buy}で購入</button></div>`;
+  }
+  modal(d.shop ? 'レシピを選択／購入' : 'レシピを選択', h);
+  document.querySelectorAll('.pick').forEach(el => el.onclick = () => { changeRecipe(b, el.dataset.r); $('modal').classList.add('hidden'); renderInfo(); save(); });
+  document.querySelectorAll('.buy').forEach(el => el.onclick = () => { const r = el.dataset.r; if (S.coins < RECIPES[r].buy) return; S.coins -= RECIPES[r].buy; S.recipes.push(r); notify(`📜 レシピ「${ITEMS[RECIPES[r].out].name}」を購入しました`); save(); pickRecipe(b); });
 }
 function pickMarketItem(b, i) {
   let h = `<div class="line"><button class="recipe-btn pick" data-it="">（なし）</button></div>`;
@@ -1151,7 +1239,7 @@ function renderPeople() {
   if (!work.length) h += `<div class="hint">まだ作業できる施設がありません</div>`;
   for (const b of work) {
     const d = BUILD[b.type];
-    const what = d.kind === 'gather' ? ITEMS[d.res].name : d.kind === 'prod' ? ITEMS[RECIPES[b.recipe].out].name : '配達';
+    const what = d.kind === 'gather' ? ITEMS[d.res].name : d.kind === 'prod' ? (b.recipe ? ITEMS[RECIPES[b.recipe].out].name : 'レシピ未設定') : '配達';
     h += `<div class="line"><span class="lbl"><a class="jump" data-id="${b.id}">${bname(b)}</a> <small>${what}</small></span><span class="val">${b.workers}人</span><button class="btn small pw-minus" data-id="${b.id}" ${b.workers === 0 ? 'disabled' : ''}>－</button><button class="btn small pw-plus" data-id="${b.id}" ${(b.workers >= CONFIG.MAX_WORKERS || freeWorkers() <= 0) ? 'disabled' : ''}>＋</button></div>`;
   }
   $('people-body').innerHTML = h;
@@ -1172,7 +1260,7 @@ function islandItems() {
   for (const b of S.buildings) {
     const d = BUILD[b.type];
     if (d.kind === 'gather') add(d.res, 'fac', b.inv.out);
-    if (d.kind === 'prod') { add(RECIPES[b.recipe].out, 'fac', b.inv.out); recipeMats(b).forEach((m, i) => add(m, 'fac', b.inv[i === 0 ? 'a' : 'b'])); for (const k in b.pending) add(k, 'fac', b.pending[k]); }
+    if (d.kind === 'prod' && b.recipe) { add(RECIPES[b.recipe].out, 'fac', b.inv.out); recipeMats(b).forEach((m, i) => add(m, 'fac', b.inv[i === 0 ? 'a' : 'b'])); for (const k in b.pending) add(k, 'fac', b.pending[k]); }
     if (d.kind === 'market') for (const k in b.stock) add(k, 'mk', b.stock[k]);
   }
   return o;
@@ -1180,7 +1268,7 @@ function islandItems() {
 function renderItems() {
   const o = islandItems(), el = $('store-items'); let h = '';
   for (const k of Object.keys(ITEMS)) {
-    const v = o[k]; if (!v && !unlockedItems().includes(k)) continue;
+    const v = o[k]; if (!v && !unlockedItems(true).includes(k)) continue;
     const t = v ? v.wh + v.fac + v.mk : 0;
     h += `<div class="line"><span class="lbl"><b>${ITEMS[k].name}</b> <small>🪙${ITEMS[k].price}</small></span><span class="val"><b>${t}</b> <small>倉庫${v ? v.wh : 0}(確保${v ? v.wh - whAvail(k) : 0})・施設${v ? v.fac : 0}・市場${v ? v.mk : 0}</small></span></div>`;
   }
@@ -1202,7 +1290,7 @@ function renderStore() {
     const d = document.createElement('div'); d.className = 'slot';
     const info = document.createElement('div'); info.className = 'sinfo'; info.innerHTML = slotHtml(s); d.appendChild(info);
     const sel = document.createElement('select');
-    sel.innerHTML = `<option value="">未設定</option>` + unlockedItems().map(k => `<option value="${k}">${ITEMS[k].name}</option>`).join('') + `<option value="block">🚫 搬入停止</option>`;
+    sel.innerHTML = `<option value="">未設定</option>` + unlockedItems(true).map(k => `<option value="${k}">${ITEMS[k].name}</option>`).join('') + `<option value="block">🚫 搬入停止</option>`;
     sel.value = s.cfg || '';
     sel.onchange = () => { s.cfg = sel.value === '' ? null : sel.value; if (s.cfg && s.cfg !== 'block') S.stats.slot_set++; info.innerHTML = slotHtml(s); save(); };
     d.appendChild(sel);
@@ -1245,7 +1333,9 @@ function renderGoal() {
     for (const u of nu) { S.unlocked.push(u); S.newTypes.push(u); }
     if (nu.length) notify(`🔨 新しい施設：${nu.map(u => BUILD[u].name).join('・')} が建てられるようになりました`);
     if (g.area && S.areaStage < g.area) { S.areaStage = g.area; notify(g.area === 1 ? '🗺 下のエリアを開放できるようになりました' : '🗺 隣のエリアを自由に開放できるようになりました'); }
-    S.goal++; S.goalNotified = false; save(); renderGoal();
+    S.goal++; S.goalNotified = false;
+    if (S.goal >= GOALS.length) notify('🎉 チュートリアル完了！ここからは自由モードです');
+    save(); renderGoal();
   };
 }
 
@@ -1264,8 +1354,8 @@ function checkEvents() {
       if (!dead) delete S.notified[key + 'res'];
     }
     if (b.inv) {
-      const full = b.inv.out >= CONFIG.INV_CAP;
-      const item = d.kind === 'gather' ? d.res : RECIPES[b.recipe].out;
+      const full = b.inv.out >= CONFIG.INV_CAP && (d.kind === 'gather' || b.recipe);
+      const item = d.kind === 'gather' ? d.res : (b.recipe ? RECIPES[b.recipe].out : null);
       if (full && !S.notified[key + 'full']) { S.notified[key + 'full'] = true; notify(S.slots.length ? `📦 ${bname(b)}の${ITEMS[item].name}が倉庫に入らず満杯です（スロットを確認）` : `📦 ${bname(b)}の${ITEMS[item].name}が満杯です（倉庫がありません）`); }
       if (!full) delete S.notified[key + 'full'];
     }
