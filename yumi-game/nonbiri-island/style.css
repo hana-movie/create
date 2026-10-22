@@ -128,3 +128,23 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .bitem .bcnt { font-size: 11px; color: #666; }
 .btn.small.dest { padding: 6px 8px; font-size: 13px; }
 .btn.small.dest.on { background: #f0b63c; }
+#st-happy small { opacity: .7; font-size: 11px; }
+#st-happy.ok { background: rgba(108,174,76,.55); }
+.happybox { background: #fff; border: 2px solid #e8dcc0; border-radius: 12px; padding: 8px 10px; margin: 6px 0; }
+.happybox.ok { border-color: #8cc46c; }
+.hb-row { display: grid; grid-template-columns: auto auto 1fr auto; gap: 6px; align-items: baseline; font-size: 13px; }
+.hb-row b { font-size: 18px; }
+.hb-row span:nth-child(3) { text-align: right; }
+.hb-gauge { position: relative; height: 12px; background: #e8dcc0; border-radius: 6px; margin: 6px 0; overflow: visible; }
+.hb-fill { height: 100%; background: #f0b63c; border-radius: 6px; }
+.happybox.ok .hb-fill { background: #6cae4c; }
+.hb-mark { position: absolute; top: -4px; width: 3px; height: 20px; background: #d33; border-radius: 2px; transform: translateX(-1px); }
+.hb-msg { font-size: 13px; }
+.bitem.locked { background: #f4efe2; }
+.bitem.locked canvas { opacity: .45; }
+@media (max-width: 420px) {
+  #topbar { gap: 3px; padding-left: 4px; padding-right: 4px; font-size: 12px; }
+  .stat { padding: 5px 5px; }
+  .icon-btn { width: 30px; height: 30px; font-size: 15px; }
+  .icon-btn.wide { padding: 0 4px; font-size: 11px; }
+}
