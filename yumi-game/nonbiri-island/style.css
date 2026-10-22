@@ -126,3 +126,5 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .mkrow .recipe-btn { padding: 6px 4px; white-space: nowrap; }
 .mkrow .mkc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bitem .bcnt { font-size: 11px; color: #666; }
+.btn.small.dest { padding: 6px 8px; font-size: 13px; }
+.btn.small.dest.on { background: #f0b63c; }
