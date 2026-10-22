@@ -4,7 +4,7 @@
    仕様引き継ぎ書に基づく実装。仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.11.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.11.1';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数（未確定仕様はここで仮置き） ----------
 const CONFIG = {
@@ -44,7 +44,7 @@ const CONFIG = {
   // ---- 幸福度（住民ごと）----
   // 個人幸福度 = 持っているアイテムの幸福ポイント合計 ÷ 分母 × 100（上限100）。分母は解放済みの最大加工段階で決まり、下がらない
   HAPPY_POINTS: [1, 2, 3, 4],       // 加工段階 0/1/2/3 のアイテム1種あたりの幸福ポイント（仮）
-  HAPPY_DENOM: [5, 10, 15, 20],     // 第0段階のみ / 第1まで / 第2まで / 第3まで の分母（仮）
+  HAPPY_DENOM: null,                // null = その段階までの全アイテムの幸福ポイント合計（全部届けば100%）。数値の配列にすると固定値（例 [5,10,15,20]）
   HAPPY_MIN_FOR_GROW: 35,           // 島全体の幸福度(%)がこれ以上で人口増。※仮：序盤は水+木材=2pt/5=40%が上限なので60だと増えない
   CONSUME_MULT: 1.5,    // 消費時間の倍率（搬送に時間がかかるようになったぶん長く）
   DELIVER_AT: 20,       // 施設の完成品棚がこの数以上（または作業できないとき）なら搬送先へ運ぶ
@@ -581,7 +581,11 @@ function houseWithRoom() { const hs = S.buildings.filter(b => b.type === 'house'
 function addResident() { const h = houseWithRoom(); const r = { id: S.residents.length + 1, house: h ? h.id : null, demand: {}, happy: 0 }; S.residents.push(r); recalcHappy(); return r; }
 function rehouse() { for (const r of S.residents) if (!r.house || !getB(r.house)) { const h = houseWithRoom(); r.house = h ? h.id : null; } }
 function itemPoints(k) { return CONFIG.HAPPY_POINTS[ITEMS[k].stage] || 0; }
-function happyDenom() { return CONFIG.HAPPY_DENOM[Math.min(S.maxStage, CONFIG.HAPPY_DENOM.length - 1)]; }
+function happyDenom() {
+  const st = S.maxStage || 0;
+  if (CONFIG.HAPPY_DENOM) return CONFIG.HAPPY_DENOM[Math.min(st, CONFIG.HAPPY_DENOM.length - 1)];
+  let d = 0; for (const k in ITEMS) if (ITEMS[k].stage <= st) d += itemPoints(k); return d;
+}
 function residentPoints(r) { let p = 0; for (const k in r.demand) if (r.demand[k] > 0) p += itemPoints(k); return p; }
 function recalcHappy() {
   for (const r of S.residents) r.happy = Math.min(100, residentPoints(r) / happyDenom() * 100);
@@ -1614,12 +1618,6 @@ function checkEvents() {
       const dead = !d.nores && b.workers > 0 && !gatherTarget(b);
       if (dead && !S.notified[key + 'res']) { S.notified[key + 'res'] = true; notify(`🪓 ${bname(b)}の周りの${ITEMS[d.res].name}がなくなりました（回復待ち）`); }
       if (!dead) delete S.notified[key + 'res'];
-    }
-    if (b.inv) {
-      const full = b.inv.out >= CONFIG.INV_CAP && (d.kind === 'gather' || b.recipe);
-      const item = d.kind === 'gather' ? d.res : (b.recipe ? RECIPES[b.recipe].out : null);
-      if (full && !S.notified[key + 'full']) { S.notified[key + 'full'] = true; notify(b.dest === 'none' || !b.dest ? `📦 ${bname(b)}の${ITEMS[item].name}が満杯です（搬送先が「なし」）` : b.dest === 'market' ? `📦 ${bname(b)}の${ITEMS[item].name}が満杯です（市場の販売商品に${ITEMS[item].name}がないか満杯）` : whRoom(item) <= 0 ? `📦 ${bname(b)}の${ITEMS[item].name}が満杯です（倉庫に${ITEMS[item].name}のスロットがないか満杯）` : `📦 ${bname(b)}の${ITEMS[item].name}が満杯です（運ぶ人が足りないかも）`); }
-      if (!full) delete S.notified[key + 'full'];
     }
   }
 }
