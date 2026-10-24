@@ -71,7 +71,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .modal-box .title { font-weight: bold; font-size: 18px; margin-bottom: 8px; }
 #modal-body { font-size: 15px; line-height: 1.6; }
 
-#toast { position: fixed; top: calc(env(safe-area-inset-top) + 52px); left: 10px; right: 10px; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+#toast { position: fixed; top: calc(env(safe-area-inset-top) + 100px); left: 10px; right: 10px; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
 .toast-item { background: rgba(0,0,0,.78); color: #fff; padding: 8px 14px; border-radius: 14px; font-size: 13px; max-width: 100%; text-align: center;
   animation: tin .25s ease-out; transition: opacity .3s, transform .3s; }
 .toast-item.out { opacity: 0; transform: translateY(-6px); }
@@ -163,3 +163,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .resbtns { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 0 6px; border-bottom: 1px dashed #e0d4b4; }
 .resbtns .btn.small { flex: 0 0 auto; padding: 6px 10px; font-size: 13px; }
 .resbtns .btn.small.on { background: #f0b63c; }
+
+/* 目標の常時表示 */
+#goalbar { position: fixed; left: 8px; right: 8px; top: 56px; z-index: 4; margin-top: 4px;
+  background: rgba(253,246,227,.94); border-radius: 12px; padding: 6px 10px; font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+#goalbar .gb-row { display: flex; align-items: center; gap: 6px; }
+#goalbar .gb-t { flex: 1; font-weight: bold; color: #3a2a10; }
+#goalbar .gb-p { font-variant-numeric: tabular-nums; color: #6a5a3a; white-space: nowrap; }
+#goalbar .gb-row.done .gb-p { color: #c07000; font-weight: bold; }
+#goalbar .gb-row.done { animation: gbpulse 1.6s ease-in-out infinite; }
+@keyframes gbpulse { 50% { opacity: .65; } }

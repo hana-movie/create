@@ -4,7 +4,7 @@
    仕様引き継ぎ書に基づく実装。仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.16.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.17.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数（未確定仕様はここで仮置き） ----------
 const CONFIG = {
@@ -61,10 +61,10 @@ const CONFIG = {
   POP_TIERS: [
     { cap: 8,   stage: 0, need: 35 },
     { cap: 12,  stage: 1, need: 35 },
-    { cap: 20,  stage: 2, need: 40 },
-    { cap: 28,  stage: 3, need: 45 },
-    { cap: 40,  stage: 4, need: 50 },
-    { cap: 60,  stage: 4, need: 60 },
+    { cap: 24,  stage: 2, need: 40 },   // v0.17：20→24（第2段階に余裕を持たせる）
+    { cap: 36,  stage: 3, need: 45 },   // v0.17：28→36
+    { cap: 48,  stage: 4, need: 50 },   // v0.17：40→48
+    { cap: 64,  stage: 4, need: 60 },   // v0.17：60→64
     { cap: 80,  stage: 4, need: 70 },
     { cap: 100, stage: 4, need: 80 },
   ],
@@ -784,7 +784,7 @@ function newGame() {
     stats: { made_water: 0, made_wood: 0, made_stone: 0, made_wheat: 0, made_plank: 0, made_brick: 0, made_flour: 0, made_bread: 0, made_basket: 0, made_wheel: 0, made_cart: 0, dest_market: 0, dest_warehouse: 0, wh_ready: 0, made_cotton: 0, made_cloth: 0, made_thread: 0, made_clothset: 0, made_bag: 0, made_clothes: 0, recipe_bag: 0, bags_given: 0, built_house: 0, slot_set: 0, market_set: 0, earned: 0, happyMax: 0, areas: 1 },
     goalIdx: { main: 0 }, newTypes: [], notified: {},
     t: 0, timers: { transfer: 0, refill: 0, regen: 0, grow: 0 },
-    speed: 1, recipes: [], lastSave: Date.now(),
+    speed: 1, recipes: [], carryLv: {}, lastSave: Date.now(),
   };
   unlockBlock(cb, cb);
   addBuilding('house', c, c, true);
@@ -832,10 +832,10 @@ function updateStage() {
 function makeBuilding(type, x, y) {
   const d = BUILD[type];
   const b = { id: S.nextId++, type, x, y, order: S.order++, workers: 0 };
-  if (d.kind === 'gather') { b.inv = { out: 0 }; b.prog = 0; b.fetch = null; b.clv = 1; b.res = d.res || 'wood'; b.dest = defaultDest(); }
-  if (d.kind === 'prod') { b.recipe = d.recipes.find(r => recipeUsable(null, r)) || null; b.inv = { a: 0, b: 0, c: 0, d: 0, out: 0 }; b.prog = 0; b.active = false; b.pending = {}; b.clv = 1; b.fetch = null; b.dest = defaultDest(); }
-  if (d.kind === 'warehouse') { b.fetch = null; b.clv = 1; }
-  if (d.kind === 'market') { b.fetch = null; b.clv = 1; }
+  if (d.kind === 'gather') { b.inv = { out: 0 }; b.prog = 0; b.fetch = null; b.res = d.res || 'wood'; b.dest = defaultDest(); }
+  if (d.kind === 'prod') { b.recipe = d.recipes.find(r => recipeUsable(null, r)) || null; b.inv = { a: 0, b: 0, c: 0, d: 0, out: 0 }; b.prog = 0; b.active = false; b.pending = {}; b.fetch = null; b.dest = defaultDest(); }
+  if (d.kind === 'warehouse') { b.fetch = null; }
+  if (d.kind === 'market') { b.fetch = null; }
   if (d.kind === 'market') { b.lv = 1; b.items = new Array(CONFIG.MARKET_SLOTS).fill(null); b.stock = {}; b.prog = 0; }
   if (d.kind === 'house') { }
   return b;
@@ -936,9 +936,11 @@ function unlockedItems(all) {
 function recipeRaisesStage(r) { return ITEMS[RECIPES[r].out].stage > (S.maxStage || 0); }
 function buyRecipe(b, r) { const rc = RECIPES[r], c = recipePrice(r); if (!rc.buy || S.recipes.includes(r) || S.coins < c) return false; S.coins -= c; S.recipes.push(r); notify(`📜 レシピ「${ITEMS[rc.out].name}」を購入しました`); updateStage(); return true; }
 // 一度に運べる数：基本値 ＋ 運搬レベルの加算（施設ごと、作業員を入れ替えても変わらない）
-function carryOf(b) { const k = BUILD[b.type].kind, base = k === 'warehouse' ? CONFIG.WH_CARRY : k === 'market' ? CONFIG.MK_CARRY : CONFIG.CARRY_BASE; return base + CONFIG.CARRY_BONUS[(b.clv || 1) - 1]; }
-function carryCost(b) { return CONFIG.CARRY_COST[(b.clv || 1) - 1] || null; }
-function carryUp(b) { const c = carryCost(b); if (!c || !canAfford(c)) return false; payCost(c); b.clv = (b.clv || 1) + 1; S.stats.carry_up = 1; notify(`⬆ ${bname(b)}の運搬レベルが ${b.clv} に（一度に${carryOf(b)}個）`); return true; }
+// 運搬レベルは施設の種類ごとに共通（石工所1を上げると石工所2も同じレベル。後から建てた分も同じ）
+function clvOf(b) { S.carryLv = S.carryLv || {}; return S.carryLv[b.type] || 1; }
+function carryOf(b) { const k = BUILD[b.type].kind, base = k === 'warehouse' ? CONFIG.WH_CARRY : k === 'market' ? CONFIG.MK_CARRY : CONFIG.CARRY_BASE; return base + CONFIG.CARRY_BONUS[clvOf(b) - 1]; }
+function carryCost(b) { return CONFIG.CARRY_COST[clvOf(b) - 1] || null; }
+function carryUp(b) { const c = carryCost(b); if (!c || !canAfford(c)) return false; payCost(c); S.carryLv[b.type] = clvOf(b) + 1; S.stats.carry_up = 1; const n = countType(b.type); notify(`⬆ ${BUILD[b.type].name}${n > 1 ? `（${n}棟すべて）` : ''}の運搬レベルが ${clvOf(b)} に（一度に${carryOf(b)}個）`); return true; }
 function dist(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
 function putSlot(s, item, n) { const room = CONFIG.SLOT_CAP - s.qty; const k = Math.min(room, n); if (k > 0) { s.item = item; s.qty += k; } return k; }
 // keepMin=true のとき各スロットの最低保管量を下回らない範囲で取り出す（市場・生産への補充用）。建築費用は keepMin なし
@@ -1287,7 +1289,7 @@ function showWelcomeBack(acc) {
   modal('おかえりなさい', `<div>留守の間：約 ${hrs ? hrs + '時間' : ''}${mins}分${acc.elapsed >= CONFIG.OFFLINE_MAX_SEC ? '（上限12時間分）' : ''}</div><div>🪙 販売収入 +${acc.coins}</div><div>👤 住民 +${acc.pop}</div><div>📦 つくった品：${items}</div><div class="hint" style="text-align:left">倉庫に入りきらない完成品は施設内に残っています。</div>`);
 }
 function load() {
-  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; for (const sl of S.slots) if (sl.min === undefined) sl.min = CONFIG.SLOT_MIN; if (S.areaStage === undefined) S.areaStage = 2; S.recipes = S.recipes || []; for (const b of S.buildings) { if (b.inv && b.inv.c === undefined && BUILD[b.type].kind === 'prod') b.inv.c = 0; if (b.inv && b.inv.d === undefined && BUILD[b.type].kind === 'prod') b.inv.d = 0; if (b.bags === undefined) b.bags = 0; if (b.inv && b.dest === undefined) b.dest = 'warehouse'; if (b.fetch === undefined) b.fetch = null; } if (!S.residents) { S.residents = []; S.maxStage = 0; for (let i = 0; i < S.pop; i++) addResident(); } rebuildOcc(); return true; } catch (e) { return false; }
+  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; for (const sl of S.slots) if (sl.min === undefined) sl.min = CONFIG.SLOT_MIN; if (S.areaStage === undefined) S.areaStage = 2; S.recipes = S.recipes || []; if (!S.carryLv) { S.carryLv = {}; for (const b of S.buildings) if (b.clv > 1) S.carryLv[b.type] = Math.max(S.carryLv[b.type] || 1, b.clv); } for (const b of S.buildings) { if (b.inv && b.inv.c === undefined && BUILD[b.type].kind === 'prod') b.inv.c = 0; if (b.inv && b.inv.d === undefined && BUILD[b.type].kind === 'prod') b.inv.d = 0; if (b.bags === undefined) b.bags = 0; if (b.inv && b.dest === undefined) b.dest = 'warehouse'; if (b.fetch === undefined) b.fetch = null; } if (!S.residents) { S.residents = []; S.maxStage = 0; for (let i = 0; i < S.pop; i++) addResident(); } rebuildOcc(); return true; } catch (e) { return false; }
 }
 
 // ============================================================
@@ -1677,7 +1679,7 @@ function renderInfo() {
     else st = `<span class="lbl">…</span>`;
     return `<div class="line status">${st}</div>`;
   };
-  const bagLine = () => { const c = carryCost(b); return `<div class="line"><span class="lbl">運搬Lv ${b.clv || 1} <small>一度に${carryOf(b)}個運ぶ</small></span>` + (c ? `<button class="btn small" id="carry-up" ${canAfford(c) ? '' : 'disabled'}>⬆ ${Object.entries(c).map(([k, v]) => (k === 'coins' ? '🪙' : ITEMS[k].name) + v).join('+')}</button>` : '<span class="val">最大</span>') + `</div>`; };
+  const bagLine = () => { const c = carryCost(b); return `<div class="line"><span class="lbl">運搬Lv ${clvOf(b)} <small>一度に${carryOf(b)}個運ぶ${BUILD[b.type].fixed ? '' : '（同じ種類の施設すべて）'}</small></span>` + (c ? `<button class="btn small" id="carry-up" ${canAfford(c) ? '' : 'disabled'}>⬆ ${Object.entries(c).map(([k, v]) => (k === 'coins' ? '🪙' : ITEMS[k].name) + v).join('+')}</button>` : '<span class="val">最大</span>') + `</div>`; };
   if (d.kind === 'gather') {
     const tgt = gatherTarget(b);
     const R = CONFIG.GATHER_RANGE;
@@ -1879,7 +1881,7 @@ function renderItems() {
 }
 function slotHtml(s) {
   const cfgName = s.cfg === 'block' ? '🚫' : s.cfg ? ITEMS[s.cfg].name : '未設定';
-  const col = s.item ? (ITEMS[s.item].color === '#f2eee0' ? '#999' : ITEMS[s.item].color) : '#bbb';
+  const col = s.item ? itemTextColor(s.item) : '#bbb';
   const out = Math.max(0, s.qty - (s.min || 0));
   return `<div class="sq" style="color:${col}">${s.item ? ITEMS[s.item].name : '－'}</div><div>${s.qty}/${CONFIG.SLOT_CAP}</div><div class="cfg">${cfgName}</div><div class="cfg ${s.qty > 0 && out === 0 ? 'red' : ''}">出せる ${out}</div>`;
 }
@@ -1924,6 +1926,15 @@ function openLand() {
 // --- 目標 ---
 $('btn-reset').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); resetGame(); });
 $('btn-goal').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); $('goalpanel').classList.remove('hidden'); renderGoal(); });
+$('goalbar').addEventListener('click', () => { if (UI.mode !== 'normal') return; closeAll(); $('goalpanel').classList.remove('hidden'); renderGoal(); });
+// 白っぽいアイテム色（綿・小麦粉・布など）は白い背景で読めないので、濃くして文字色に使う
+function itemTextColor(k) {
+  const c = ITEMS[k].color, r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  if (lum < 0.62) return c;
+  const f = 0.62 / lum * 0.75, h = v => Math.round(v * f).toString(16).padStart(2, '0');
+  return '#' + h(r) + h(g) + h(b);
+}
 function goalProgress(g) { return Math.min(g.n, S.stats[g.stat] || 0); }
 function renderGoal() {
   const list = activeGoals();
@@ -1977,6 +1988,17 @@ function renderTop() {
   $('btn-goal').textContent = ready ? '🎁' : '🎯';
   $('btn-goal').classList.toggle('pulse', ready);
   $('build-badge').classList.toggle('hidden', S.newTypes.length === 0);
+  renderGoalBar();
+}
+// 目標の常時表示（上部バーの下）。タップで目標パネル
+let goalBarHtml = '';
+function renderGoalBar() {
+  const el = $('goalbar'), list = activeGoals();
+  let h;
+  if (!list.length) h = allGoalsDone() ? '<span class="gb-t">🎉 すべての目標を達成（自由モード）</span>' : '';
+  else h = list.map(({ g }) => { const p = goalProgress(g), done = p >= g.n; return `<div class="gb-row ${done ? 'done' : ''}"><span class="gb-i">${done ? '🎁' : '🎯'}</span><span class="gb-t">${g.text}</span><span class="gb-p">${done ? 'タップで受け取る' : `${p}/${g.n}`}</span></div>`; }).join('');
+  if (h !== goalBarHtml) { goalBarHtml = h; el.innerHTML = h; el.classList.toggle('hidden', !h); }
+  const top = $('topbar').offsetHeight; if (top && el.style.top !== top + 'px') el.style.top = top + 'px';
 }
 
 // ============================================================
