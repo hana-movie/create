@@ -148,3 +148,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
   .icon-btn { width: 30px; height: 30px; font-size: 15px; }
   .icon-btn.wide { padding: 0 4px; font-size: 11px; }
 }
+.mkrow2 { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #e0d4b4; }
+.mkrow2 .recipe-btn { min-width: 72px; white-space: nowrap; }
+.mkinfo { flex: 1; min-width: 0; }
+.mkprice { font-size: 14px; font-weight: bold; }
+.mksub { font-size: 12px; color: #777; }
+.lvline .lbl small { color: #777; }
+.tiers { display: flex; flex-wrap: wrap; gap: 4px; }
+.tier { background: #e8dcc0; border-radius: 10px; padding: 3px 8px; font-size: 12px; display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
+.tier small { font-size: 10px; color: #777; }
+.tier.cur { background: #f0b63c; font-weight: bold; }
+.tier.done { background: #cfe8b8; }
+.tier.lock { opacity: .6; }
+.resbtns { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 0 6px; border-bottom: 1px dashed #e0d4b4; }
+.resbtns .btn.small { flex: 0 0 auto; padding: 6px 10px; font-size: 13px; }
+.resbtns .btn.small.on { background: #f0b63c; }
