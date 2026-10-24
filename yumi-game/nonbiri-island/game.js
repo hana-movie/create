@@ -4,7 +4,7 @@
    仕様引き継ぎ書に基づく実装。仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.18.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.18.2';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数（未確定仕様はここで仮置き） ----------
 const CONFIG = {
@@ -228,7 +228,9 @@ const GOAL_TRACKS = {
     { id: 'm8', text: '石を5個採集',                    stat: 'made_stone',  n: 5,  reward: 150, hint: () => findHint('stone') },
     { id: 'm9', text: '製材所で木材を5個つくる',        stat: 'made_timber', n: 5,  reward: 150, hint: '製材所の設計図を買うと木材（第1段階）が作れるようになり、島が第1段階に上がります。板材はレシピ購入で解放されます' },
     // 人数の目標（人口の段階上限ごと）
-    ...[[8, 200], [12, 300], [24, 400], [36, 600], [48, 800], [64, 1000], [80, 1200], [100, 1500]].map(([n, reward], i) => ({ id: 'p' + (i + 1), text: `住民を${n}人にする`, stat: 'pop', n, reward, hint: () => tierBlock() || `島の幸福度が${growNeed()}%に届くと3分ごとに1人増えます（住居の空きも必要）` })),
+    // 人数の目標（人口の段階上限ごと）と、次の段階へ上げる目標を交互に
+    // 目標の人数は人口の段階上限。段階が足りないときは目標バーに「第N段階が必要」とやり方を出す
+    ...[[8, 200], [12, 300], [24, 600], [36, 1000], [48, 1500], [64, 1000], [80, 1200], [100, 1500]].map(([n, reward]) => ({ id: 'p' + n, text: `住民を${n}人にする`, stat: 'pop', n, reward, hint: () => popGoalHint(n) })),
   ] },
 };
 const GOALS = Object.values(GOAL_TRACKS).flatMap(t => t.list);  // 全目標（参照用）
@@ -793,7 +795,7 @@ function newGame() {
     tiles, blocks: new Array(NB * NB).fill(false), areaStage: 0, buildings: [], nextId: 1, order: 1,
     slots: [], unlocked: [...INITIAL_UNLOCK], lastTab: 'gather',
     stats: { made_water: 0, made_wood: 0, made_stone: 0, made_wheat: 0, made_plank: 0, made_brick: 0, made_flour: 0, made_bread: 0, made_basket: 0, made_wheel: 0, made_cart: 0, dest_market: 0, dest_warehouse: 0, wh_ready: 0, made_cotton: 0, made_cloth: 0, made_thread: 0, made_clothset: 0, made_bag: 0, made_clothes: 0, recipe_bag: 0, bags_given: 0, built_house: 0, slot_set: 0, market_set: 0, earned: 0, happyMax: 0, areas: 1 },
-    goalIdx: { main: 0 }, newTypes: [], notified: {},
+    goalIdx: { main: 0 }, goalV: 2, newTypes: [], notified: {},
     t: 0, timers: { transfer: 0, refill: 0, regen: 0, grow: 0 },
     speed: 1, recipes: [], carryLv: {}, lastSave: Date.now(),
   };
@@ -828,8 +830,28 @@ function recalcHappy() {
 function popTier() { return CONFIG.POP_TIERS.find(t => S.pop < t.cap) || null; }
 function growNeed() { const t = popTier(); return t ? t.need : 100; }
 // 段の上限で止まっているときの理由（増やせるなら null）
-function tierBlock() { const t = popTier(); if (!t) return '島の人口は最大です'; if (t.stage > (S.maxStage || 0)) return `第${t.stage}段階の品を解放すると${t.cap}人まで増やせます`; return null; }
+function tierBlock() { const t = popTier(); if (!t) return '島の人口は最大です'; if (t.stage > (S.maxStage || 0)) return `今の段階では${popLimit()}人まで。${stageHowTo(t.stage)}（${t.cap}人まで増やせます）`; return null; }
+// 第st段階に上げる方法の案内（買える／建てられるものを具体的に挙げる）
+function stageHowTo(st) {
+  if ((S.maxStage || 0) >= st) return `第${st}段階になっています`;
+  if (st - 1 > (S.maxStage || 0)) return `先に第${st - 1}段階に上げましょう`;
+  const own = [], bp = [];
+  for (const t in BUILD) { const d = BUILD[t]; const outs = d.kind === 'prod' ? d.recipes.filter(r => ITEMS[RECIPES[r].out].stage === st) : (d.res && ITEMS[d.res] && ITEMS[d.res].stage === st ? [null] : []);
+    for (const r of outs) { const name = r ? ITEMS[RECIPES[r].out].name : ITEMS[d.res].name;
+      if (S.unlocked.includes(t)) { if (r && RECIPES[r].buy) own.push(`${d.name}で「${name}」のレシピを買う`); }
+      else if (!bpBlocker(t)) bp.push(r && RECIPES[r].buy ? `${d.name}を建てて「${name}」のレシピを買う` : `${d.name}の設計図を買う（${name}）`); } }
+  const list = [...own, ...bp].slice(0, 2);
+  return list.length ? `第${st}段階にするには：${list.join('、または')}` : `第${st}段階の品を作れる施設を探しましょう（エリアを開放）`;
+}
+// 人数目標の案内：段階が足りなければ何を買えばいいか、足りていれば幸福度と住居
+function popGoalHint(n) {
+  const t = CONFIG.POP_TIERS.find(x => x.cap >= n);
+  if (t && t.stage > (S.maxStage || 0)) return `第${t.stage}段階が必要（今は${popLimit()}人まで）。${stageHowTo(t.stage)}`;
+  if (countType('house') * CONFIG.HOUSE_CAP <= S.pop) return '住居が満員です。住居を建てましょう';
+  return `島の幸福度が${growNeed()}%に届くと3分ごとに1人増えます`;
+}
 function canGrow() { return !tierBlock() && S.happy >= growNeed(); }
+function popCap() { return Math.min(popLimit(), countType('house') * CONFIG.HOUSE_CAP); }
 function popLimit() { let c = 0; for (const t of CONFIG.POP_TIERS) if (t.stage <= (S.maxStage || 0)) c = t.cap; return c; }
 // 解放済みアイテムの最大加工段階 → 分母（下がらない）
 function updateStage() {
@@ -993,7 +1015,7 @@ function sim(dt, acc) {
     S.timers.grow -= CONFIG.POP_GROW_SEC;
     if (S.pop < cap && canGrow()) { S.pop++; addResident(); if (acc) acc.pop++; }
   }
-  S.stats.pop = S.pop;
+  S.stats.pop = S.pop; S.stats.stage = S.maxStage || 0;
 }
 
 function stepBuilding(b, dt, acc) {
@@ -1302,7 +1324,7 @@ function showWelcomeBack(acc) {
   modal('おかえりなさい', `<div>留守の間：約 ${hrs ? hrs + '時間' : ''}${mins}分${acc.elapsed >= CONFIG.OFFLINE_MAX_SEC ? '（上限12時間分）' : ''}</div><div>🪙 販売収入 +${acc.coins}</div><div>👤 住民 +${acc.pop}</div><div>📦 つくった品：${items}</div><div class="hint" style="text-align:left">倉庫に入りきらない完成品は施設内に残っています。</div>`);
 }
 function load() {
-  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; for (const sl of S.slots) if (sl.min === undefined) sl.min = CONFIG.SLOT_MIN; if (S.areaStage === undefined) S.areaStage = 2; S.recipes = S.recipes || []; if (!S.carryLv) { S.carryLv = {}; for (const b of S.buildings) if (b.clv > 1) S.carryLv[b.type] = Math.max(S.carryLv[b.type] || 1, b.clv); } for (const b of S.buildings) { if (b.inv && b.inv.c === undefined && BUILD[b.type].kind === 'prod') b.inv.c = 0; if (b.inv && b.inv.d === undefined && BUILD[b.type].kind === 'prod') b.inv.d = 0; if (b.bags === undefined) b.bags = 0; if (b.inv && b.dest === undefined) b.dest = 'warehouse'; if (b.fetch === undefined) b.fetch = null; } if (!S.residents) { S.residents = []; S.maxStage = 0; for (let i = 0; i < S.pop; i++) addResident(); } rebuildOcc(); return true; } catch (e) { return false; }
+  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; for (const sl of S.slots) if (sl.min === undefined) sl.min = CONFIG.SLOT_MIN; if (S.areaStage === undefined) S.areaStage = 2; S.recipes = S.recipes || []; if (S.goalV !== 2) { const old = ['m1','m2','m3','m4','m5','m6','m7','m8','m9','p8','p12','s2','p24','s3','p36','s4','p48','p64','p80','p100'], ids = GOAL_TRACKS.main.list.map(g => g.id); let i = (S.goalIdx && S.goalIdx.main) || 0; while (i < old.length && !ids.includes(old[i])) i++; S.goalIdx = S.goalIdx || {}; S.goalIdx.main = i < old.length ? ids.indexOf(old[i]) : ids.length; S.goalV = 2; } if (!S.carryLv) { S.carryLv = {}; for (const b of S.buildings) if (b.clv > 1) S.carryLv[b.type] = Math.max(S.carryLv[b.type] || 1, b.clv); } for (const b of S.buildings) { if (b.inv && b.inv.c === undefined && BUILD[b.type].kind === 'prod') b.inv.c = 0; if (b.inv && b.inv.d === undefined && BUILD[b.type].kind === 'prod') b.inv.d = 0; if (b.bags === undefined) b.bags = 0; if (b.inv && b.dest === undefined) b.dest = 'warehouse'; if (b.fetch === undefined) b.fetch = null; } if (!S.residents) { S.residents = []; S.maxStage = 0; for (let i = 0; i < S.pop; i++) addResident(); } rebuildOcc(); return true; } catch (e) { return false; }
 }
 
 // ============================================================
@@ -1677,6 +1699,15 @@ function renderInfo() {
     const c = nextLevelCost(b), lv = lvOf(b), key = b.type === 'market' ? 'workers' : 'slots', nm = b.type === 'market' ? '作業員' : 'スロット';
     return `<div class="line lvline"><span class="lbl">規模Lv ${lv} <small>${nm}${L[key][lv - 1]}${c === null ? '' : ` → ${L[key][lv]}`}</small></span>` + (c === null ? '<span class="val">最大</span>' : `<button class="btn small" id="lv-up" ${S.coins >= c ? '' : 'disabled'}>⬆ 🪙${c}</button>`) + `</div>`;
   };
+  // 買えるレシピの案内（どこで買うか分かるように）
+  const buyableLine = () => {
+    if (d.kind !== 'prod') return '';
+    const can = d.recipes.filter(r => !recipeOwned(r) && !recipeBlocker(r)), lock = d.recipes.filter(r => !recipeOwned(r) && recipeBlocker(r));
+    if (!can.length && !lock.length) return '';
+    if (!can.length) return `<div class="line"><span class="lbl"><small>🔒 ${lock.map(r => ITEMS[RECIPES[r].out].name).join('・')}：${recipeBlocker(lock[0])}</small></span></div>`;
+    const up = can.some(recipeRaisesStage);
+    return `<div class="line buyable"><span class="lbl">📜 <b>買えるレシピ</b> <small>${can.map(r => `${ITEMS[RECIPES[r].out].name} 🪙${recipePrice(r)}`).join('・')}${up ? `<br><span class="red">買うと第${Math.min(...can.filter(recipeRaisesStage).map(r => ITEMS[RECIPES[r].out].stage))}段階に上がり、人口をもっと増やせます</span>` : ''}</small></span><button class="btn small primary" id="recipe-buy">見る</button></div>`;
+  };
   const destLine = () => CONFIG.FETCH_MODE ? `<div class="line"><span class="lbl">搬送先</span>` + ['none', 'warehouse', 'market'].map(k => `<button class="btn small dest ${b.dest === k ? 'on' : ''}" data-d="${k}">${DEST_NAMES[k]}</button>`).join('') + `</div>` : '';
   const tripLine = () => {
     if (!CONFIG.FETCH_MODE) return '';
@@ -1716,11 +1747,13 @@ function renderInfo() {
     h += gaugeLine(`完成品 ${ITEMS[gRes(b)].name}`, b.inv.out, CONFIG.INV_CAP);
     }
   } else if (d.kind === 'prod' && !b.recipe) {
-    h += `<div class="line"><span class="lbl">レシピ</span><button class="recipe-btn" id="recipe-btn">レシピを選ぶ／買う</button></div>`;
+    h += `<div class="line"><span class="lbl">レシピ</span><button class="recipe-btn" id="recipe-btn">レシピを選ぶ／買う　▼</button></div>`;
+    h += buyableLine();
     h += workersLine(); h += destLine();
   } else if (d.kind === 'prod') {
     const r = RECIPES[b.recipe], mats = Object.keys(r.need);
-    h += `<div class="line"><span class="lbl">レシピ</span><button class="recipe-btn" id="recipe-btn">${mats.map(m => ITEMS[m].name + r.need[m]).join('＋')} → ${ITEMS[r.out].name}</button></div>`;
+    h += `<div class="line"><span class="lbl">レシピ</span><button class="recipe-btn" id="recipe-btn">${mats.map(m => ITEMS[m].name + r.need[m]).join('＋')} → ${ITEMS[r.out].name}　▼</button></div>`;
+    h += buyableLine();
     h += workersLine();
     h += destLine(); if (CONFIG.FETCH_MODE) h += bagLine(); h += tripLine();
     h += `<div class="line"><span class="lbl">生産速度</span><span class="val">${b.workers ? (workSec(b) / b.workers).toFixed(0) + '秒/個' : '停止'}${r.fuel ? ' <small>(' + ITEMS[r.fuel].name + 'は火)</small>' : ''}</span></div>`;
@@ -1767,6 +1800,7 @@ function renderInfo() {
   if (wm) wm.onclick = () => { setWorkers(b, b.workers - 1); renderInfo(); };
   if (wp) wp.onclick = () => { setWorkers(b, b.workers + 1); renderInfo(); };
   const rb = $('recipe-btn'); if (rb) rb.onclick = () => pickRecipe(b);
+  const rb2 = $('recipe-buy'); if (rb2) rb2.onclick = () => pickRecipe(b);
   document.querySelectorAll('.dest').forEach(el => el.onclick = () => { setDest(b, el.dataset.d); save(); renderInfo(); });
   document.querySelectorAll('.resb').forEach(el => el.onclick = () => { setRes(b, el.dataset.r); save(); renderInfo(); });
   const cu = $('carry-up'); if (cu) cu.onclick = () => { carryUp(b); save(); renderInfo(); };
@@ -1977,6 +2011,7 @@ function checkEvents() {
   for (const { g } of activeGoals()) if (!S.notified['goal_' + g.id] && goalProgress(g) >= g.n) { S.notified['goal_' + g.id] = true; notify(`🎁 目標達成「${g.text}」 🎯で報酬を受け取れます`); }
   for (const tr of []) { const T = GOAL_TRACKS[tr]; if (goalIdx('main') >= GOAL_TRACKS.main.list.length && T.when() && !S.notified['track_' + tr]) { S.notified['track_' + tr] = true; notify(`🎯 新しい目標：${T.list[goalIdx(tr)] ? T.list[goalIdx(tr)].text : ''}`); } }
   if (prevPop !== null && S.pop > prevPop) notify(`👤 住民が増えました（${S.pop}人）`);
+  { const t = popTier(); if (t && t.stage > (S.maxStage || 0) && S.pop >= popLimit() && !S.notified['tier' + t.stage]) { S.notified['tier' + t.stage] = true; notify(`⚠ 人口が今の段階の上限（${popLimit()}人）です。${stageHowTo(t.stage)}`); } }
   prevPop = S.pop;
   // 倉庫にはあるのに確保で市場に出せない商品がある
   const blocked = S.buildings.some(m => m.type === 'market' && m.workers > 0 && m.items.some(it => it && (m.stock[it] || 0) === 0 && whCount(it) > 0 && whAvail(it) === 0));
@@ -1994,7 +2029,10 @@ function checkEvents() {
 // --- 上部バー ---
 function renderTop() {
   $('st-coins').querySelector('span').textContent = S.coins;
-  $('st-pop').querySelector('span').textContent = S.pop;
+  // 人口／今の上限（住居の定員と段階の上限の小さいほう）。上限に達したら赤
+  const pcap = popCap();
+  $('st-pop').querySelector('span').innerHTML = `${S.pop}<small>/${pcap}</small>`;
+  $('st-pop').classList.toggle('full', S.pop >= pcap && S.pop < CONFIG.POP_TIERS[CONFIG.POP_TIERS.length - 1].cap);
   $('st-free').querySelector('span').textContent = freeWorkers();
   const hp = Math.round(S.happy), goal = growNeed();
   $('st-happy').querySelector('span').innerHTML = `${hp}<small>/${goal}%</small>`;
@@ -2011,7 +2049,9 @@ function renderGoalBar() {
   const el = $('goalbar'), list = activeGoals();
   let h;
   if (!list.length) h = allGoalsDone() ? '<span class="gb-t">🎉 すべての目標を達成（自由モード）</span>' : '';
-  else h = list.map(({ g }) => { const p = goalProgress(g), done = p >= g.n; return `<div class="gb-row ${done ? 'done' : ''}"><span class="gb-i">${done ? '🎁' : '🎯'}</span><span class="gb-t">${g.text}</span><span class="gb-p">${done ? 'タップで受け取る' : `${p}/${g.n}`}</span></div>`; }).join('');
+  else h = list.map(({ g }) => { const p = goalProgress(g), done = p >= g.n; const sub = !done && g.stat === 'pop' && S.pop >= popCap() ? popGoalHint(g.n) : ''; return `<div class="gb-row ${done ? 'done' : ''}"><span class="gb-i">${done ? '🎁' : '🎯'}</span><span class="gb-t">${g.text}</span><span class="gb-p">${done ? 'タップで受け取る' : `${p}/${g.n}`}</span></div>${sub ? `<div class="gb-sub warn">⚠ ${sub}</div>` : ''}`; }).join('');
+  // 人口が段階の上限で止まっているときは、理由と次にやることを出す
+  const tb = tierBlock(); if (tb && S.pop >= popLimit() && popTier() && !list.some(({ g }) => g.stat === 'pop' && goalProgress(g) < g.n)) h += `<div class="gb-warn">⚠ 人口が増えません。${tb}</div>`;
   if (h !== goalBarHtml) { goalBarHtml = h; el.innerHTML = h; el.classList.toggle('hidden', !h); }
   const top = $('topbar').offsetHeight; if (top && el.style.top !== top + 'px') el.style.top = top + 'px';
 }
