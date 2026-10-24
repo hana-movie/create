@@ -4,7 +4,7 @@
    仕様引き継ぎ書に基づく実装。仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.17.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.18.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数（未確定仕様はここで仮置き） ----------
 const CONFIG = {
@@ -49,7 +49,7 @@ const CONFIG = {
   STAGE_BY_POINTS: { 1: 0, 2: 1, 4: 2, 6: 3, 10: 4 },
   PRICE_PER_POINT: 2,
   CONSUME_BY_STAGE: [90, 180, 240, 360, 480],  // 住民が1個を消費しきる秒数（水だけ60秒）
-  HAPPY_DENOM: null,                // null = 今手に入るアイテム（買ったレシピで作れるもの）のポイント合計（下がらない）。数値の配列にすると段階ごとの固定値
+  HAPPY_DENOM: [4, 10, 20, 34, 50],  // v0.18：段階ごとの固定値（第0〜第4）。null にすると「買ったレシピで作れる品のポイント合計」に戻る
   // ---- 蜂の巣箱 ----
   // 周り8マスの花畑の数で速さが変わる。1個にかかる秒数 = HIVE_BASE_SEC × HIVE_BASE_FLOWERS ÷ 花畑の数（0なら生産しない）
   // 基準44秒 = 木材1個（木の採集12秒×2 ＋ 加工20秒）
@@ -162,14 +162,23 @@ function gRes(b) { return b.res || BUILD[b.type].res || 'wood'; }
 function isHive(b) { return BUILD[b.type].hive === true; }
 function noRes(b) { return gRes(b) === 'water' || isHive(b); }
 // 蜂の巣箱：周り8マスの花畑の数（建物の下の花畑は数えない）
-function hiveFlowers(b) {
-  let n = 0;
+// 1つの花畑を数えられる巣箱は1つだけ：隣り合う巣箱のうち先に建てたもの（建築順）が使う
+function flowerOwner(x, y) {
+  let best = null;
+  for (const h of S.buildings) if (BUILD[h.type].hive && Math.abs(h.x - x) <= 1 && Math.abs(h.y - y) <= 1 && !(h.x === x && h.y === y) && (!best || h.order < best.order)) best = h;
+  return best;
+}
+function hiveFlowerTiles(b, all) {
+  const out = [];
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     if (!dx && !dy) continue; const x = b.x + dx, y = b.y + dy; if (!inMap(x, y)) continue;
-    const t = S.tiles[idx(x, y)]; if (t.unl && t.res && t.res.t === 'flower' && !occ[idx(x, y)]) n++;
+    const t = S.tiles[idx(x, y)]; if (!(t.unl && t.res && t.res.t === 'flower' && !occ[idx(x, y)])) continue;
+    const o = b.id ? flowerOwner(x, y) : null;   // b.id なし＝配置プレビュー（既存の巣箱が使っている花畑は数えない）
+    if (all || (b.id ? (o && o.id === b.id) : !flowerOwner(x, y))) out.push([x, y]);
   }
-  return n;
+  return out;
 }
+function hiveFlowers(b) { return hiveFlowerTiles(b).length; }
 function hiveSec(b) { const n = hiveFlowers(b); return n ? CONFIG.HIVE_BASE_SEC * CONFIG.HIVE_BASE_FLOWERS / n : Infinity; }
 // 1個あたりの作業時間（作業員1人）：採集は10秒、生産は材料の時間の合計
 function workSec(b) {
@@ -192,7 +201,7 @@ const BUILD = {
   house:    { name: '住居',     cat: 'home',   size: 1, kind: 'house',   bp: 0,   cost: { coins: 50, wood: 5 }, desc: '住民が4人まで住めます。建てられる数はエリア開放ごとに増えます。' },
   collect:  { name: '採集所',   cat: 'gather', size: 1, kind: 'gather',  bp: 0,   cost: { coins: 30 }, desc: '原材料を採集します。何を採るかはパネルで選べます（見つけた資源）。周り8マスの資源から採ります。' },
   well:     { name: '井戸',     cat: 'gather', size: 1, kind: 'gather',  bp: 40,  res: 'water', cost: { coins: 30 }, desc: '水を汲みます。資源マスは不要で、枯れません。' },
-  hive:     { name: '蜂の巣箱', cat: 'gather', size: 1, kind: 'gather',  bp: 150, res: 'honey', hive: true, needRes: 'flower', cost: { coins: 60, wood: 5 }, desc: '周り8マスの花畑の数でハチミツをつくる速さが変わります（3マスで44秒に1個）。花畑の上に置くと、そのマスの花畑はなくなります。ハチミツは自動でたまり、作業員は運ぶだけを担当します。' },
+  hive:     { name: '蜂の巣箱', cat: 'gather', size: 1, kind: 'gather',  bp: 150, res: 'honey', hive: true, needRes: 'flower', cost: { coins: 60, wood: 5 }, desc: '周り8マスの花畑の数でハチミツをつくる速さが変わります（3マスで44秒に1個）。花畑1マスを使える巣箱は1つだけ（先に建てた巣箱が優先）。花畑の上に置くと、そのマスの花畑はなくなります。ハチミツは自動でたまり、作業員は運ぶだけを担当します。' },
   sawmill:  { name: '製材所',   cat: 'prod',   size: 1, kind: 'prod', bp: 200, recipes: ['timber', 'plank'], cost: { coins: 120, wood: 10 }, desc: '木2 → 木材 ／ レシピ購入：木材2 → 板材' },
   workshop: { name: '加工所',   cat: 'prod',   size: 1, kind: 'prod', bp: 400, req: ['sawmill'], recipes: ['wheel', 'cart'], cost: { coins: 250, plank: 5 }, desc: 'レシピ購入：板材＋木材 → 車輪 ／ 車輪＋板材 → 猫車' },
   mason:    { name: '石工所',   cat: 'prod',   size: 1, kind: 'prod', bp: 200, needRes: 'stone', recipes: ['brick', 'cutstone', 'stonebrick'], cost: { coins: 120, stone: 10 }, desc: '石2 → 石材 ／ レシピ購入：石材2 → 切石、石材＋切石 → 石レンガ' },
@@ -217,7 +226,9 @@ const GOAL_TRACKS = {
     { id: 'm6', text: '住居を建てて住民を5人にする',    stat: 'pop',         n: 5,  reward: 100, area: 1, hint: () => `島の幸福度が${growNeed()}%に届くと3分ごとに1人増えます。達成で下のエリアを開放できます` },
     { id: 'm7', text: '下のエリアを開放する',           stat: 'areas',       n: 2,  reward: 150, area: 2 },
     { id: 'm8', text: '石を5個採集',                    stat: 'made_stone',  n: 5,  reward: 150, hint: () => findHint('stone') },
-    { id: 'm9', text: '製材所で木材を5個つくる',        stat: 'made_timber', n: 5,  reward: 150, hint: '製材所の設計図を買うと木材（第1段階）が作れるようになり、幸福度の分母が上がります。板材はレシピ購入で解放されます' },
+    { id: 'm9', text: '製材所で木材を5個つくる',        stat: 'made_timber', n: 5,  reward: 150, hint: '製材所の設計図を買うと木材（第1段階）が作れるようになり、島が第1段階に上がります。板材はレシピ購入で解放されます' },
+    // 人数の目標（人口の段階上限ごと）
+    ...[[8, 200], [12, 300], [24, 400], [36, 600], [48, 800], [64, 1000], [80, 1200], [100, 1500]].map(([n, reward], i) => ({ id: 'p' + (i + 1), text: `住民を${n}人にする`, stat: 'pop', n, reward, hint: () => tierBlock() || `島の幸福度が${growNeed()}%に届くと3分ごとに1人増えます（住居の空きも必要）` })),
   ] },
 };
 const GOALS = Object.values(GOAL_TRACKS).flatMap(t => t.list);  // 全目標（参照用）
@@ -823,9 +834,9 @@ function popLimit() { let c = 0; for (const t of CONFIG.POP_TIERS) if (t.stage <
 // 解放済みアイテムの最大加工段階 → 分母（下がらない）
 function updateStage() {
   let st = 0; for (const k of unlockedItems()) st = Math.max(st, ITEMS[k].stage);
-  const prevD = S.denomMax || 0, d = happyDenom();
-  if (st > (S.maxStage || 0)) { S.maxStage = st; notify(`📈 第${st}段階のアイテムが解放。幸福度の分母が ${d} になりました`); }
-  else if (prevD && d > prevD) notify(`📈 新しいアイテムが解放。幸福度の分母が ${d} になりました`);
+  const prevD = CONFIG.HAPPY_DENOM ? null : (S.denomMax || 0);
+  if (st > (S.maxStage || 0)) { S.maxStage = st; notify(`📈 第${st}段階に上がりました。幸福度の分母が ${happyDenom()} になりました`); }
+  else if (prevD !== null) { const d = happyDenom(); if (prevD && d > prevD) notify(`📈 新しいアイテムが解放。幸福度の分母が ${d} になりました`); }
 }
 
 // ---------- 建物 ----------
@@ -934,7 +945,9 @@ function unlockedItems(all) {
 }
 // レシピ購入（施設Lvはなし）。今の段階より上のレシピも買えるが、UI側で確認を出す
 function recipeRaisesStage(r) { return ITEMS[RECIPES[r].out].stage > (S.maxStage || 0); }
-function buyRecipe(b, r) { const rc = RECIPES[r], c = recipePrice(r); if (!rc.buy || S.recipes.includes(r) || S.coins < c) return false; S.coins -= c; S.recipes.push(r); notify(`📜 レシピ「${ITEMS[rc.out].name}」を購入しました`); updateStage(); return true; }
+// レシピを買えない理由（買えるなら null）：1つ下の段階に届いていないと買えない
+function recipeBlocker(r) { const st = ITEMS[RECIPES[r].out].stage; return st - 1 > (S.maxStage || 0) ? `第${st - 1}段階になると買えます` : null; }
+function buyRecipe(b, r) { const rc = RECIPES[r], c = recipePrice(r); if (!rc.buy || S.recipes.includes(r) || recipeBlocker(r) || S.coins < c) return false; S.coins -= c; S.recipes.push(r); notify(`📜 レシピ「${ITEMS[rc.out].name}」を購入しました`); updateStage(); return true; }
 // 一度に運べる数：基本値 ＋ 運搬レベルの加算（施設ごと、作業員を入れ替えても変わらない）
 // 運搬レベルは施設の種類ごとに共通（石工所1を上げると石工所2も同じレベル。後から建てた分も同じ）
 function clvOf(b) { S.carryLv = S.carryLv || {}; return S.carryLv[b.type] || 1; }
@@ -1668,12 +1681,12 @@ function renderInfo() {
   const tripLine = () => {
     if (!CONFIG.FETCH_MODE) return '';
     let st;
-    if (isHive(b) && b.workers === 0) st = `<span class="lbl">${hiveFlowers(b) ? (b.inv.out >= CONFIG.INV_CAP ? '📦 棚が満杯（作業員を置くと運びます）' : '🐝 ハチミツをためています（作業員を置くと運びます）') : '🌼 周りに花畑がありません'}</span>`;
+    if (isHive(b) && b.workers === 0) st = `<span class="lbl">${hiveFlowers(b) ? (b.inv.out >= CONFIG.INV_CAP ? '📦 棚が満杯（作業員を置くと運びます）' : '🐝 ハチミツをためています（作業員を置くと運びます）') : '🌼 使える花畑がありません'}</span>`;
     else if (b.workers === 0) st = `<span class="lbl">⏸ 停止（作業員なし）</span>`;
     else if (b.fetch) { const fo = getB(b.fetch.from); st = `<span class="lbl">🚶 ${ITEMS[b.fetch.item].name}×${b.fetch.qty} ${b.fetch.mode === 'in' ? '←' : '→'} ${fo ? bname(fo) : '?'}</span><div class="gauge prog"><div style="width:${Math.min(100, b.fetch.prog / b.fetch.time * 100)}%"></div></div><span class="val">${Math.max(0, Math.ceil((b.fetch.time - b.fetch.prog) / Math.max(1, b.workers)))}秒</span>`; }
     else if (b.inv && b.inv.out >= CONFIG.INV_CAP) st = `<span class="lbl">📦 完成品が満杯${b.dest === 'none' ? '（搬送先なし）' : '（搬送先に空きがありません）'}</span>`;
     else if (b.active) st = `<span class="lbl">⚙️ 生産中</span>`;
-    else if (isHive(b)) st = `<span class="lbl">${hiveFlowers(b) ? '🐝 ハチミツをためています' : '🌼 周りに花畑がありません'}</span>`;
+    else if (isHive(b)) st = `<span class="lbl">${hiveFlowers(b) ? '🐝 ハチミツをためています' : '🌼 使える花畑がありません'}</span>`;
     else if (d.kind === 'gather') st = `<span class="lbl">${gatherTarget(b) ? '⛏ 採集中' : '🔍 資源待ち'}</span>`;
     else if (b.recipe && !recipeMats(b).every((m, i) => b.inv[MK[i]] >= RECIPES[b.recipe].need[m])) st = `<span class="lbl">🔍 材料待ち（在庫なし）</span>`;
     else st = `<span class="lbl">…</span>`;
@@ -1689,7 +1702,9 @@ function renderInfo() {
     if (!noRes(b)) h += `<div class="line"><span class="lbl">範囲内の資源量</span><span class="val">${sum[0]}/${sum[1]}${tgt ? '' : ' <small>(採集できる資源なし)</small>'}</span></div>`;
     if (isHive(b)) {
       const n = hiveFlowers(b);
-      h += `<div class="line"><span class="lbl">周りの花畑</span><span class="val">${n}マス <small>(${CONFIG.HIVE_BASE_FLOWERS}マスで${CONFIG.HIVE_BASE_SEC}秒/個)</small></span></div>`;
+      const shared = hiveFlowerTiles(b, true).length - n;
+      h += `<div class="line"><span class="lbl">使える花畑</span><span class="val">${n}マス <small>(${CONFIG.HIVE_BASE_FLOWERS}マスで${CONFIG.HIVE_BASE_SEC}秒/個)</small></span></div>`;
+      if (shared) h += `<div class="hint" style="text-align:left">周りの花畑のうち${shared}マスは先に建てた巣箱が使っています（花畑1マスを使える巣箱は1つだけ）</div>`;
       h += `<div class="line"><span class="lbl">生産速度</span><span class="val">${n ? Math.round(hiveSec(b)) + '秒/個' : '停止（花畑なし）'} <small>作業員は運ぶだけ</small></span></div>`;
       h += workersLine(); h += destLine(); if (CONFIG.FETCH_MODE) h += bagLine(); h += tripLine();
       h += gaugeLine('生産進捗', n && b.inv.out < CONFIG.INV_CAP ? b.prog * 100 : 0, 100, 'prog');
@@ -1728,8 +1743,7 @@ function renderInfo() {
     h += `<div class="line"><span class="lbl">住民</span><span class="val">${rs.length}/${CONFIG.HOUSE_CAP}人</span></div>`;
     rs.forEach((r, i) => {
       const got = Object.keys(r.demand).filter(k => r.demand[k] > 0);
-      h += `<div class="line"><span class="lbl">住民${r.id} <small>${residentPoints(r)}/${happyDenom()}pt</small></span><div class="gauge"><div style="width:${r.happy}%"></div></div><span class="val">😊${Math.round(r.happy)}%</span></div>`;
-      h += `<div class="chips">` + unlockedItems().map(k => { const g = Math.round(r.demand[k] || 0); return `<span class="chip ${g > 0 ? 'on' : ''}">${ITEMS[k].name}${g > 0 ? ' ' + g + '%' : ''}</span>`; }).join('') + `</div>`;
+      h += `<div class="line"><span class="lbl">住民${r.id} <small>${Object.keys(r.demand).filter(k => r.demand[k] > 0).length}品・${residentPoints(r)}/${happyDenom()}pt</small></span><div class="gauge"><div style="width:${r.happy}%"></div></div><span class="val">😊${Math.round(r.happy)}%</span></div>`;
     });
     h += `<div class="hint" style="text-align:left">需要が${CONFIG.DELIVER_BELOW}%を切ると市場が届けます。幸福度＝持っている商品の幸福ポイント合計÷分母${happyDenom()}。島の幸福度 ${Math.round(S.happy)}% ／ 人口が増える幸福度 ${growNeed()}%</div>`;
   } else if (d.kind === 'warehouse') {
@@ -1777,9 +1791,10 @@ function pickRecipe(b) {
   for (const r of list) {
     const rc = RECIPES[r], it = ITEMS[rc.out], label = `${Object.entries(rc.need).map(([k, v]) => ITEMS[k].name + v + (k === rc.fuel ? '(燃料)' : '')).join('＋')} → ${it.name}<small>（${it.pts}pt・第${it.stage}段階）</small>`;
     if (recipeUsable(b, r)) h += `<div class="line"><button class="recipe-btn pick" data-r="${r}">${label}${b.recipe === r ? '　✔' : ''}</button></div>`;
+    else if (recipeBlocker(r)) h += `<div class="line"><span class="lbl">🔒 ${label}</span><span class="val"><small>${recipeBlocker(r)}</small></span></div>`;
     else { const c = recipePrice(r), up = recipeRaisesStage(r); h += `<div class="line"><span class="lbl">${label}${up ? `<br><small class="red">⚠ 買うと第${it.stage}段階に上がります</small>` : ''}</span><button class="btn small buy" data-r="${r}" ${S.coins >= c ? '' : 'disabled'}>🪙${c}で購入</button></div>`; }
   }
-  h += `<div class="hint" style="text-align:left">レシピを買うと作れる品が増え、幸福度の分母（全部届いたときのポイント）が上がります。今の段階は第${S.maxStage || 0}段階です</div>`;
+  h += `<div class="hint" style="text-align:left">今は第${S.maxStage || 0}段階（幸福度の分母 ${happyDenom()}）。上の段階のレシピは、1つ下の段階に届くと買えます。買うと段階が上がり、分母も上がります</div>`;
   modal('レシピを選択', h);
   document.querySelectorAll('.pick').forEach(el => el.onclick = () => { changeRecipe(b, el.dataset.r); $('modal').classList.add('hidden'); renderInfo(); save(); });
   document.querySelectorAll('.buy').forEach(el => el.onclick = () => {
@@ -1789,7 +1804,7 @@ function pickRecipe(b) {
   });
 }
 // 段階が上がるレシピの購入確認
-function denomIfBought(r) { const out = RECIPES[r].out, ul = unlockedItems(); let s = 0; for (const k of ul) s += itemPoints(k); if (!ul.includes(out)) s += itemPoints(out); return Math.max(happyDenom(), s); }
+function denomIfBought(r) { const out = RECIPES[r].out; if (CONFIG.HAPPY_DENOM) return CONFIG.HAPPY_DENOM[Math.min(Math.max(S.maxStage || 0, ITEMS[out].stage), CONFIG.HAPPY_DENOM.length - 1)]; const ul = unlockedItems(); let s = 0; for (const k of ul) s += itemPoints(k); if (!ul.includes(out)) s += itemPoints(out); return Math.max(happyDenom(), s); }
 function confirmStageUp(r, onYes, onNo) {
   const it = ITEMS[RECIPES[r].out], d0 = happyDenom(), d1 = denomIfBought(r);
   const h = `<div>「${it.name}」のレシピを買うと、島が<b>第${it.stage}段階</b>に上がります。</div>` +
