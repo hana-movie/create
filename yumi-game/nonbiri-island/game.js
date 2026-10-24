@@ -4,7 +4,7 @@
    仕様引き継ぎ書に基づく実装。仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.15.1';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.16.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数（未確定仕様はここで仮置き） ----------
 const CONFIG = {
@@ -24,7 +24,7 @@ const CONFIG = {
   MK_CARRY: 2,          // 市場の作業員が仕入れに行くとき一度に運べる数
   // 運搬レベル：施設ごと。上げると一度に運べる数が増える（作業員を入れ替えても変わらない）
   CARRY_BONUS: [0, 2, 4],                     // 運搬Lv1/2/3 の加算
-  CARRY_COST: [{ bag: 5 }, { cart: 5 }],      // Lv1→2 はカバン5個、Lv2→3 は台車5個
+  CARRY_COST: [{ bag: 5 }, { cart: 5 }],      // Lv1→2 はカバン5個、Lv2→3 は猫車5個
   MARKET_SLOTS: 20,     // 市場の販売枠
   SPEEDS: [1, 2, 4],    // 時間加速の倍率
   DEBUG_SPEED: true,    // 時間加速ボタン（テスト用）。本番では false
@@ -43,9 +43,19 @@ const CONFIG = {
   HOUSE_CAP: 4,         // 住居1棟あたり人口上限
   POP_GROW_SEC: 180,    // 人口+1の間隔
   // ---- 幸福度（住民ごと）----
-  // 個人幸福度 = 持っているアイテムの幸福ポイント合計 ÷ 分母 × 100（上限100）。分母は解放済みの最大加工段階で決まり、下がらない
-  HAPPY_POINTS: [1, 2, 3, 4, 5],       // 加工段階 0/1/2/3 のアイテム1種あたりの幸福ポイント（仮）
-  HAPPY_DENOM: null,                // null = 今手に入るアイテムの幸福ポイント合計（全部届けば100%、下がらない）。数値の配列にすると段階ごとの固定値
+  // 個人幸福度 = 持っているアイテムのポイント合計 ÷ 分母 × 100（上限100）
+  // アイテムのポイント = 材料のポイント合計（燃料の木も含む）。原材料は1P、ハチミツは2P（直接指定）
+  // 加工段階はポイントで決まる（STAGE_BY_POINTS）。売値 = ポイント × PRICE_PER_POINT
+  STAGE_BY_POINTS: { 1: 0, 2: 1, 4: 2, 6: 3, 10: 4 },
+  PRICE_PER_POINT: 2,
+  CONSUME_BY_STAGE: [90, 180, 240, 360, 480],  // 住民が1個を消費しきる秒数（水だけ60秒）
+  HAPPY_DENOM: null,                // null = 今手に入るアイテム（買ったレシピで作れるもの）のポイント合計（下がらない）。数値の配列にすると段階ごとの固定値
+  // ---- 蜂の巣箱 ----
+  // 周り8マスの花畑の数で速さが変わる。1個にかかる秒数 = HIVE_BASE_SEC × HIVE_BASE_FLOWERS ÷ 花畑の数（0なら生産しない）
+  // 基準44秒 = 木材1個（木の採集12秒×2 ＋ 加工20秒）
+  HIVE_BASE_SEC: 44,
+  HIVE_BASE_FLOWERS: 3,
+  RECIPE_COST: [0, 0, 200, 300, 500],   // 段階ごとのレシピ購入価格（第2〜4段階）
   // 人口の段階上限：今の人口が cap 未満の段のうち最初の段が適用される。
   // stage = その段に進むのに必要な加工段階（解放済み）、need = その段で人口が増えるのに必要な幸福度(%)
   POP_TIERS: [
@@ -68,61 +78,103 @@ const CONFIG = {
   DELIVER_BELOW: 30,        // 需要ゲージがこの%を切ったら配達対象
   MAX_GATHER_ITEMS: 4,  // 採集アイテムの種類上限（木材・石材・小麦・水）
   MAX_PROD_ITEMS: 5,    // 生産アイテムの種類上限
-  SAVE_KEY: 'nonbiri-island-v15',
+  SAVE_KEY: 'nonbiri-island-v16',
 };
 
-// consume: 住民が1個を消費しきる秒数（作るのに手間がかかる品ほど長い）
-// stage: 加工段階（0=原材料 1=一次加工 2=二次加工 3=三次加工）。幸福ポイントと分母はこれで決まる
+// ポイント・段階・売値・消費時間・作業時間はレシピから自動で計算する（initItems）
+// pts: 原材料1P。ハチミツは材料がないので2Pを直接指定
 const ITEMS = {
-  // 第0段階（原材料）
-  wood:   { name: '木',     color: '#2e6b2a', price: 2,  consume: 90,  time: 10, stage: 0 },
-  water:  { name: '水',     color: '#4a90e2', price: 2,  consume: 60,  time: 10, stage: 0 },
-  stone:  { name: '石',     color: '#8a8a8a', price: 2,  consume: 90,  time: 10, stage: 0 },
-  wheat:  { name: '小麦',   color: '#d4b24a', price: 2,  consume: 90,  time: 10, stage: 0 },
-  cotton: { name: '綿',     color: '#f0f0f0', price: 2,  consume: 90,  time: 10, stage: 0 },
-  orange: { name: 'オレンジ', color: '#f08a24', price: 2, consume: 90, time: 10, stage: 0 },
-  // 第1段階（原材料×2）
-  timber: { name: '木材',   color: '#8b5a2b', price: 5,  consume: 180, time: 20, stage: 1 },
-  brick:  { name: '石材',   color: '#b5533c', price: 5,  consume: 180, time: 20, stage: 1 },
-  thread: { name: '糸',     color: '#d8c8b0', price: 5,  consume: 180, time: 20, stage: 1 },
-  flour:  { name: '小麦粉', color: '#f2eee0', price: 5,  consume: 180, time: 20, stage: 1 },
-  juice:  { name: 'オレンジジュース', color: '#f5a623', price: 5, consume: 180, time: 20, stage: 1 },
-  // 第2段階（1段階×2、または 0段階×2＋1段階×1）
-  plank:  { name: '板材',   color: '#c49a5a', price: 10, consume: 240, time: 40, stage: 2 },
-  wheel:  { name: '車輪',   color: '#7a5a3a', price: 10, consume: 240, time: 40, stage: 2 },
-  cutstone:{ name: '切石',  color: '#a0a0a8', price: 10, consume: 240, time: 40, stage: 2 },
-  cloth:  { name: '布',     color: '#e8d8f0', price: 10, consume: 240, time: 40, stage: 2 },
-  bread:  { name: 'パン',   color: '#d9893b', price: 10, consume: 240, time: 30, stage: 2 },
-  // 第3段階（2段階×2）
-  bag:    { name: 'カバン', color: '#8a6a3a', price: 20, consume: 360, time: 80, stage: 3 },  // 施設の運搬レベルを上げるのにも使う
-  clothes:{ name: '服',     color: '#c05070', price: 20, consume: 360, time: 80, stage: 3 },
-  // 第4段階（2段階×4 など）
-  cart:   { name: '台車',   color: '#6a4a2a', price: 40, consume: 480, time: 160, stage: 4 },  // 施設の運搬レベルを上げるのにも使う
+  // 原材料（1P・第0段階）
+  wood:   { name: '木',     color: '#2e6b2a', pts: 1, time: 10 },
+  water:  { name: '水',     color: '#4a90e2', pts: 1, time: 10, consume: 60 },
+  stone:  { name: '石',     color: '#8a8a8a', pts: 1, time: 10 },
+  wheat:  { name: '小麦',   color: '#d4b24a', pts: 1, time: 10 },
+  cotton: { name: '綿',     color: '#f0f0f0', pts: 1, time: 10 },
+  orange: { name: 'オレンジ', color: '#f08a24', pts: 1, time: 10 },
+  honey:  { name: 'ハチミツ', color: '#e8b020', pts: 2, time: 20 },   // 蜂の巣箱で生産
+  // 2P（第1段階）
+  timber: { name: '木材',   color: '#8b5a2b' },
+  brick:  { name: '石材',   color: '#b5533c' },
+  thread: { name: '糸',     color: '#d8c8b0' },
+  flour:  { name: '小麦粉', color: '#f2eee0' },
+  juice:  { name: 'オレンジジュース', color: '#f5a623' },
+  // 4P（第2段階）
+  plank:  { name: '板材',   color: '#c49a5a' },
+  cutstone:{ name: '切石',  color: '#a0a0a8' },
+  bread:  { name: 'パン',   color: '#d9893b' },
+  cloth:  { name: '布',     color: '#e8d8f0' },
+  jam:    { name: 'オレンジジャム', color: '#e86a20' },
+  // 6P（第3段階）
+  stonebrick: { name: '石レンガ', color: '#9a6a5a' },
+  wheel:  { name: '車輪',   color: '#7a5a3a' },
+  cookie: { name: 'クッキー', color: '#c8964a' },
+  bag:    { name: 'カバン', color: '#8a6a3a' },  // 施設の運搬レベルを上げるのにも使う
+  // 10P（第4段階）
+  cart:   { name: '猫車',   color: '#6a4a2a' },  // 施設の運搬レベルを上げるのにも使う
+  clothes:{ name: '服',     color: '#c05070' },
+  honeycake: { name: 'ハニーケーキ', color: '#d8a040' },
 };
-// fuel: 火として使う木材（生産時間には加算しない）
-// buy のあるレシピはコインで購入すると使える（購入した時点で加工段階が上がる）。up: true はさらに施設Lv2が必要
+// fuel: 火として使う木（生産時間には加算しないが、ポイントには加算する）
+// buy: true のレシピはコインで購入すると使える（価格は段階で決まる：CONFIG.RECIPE_COST）。2Pのレシピは設計図だけで使える
 const RECIPES = {
   timber:  { out: 'timber',  need: { wood: 2 } },
-  plank:   { out: 'plank',   need: { timber: 2 }, up: true, buy: 200 },
-  wheel:   { out: 'wheel',   need: { timber: 2 }, buy: 250 },
-  cart:    { out: 'cart',    need: { wheel: 2, plank: 2 }, up: true, buy: 500 },
+  plank:   { out: 'plank',   need: { timber: 2 }, buy: true },
+  wheel:   { out: 'wheel',   need: { plank: 1, timber: 1 }, buy: true },
+  cart:    { out: 'cart',    need: { wheel: 1, plank: 1 }, buy: true },
   brick:   { out: 'brick',   need: { stone: 2 } },
-  cutstone:{ out: 'cutstone',need: { brick: 2 }, up: true, buy: 200 },
+  cutstone:{ out: 'cutstone',need: { brick: 2 }, buy: true },
+  stonebrick: { out: 'stonebrick', need: { brick: 1, cutstone: 1 }, buy: true },
   thread:  { out: 'thread',  need: { cotton: 2 } },
-  cloth:   { out: 'cloth',   need: { thread: 2 }, up: true, buy: 250 },
-  bag:     { out: 'bag',     need: { cloth: 2 }, buy: 300 },
-  clothes: { out: 'clothes', need: { cloth: 2 }, up: true, buy: 400 },
+  cloth:   { out: 'cloth',   need: { thread: 2 }, buy: true },
+  bag:     { out: 'bag',     need: { cloth: 1, thread: 1 }, buy: true },
+  clothes: { out: 'clothes', need: { cloth: 2, thread: 1 }, buy: true },
   flour:   { out: 'flour',   need: { wheat: 2 } },
-  bread:   { out: 'bread',   need: { flour: 1, water: 1, wood: 1 }, fuel: 'wood' },
   juice:   { out: 'juice',   need: { orange: 1, water: 1 } },
+  bread:   { out: 'bread',   need: { flour: 1, water: 1, wood: 1 }, fuel: 'wood', buy: true },
+  jam:     { out: 'jam',     need: { orange: 1, honey: 1, wood: 1 }, fuel: 'wood', buy: true },
+  cookie:  { out: 'cookie',  need: { flour: 1, honey: 1, water: 1, wood: 1 }, fuel: 'wood', buy: true },
+  honeycake: { out: 'honeycake', need: { flour: 2, honey: 2, water: 1, wood: 1 }, fuel: 'wood', buy: true },
 };
-// 採集所が採れる資源（水は井戸で別に扱う）
+// アイテムのポイント・段階・売値・消費時間・作業時間をレシピから計算
+(function initItems() {
+  const byOut = {}; for (const id in RECIPES) byOut[RECIPES[id].out] = RECIPES[id];
+  const calc = (k) => {
+    const it = ITEMS[k]; if (it.stage !== undefined) return it;
+    if (it.pts === undefined || it.time === undefined) {
+      const r = byOut[k]; let p = 0, t = 0;
+      for (const m in r.need) { const mi = calc(m); p += mi.pts * r.need[m]; if (m !== r.fuel) t += mi.time * r.need[m]; }
+      if (it.pts === undefined) it.pts = p; if (it.time === undefined) it.time = t;
+    }
+    it.stage = CONFIG.STAGE_BY_POINTS[it.pts]; if (it.stage === undefined) it.stage = it.pts >= 10 ? 4 : it.pts >= 6 ? 3 : it.pts >= 4 ? 2 : it.pts >= 2 ? 1 : 0;
+    it.price = it.pts * CONFIG.PRICE_PER_POINT;
+    if (it.consume === undefined) it.consume = CONFIG.CONSUME_BY_STAGE[it.stage];
+    return it;
+  };
+  for (const k in ITEMS) calc(k);
+})();
+function recipePrice(r) { return RECIPES[r].buy ? CONFIG.RECIPE_COST[ITEMS[RECIPES[r].out].stage] : 0; }
+// 採集所が採れる資源（水は井戸、ハチミツは蜂の巣箱で別に扱う）
 const GATHERABLE = ['wood', 'stone', 'wheat', 'cotton', 'orange'];
+// 資源マスの種類のうちアイテムではないもの
+const RES_NAMES = { flower: '花畑' };
+function resName(t) { return ITEMS[t] ? ITEMS[t].name : RES_NAMES[t]; }
 function gRes(b) { return b.res || BUILD[b.type].res || 'wood'; }
-function noRes(b) { return gRes(b) === 'water'; }
+function isHive(b) { return BUILD[b.type].hive === true; }
+function noRes(b) { return gRes(b) === 'water' || isHive(b); }
+// 蜂の巣箱：周り8マスの花畑の数（建物の下の花畑は数えない）
+function hiveFlowers(b) {
+  let n = 0;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    if (!dx && !dy) continue; const x = b.x + dx, y = b.y + dy; if (!inMap(x, y)) continue;
+    const t = S.tiles[idx(x, y)]; if (t.unl && t.res && t.res.t === 'flower' && !occ[idx(x, y)]) n++;
+  }
+  return n;
+}
+function hiveSec(b) { const n = hiveFlowers(b); return n ? CONFIG.HIVE_BASE_SEC * CONFIG.HIVE_BASE_FLOWERS / n : Infinity; }
 // 1個あたりの作業時間（作業員1人）：採集は10秒、生産は材料の時間の合計
 function workSec(b) {
   const d = BUILD[b.type];
+  if (isHive(b)) return hiveSec(b);
   if (d.kind === 'gather') return ITEMS[gRes(b)].time + (CONFIG.FETCH_MODE && !noRes(b) ? CONFIG.GATHER_TRIP : 0);
   if (d.kind === 'prod') { if (!b.recipe) return CONFIG.BASE_SEC; const r = RECIPES[b.recipe]; let t = 0; for (const m in r.need) if (m !== r.fuel) t += ITEMS[m].time * r.need[m]; return t; }
   return CONFIG.BASE_SEC;
@@ -140,14 +192,15 @@ const BUILD = {
   house:    { name: '住居',     cat: 'home',   size: 1, kind: 'house',   bp: 0,   cost: { coins: 50, wood: 5 }, desc: '住民が4人まで住めます。建てられる数はエリア開放ごとに増えます。' },
   collect:  { name: '採集所',   cat: 'gather', size: 1, kind: 'gather',  bp: 0,   cost: { coins: 30 }, desc: '原材料を採集します。何を採るかはパネルで選べます（見つけた資源）。周り8マスの資源から採ります。' },
   well:     { name: '井戸',     cat: 'gather', size: 1, kind: 'gather',  bp: 40,  res: 'water', cost: { coins: 30 }, desc: '水を汲みます。資源マスは不要で、枯れません。' },
-  sawmill:  { name: '製材所',   cat: 'prod',   size: 1, kind: 'prod', upCost: 300, bp: 200, recipes: ['timber', 'plank'], cost: { coins: 120, wood: 10 }, desc: '木2 → 木材 ／ Lv2：木材2 → 板材' },
-  workshop: { name: '加工所',   cat: 'prod',   size: 1, kind: 'prod', upCost: 600, bp: 400, req: ['sawmill'], recipes: ['wheel', 'cart'], cost: { coins: 250, plank: 5 }, desc: 'レシピ購入：木材2 → 車輪 ／ Lv2：車輪2＋板材2 → 台車' },
-  mason:    { name: '石工所',   cat: 'prod',   size: 1, kind: 'prod', upCost: 300, bp: 200, needRes: 'stone', recipes: ['brick', 'cutstone'], cost: { coins: 120, stone: 10 }, desc: '石2 → 石材 ／ Lv2：石材2 → 切石' },
-  spinner:  { name: '紡績所',   cat: 'prod',   size: 1, kind: 'prod', upCost: 400, bp: 250, needRes: 'cotton', recipes: ['thread', 'cloth'], cost: { coins: 150, timber: 5 }, desc: '綿2 → 糸 ／ Lv2：糸2 → 布' },
-  tailor:   { name: '仕立て屋', cat: 'prod',   size: 1, kind: 'prod', upCost: 600, bp: 400, req: ['spinner'], recipes: ['bag', 'clothes'], cost: { coins: 250, plank: 5 }, desc: 'レシピ購入：布2 → カバン ／ Lv2：布2 → 服' },
+  hive:     { name: '蜂の巣箱', cat: 'gather', size: 1, kind: 'gather',  bp: 150, res: 'honey', hive: true, needRes: 'flower', cost: { coins: 60, wood: 5 }, desc: '周り8マスの花畑の数でハチミツをつくる速さが変わります（3マスで44秒に1個）。花畑の上に置くと、そのマスの花畑はなくなります。ハチミツは自動でたまり、作業員は運ぶだけを担当します。' },
+  sawmill:  { name: '製材所',   cat: 'prod',   size: 1, kind: 'prod', bp: 200, recipes: ['timber', 'plank'], cost: { coins: 120, wood: 10 }, desc: '木2 → 木材 ／ レシピ購入：木材2 → 板材' },
+  workshop: { name: '加工所',   cat: 'prod',   size: 1, kind: 'prod', bp: 400, req: ['sawmill'], recipes: ['wheel', 'cart'], cost: { coins: 250, plank: 5 }, desc: 'レシピ購入：板材＋木材 → 車輪 ／ 車輪＋板材 → 猫車' },
+  mason:    { name: '石工所',   cat: 'prod',   size: 1, kind: 'prod', bp: 200, needRes: 'stone', recipes: ['brick', 'cutstone', 'stonebrick'], cost: { coins: 120, stone: 10 }, desc: '石2 → 石材 ／ レシピ購入：石材2 → 切石、石材＋切石 → 石レンガ' },
+  spinner:  { name: '紡績所',   cat: 'prod',   size: 1, kind: 'prod', bp: 250, needRes: 'cotton', recipes: ['thread', 'cloth'], cost: { coins: 150, timber: 5 }, desc: '綿2 → 糸 ／ レシピ購入：糸2 → 布' },
+  tailor:   { name: '仕立て屋', cat: 'prod',   size: 1, kind: 'prod', bp: 400, req: ['spinner'], recipes: ['bag', 'clothes'], cost: { coins: 250, plank: 5 }, desc: 'レシピ購入：布＋糸 → カバン ／ 布2＋糸 → 服' },
   mill:     { name: '製粉所',   cat: 'prod',   size: 1, kind: 'prod', bp: 200, needRes: 'wheat', recipes: ['flour'], cost: { coins: 150, timber: 5 }, desc: '小麦2 → 小麦粉' },
-  bakery:   { name: 'パン屋',   cat: 'prod',   size: 1, kind: 'prod', bp: 350, req: ['mill'], recipes: ['bread'], cost: { coins: 250, brick: 5 }, desc: '小麦粉1＋水1＋木1（燃料） → パン' },
-  drinks:   { name: '飲料工房', cat: 'prod',   size: 1, kind: 'prod', bp: 200, needRes: 'orange', recipes: ['juice'], cost: { coins: 150, timber: 5 }, desc: 'オレンジ1＋水1 → オレンジジュース' },
+  drinks:   { name: '飲料工房', cat: 'prod',   size: 1, kind: 'prod', bp: 200, needRes: 'orange', recipes: ['juice'], cost: { coins: 150, timber: 5 }, desc: 'オレンジ＋水 → オレンジジュース' },
+  food:     { name: '食品加工所', cat: 'prod', size: 1, kind: 'prod', bp: 350, recipes: ['bread', 'jam', 'cookie', 'honeycake'], cost: { coins: 200, timber: 5 }, desc: 'レシピ購入：パン・オレンジジャム・クッキー・ハニーケーキ（木は燃料）' },
   market:   { name: '市場',     cat: 'home',   size: 1, kind: 'market', fixed: true, cost: {}, desc: '作業員が住民に商品を届け、コインを得ます。島に1つだけ（最初から建っています）。規模レベルを上げると作業員が増えます。' },
   warehouse:{ name: '倉庫',     cat: 'home',   size: 1, kind: 'warehouse', fixed: true, cost: {}, desc: '島の共通倉庫。島に1つだけ（最初から建っています）。規模レベルを上げるとスロットが増えます。作業員を置くと施設の完成品を回収し、市場や生産施設へ届けます。' },
 };
@@ -164,7 +217,7 @@ const GOAL_TRACKS = {
     { id: 'm6', text: '住居を建てて住民を5人にする',    stat: 'pop',         n: 5,  reward: 100, area: 1, hint: () => `島の幸福度が${growNeed()}%に届くと3分ごとに1人増えます。達成で下のエリアを開放できます` },
     { id: 'm7', text: '下のエリアを開放する',           stat: 'areas',       n: 2,  reward: 150, area: 2 },
     { id: 'm8', text: '石を5個採集',                    stat: 'made_stone',  n: 5,  reward: 150, hint: () => findHint('stone') },
-    { id: 'm9', text: '製材所で木材を5個つくる',        stat: 'made_timber', n: 5,  reward: 150, hint: '製材所の設計図を買うと、木材（第1段階）と板材（第2段階）が解放され、幸福度の分母が上がります' },
+    { id: 'm9', text: '製材所で木材を5個つくる',        stat: 'made_timber', n: 5,  reward: 150, hint: '製材所の設計図を買うと木材（第1段階）が作れるようになり、幸福度の分母が上がります。板材はレシピ購入で解放されます' },
   ] },
 };
 const GOALS = Object.values(GOAL_TRACKS).flatMap(t => t.list);  // 全目標（参照用）
@@ -200,7 +253,7 @@ function resFound(res) { return S.tiles.some(t => t.unl && t.res && t.res.t === 
 // 設計図を買えない理由（買えるなら null）
 function bpBlocker(type) {
   const d = BUILD[type];
-  if (d.needRes && !resFound(d.needRes)) return `${ITEMS[d.needRes].name}を見つけていません（エリアを開放）`;
+  if (d.needRes && !resFound(d.needRes)) return `${resName(d.needRes)}を見つけていません（エリアを開放）`;
   const miss = (d.req || []).filter(r => !S.unlocked.includes(r));
   if (miss.length) return `先に ${miss.map(r => BUILD[r].name).join('・')} の設計図が必要`;
   return null;
@@ -619,6 +672,43 @@ SPR.drinks = [
   '.BBBBBBBBBBBBBB.',
   '................',
 ];
+SPR.food = SPR.bakery;   // 食品加工所（旧パン屋の絵）
+SPR.flower = [
+  '................',
+  '..r.......y.....',
+  '.rYr.....yOy....',
+  '..r...p...y..r..',
+  '..t..pYp..t.rYr.',
+  '..t...p...t..r..',
+  '.tt...t..tt..t..',
+  '..t..tt...t..tt.',
+  '.y.......r...t..',
+  'yOy..p..rYr.....',
+  '.y..pYp..r...p..',
+  '.t...p...t..pYp.',
+  '.tt..t..tt...p..',
+  '..t..tt..t...t..',
+  '.ttt.t..ttt.ttt.',
+  '................',
+];
+SPR.hive = [
+  '................',
+  '.......BB.......',
+  '.......BB.......',
+  '....yyyyyyyy....',
+  '...YyyyyyyyyY...',
+  '...kkkkkkkkkk...',
+  '..yyyyyyyyyyyy..',
+  '..YyyyyyyyyyyY..',
+  '..kkkkkkkkkkkk..',
+  '..yyyyykkyyyyy..',
+  '..YyyyykkyyyyY..',
+  '...kkkkkkkkkk...',
+  '....BBBBBBBB....',
+  '....B......B....',
+  '...BBB....BBB...',
+  '................',
+];
 const VILL = ['..ii....', '..ii....', '.llll...', '.llll...', '..ll....', '.ll.l...', '.B..B...', '........'];
 const WORK = ['..ii....', '.yii....', '.oooo...', '.oooo...', '..oo....', '.oo.o...', '.B..B...', '........'];
 
@@ -637,7 +727,7 @@ function unlockBlock(bx, by) {
   S.stats.areas = blocksOpen();
   if (S.areaStage === 1) S.areaStage = 2;
   // 新しい資源の発見 → 採集所で選べるようになったことを知らせる
-  for (const res of found) { if (S.buildings.length && !S.notified['found_' + res]) { S.notified['found_' + res] = true; notify(`🔎 ${ITEMS[res].name}を発見！ 採集所で採れるようになりました`); } }
+  for (const res of found) { if (S.buildings.length && !S.notified['found_' + res]) { S.notified['found_' + res] = true; notify(res === 'flower' ? '🌼 花畑を発見！ 蜂の巣箱の設計図が買えるようになりました' : `🔎 ${resName(res)}を発見！ 採集所で採れるようになりました`); } }
 }
 function blocksOpen() { return S.blocks.filter(Boolean).length; }
 function houseCap() { return CONFIG.HOUSE_BASE + CONFIG.HOUSE_PER_AREA * (blocksOpen() - 1); }
@@ -684,6 +774,8 @@ function newGame() {
   cluster(cb + 1, cb - 1, 'cotton', 7); cluster(cb + 1, cb - 1, 'orange', 6);
   cluster(cb - 1, cb + 1, 'cotton', 7); cluster(cb - 1, cb + 1, 'wheat', 6);
   cluster(cb + 1, cb + 1, 'cotton', 7); cluster(cb + 1, cb + 1, 'wood', 6);
+  // 花畑（蜂の巣箱用）：左のエリアと右上の角（オレンジの近く）
+  cluster(cb - 1, cb, 'flower', 6); cluster(cb + 1, cb - 1, 'flower', 5);
 
   S = {
     v: 11, coins: CONFIG.START_COINS, pop: CONFIG.START_POP, happy: 0, residents: [], maxStage: 0,
@@ -707,7 +799,7 @@ function residentsOf(h) { return S.residents.filter(r => r.house === h.id); }
 function houseWithRoom() { const hs = S.buildings.filter(b => b.type === 'house' && residentsOf(b).length < CONFIG.HOUSE_CAP).sort((a, b) => residentsOf(a).length - residentsOf(b).length || a.order - b.order); return hs[0] || null; }
 function addResident() { const h = houseWithRoom(); const r = { id: S.residents.length + 1, house: h ? h.id : null, demand: {}, happy: 0 }; S.residents.push(r); recalcHappy(); return r; }
 function rehouse() { for (const r of S.residents) if (!r.house || !getB(r.house)) { const h = houseWithRoom(); r.house = h ? h.id : null; } }
-function itemPoints(k) { return CONFIG.HAPPY_POINTS[ITEMS[k].stage] || 0; }
+function itemPoints(k) { return ITEMS[k].pts || 0; }
 function happyDenom() {
   const st = S.maxStage || 0;
   if (CONFIG.HAPPY_DENOM) return CONFIG.HAPPY_DENOM[Math.min(st, CONFIG.HAPPY_DENOM.length - 1)];
@@ -741,7 +833,7 @@ function makeBuilding(type, x, y) {
   const d = BUILD[type];
   const b = { id: S.nextId++, type, x, y, order: S.order++, workers: 0 };
   if (d.kind === 'gather') { b.inv = { out: 0 }; b.prog = 0; b.fetch = null; b.clv = 1; b.res = d.res || 'wood'; b.dest = defaultDest(); }
-  if (d.kind === 'prod') { b.lv = 1; b.recipe = d.recipes.find(r => recipeUsable({ lv: 1 }, r)) || null; b.inv = { a: 0, b: 0, c: 0, out: 0 }; b.prog = 0; b.active = false; b.pending = {}; b.clv = 1; b.fetch = null; b.dest = defaultDest(); }
+  if (d.kind === 'prod') { b.recipe = d.recipes.find(r => recipeUsable(null, r)) || null; b.inv = { a: 0, b: 0, c: 0, d: 0, out: 0 }; b.prog = 0; b.active = false; b.pending = {}; b.clv = 1; b.fetch = null; b.dest = defaultDest(); }
   if (d.kind === 'warehouse') { b.fetch = null; b.clv = 1; }
   if (d.kind === 'market') { b.fetch = null; b.clv = 1; }
   if (d.kind === 'market') { b.lv = 1; b.items = new Array(CONFIG.MARKET_SLOTS).fill(null); b.stock = {}; b.prog = 0; }
@@ -817,7 +909,7 @@ function payCost(cost) {
 }
 
 // レシピ材料の対応（材料A/B）
-const MK = ['a', 'b', 'c'];   // 材料欄（最大3種）
+const MK = ['a', 'b', 'c', 'd'];   // 材料欄（最大4種）
 function recipeMats(b) { return b.recipe ? Object.keys(RECIPES[b.recipe].need) : []; }
 
 // ---------- 共通倉庫 ----------
@@ -832,18 +924,17 @@ function whAdd(item, qty) {
 }
 // 解放済み施設から作れるアイテム一覧（幸福度の分母）
 function recipeOwned(r) { return !RECIPES[r].buy || S.recipes.includes(r); }
-function recipeUsable(b, r) { return recipeOwned(r) && (!RECIPES[r].up || (b.lv || 1) >= 2); }
+function recipeUsable(b, r) { return recipeOwned(r); }
 function unlockedItems(all) {
   const set = new Set();
   if (S.unlocked.includes('collect')) for (const r of GATHERABLE) if (resFound(r)) set.add(r);
-  if (S.unlocked.includes('well')) set.add('water');
+  for (const t of S.unlocked) { const d = BUILD[t]; if (d.kind === 'gather' && d.res) set.add(d.res); }
   for (const t of S.unlocked) { const d = BUILD[t]; if (d.kind === 'prod') d.recipes.forEach(r => { if (recipeOwned(r)) set.add(RECIPES[r].out); }); }
   return Object.keys(ITEMS).filter(k => set.has(k));
 }
-// 生産施設のアップグレード（Lv1→2）。Lv2 で上位レシピを購入・使用できる
-function facUpCost(b) { const d = BUILD[b.type]; return d.upCost && (b.lv || 1) < 2 ? d.upCost : null; }
-function facUp(b) { const c = facUpCost(b); if (c === null || S.coins < c) return false; S.coins -= c; b.lv = 2; notify(`⬆ ${bname(b)}を Lv2 にアップグレードしました。新しいレシピが買えます`); return true; }
-function buyRecipe(b, r) { const rc = RECIPES[r]; if (!rc.buy || S.recipes.includes(r) || (rc.up && (b.lv || 1) < 2) || S.coins < rc.buy) return false; S.coins -= rc.buy; S.recipes.push(r); notify(`📜 レシピ「${ITEMS[rc.out].name}」を購入しました`); return true; }
+// レシピ購入（施設Lvはなし）。今の段階より上のレシピも買えるが、UI側で確認を出す
+function recipeRaisesStage(r) { return ITEMS[RECIPES[r].out].stage > (S.maxStage || 0); }
+function buyRecipe(b, r) { const rc = RECIPES[r], c = recipePrice(r); if (!rc.buy || S.recipes.includes(r) || S.coins < c) return false; S.coins -= c; S.recipes.push(r); notify(`📜 レシピ「${ITEMS[rc.out].name}」を購入しました`); updateStage(); return true; }
 // 一度に運べる数：基本値 ＋ 運搬レベルの加算（施設ごと、作業員を入れ替えても変わらない）
 function carryOf(b) { const k = BUILD[b.type].kind, base = k === 'warehouse' ? CONFIG.WH_CARRY : k === 'market' ? CONFIG.MK_CARRY : CONFIG.CARRY_BASE; return base + CONFIG.CARRY_BONUS[(b.clv || 1) - 1]; }
 function carryCost(b) { return CONFIG.CARRY_COST[(b.clv || 1) - 1] || null; }
@@ -892,6 +983,17 @@ function sim(dt, acc) {
 
 function stepBuilding(b, dt, acc) {
   const d = BUILD[b.type];
+  if (isHive(b)) {
+    // 蜂の巣箱：作業員がいなくてもハチミツは自動でたまる（棚が満杯なら止まる）。作業員は運ぶだけ
+    if (b.inv.out < CONFIG.INV_CAP && hiveFlowers(b) > 0) {
+      b.prog += dt / hiveSec(b);
+      if (b.prog >= 1) { b.prog -= 1; b.inv.out++; S.stats.made_honey = (S.stats.made_honey || 0) + 1; if (acc) acc.items.honey = (acc.items.honey || 0) + 1; }
+    }
+    if (b.workers === 0 || !CONFIG.FETCH_MODE) return;
+    if (b.fetch) { stepTrip(b, dt); return; }
+    if (b.inv.out >= Math.min(carryOf(b), CONFIG.INV_CAP)) startDeliver(b);
+    return;
+  }
   if (d.kind === 'gather') {
     if (b.workers === 0) { b.prog = 0; return; }
     if (CONFIG.FETCH_MODE && b.fetch) { stepTrip(b, dt); return; }
@@ -1118,9 +1220,12 @@ function build(type, x, y) {
   if (type === 'house' && countType('house') >= houseCap()) return false;
   if (!canPlace(type, x, y) || !canAfford(d.cost)) return false;
   payCost(d.cost);
-  addBuilding(type, x, y, false);
+  const nb = addBuilding(type, x, y, false);
+  clearFlowerUnder(nb);
   return true;
 }
+// 蜂の巣箱を花畑の上に置くと、そのマスの花畑はなくなる
+function clearFlowerUnder(b) { if (!isHive(b)) return; const t = S.tiles[idx(b.x, b.y)]; if (t.res && t.res.t === 'flower') t.res = null; }
 // 採集所の「採るもの」を変える。棚に残っていた品は倉庫へ（入りきらない分は破棄）
 function setRes(b, r) {
   if (b.type !== 'collect' || gRes(b) === r || !resFound(r)) return;
@@ -1128,7 +1233,7 @@ function setRes(b, r) {
   b.inv.out = 0; b.prog = 0; b.res = r;
   if (b.fetch && b.fetch.mode === 'out') { whAdd(b.fetch.item, b.fetch.qty); b.fetch = null; }
 }
-function moveBuilding(b, x, y) { if (!canPlace(b.type, x, y, b.id)) return false; b.x = x; b.y = y; rebuildOcc(); return true; }
+function moveBuilding(b, x, y) { if (!canPlace(b.type, x, y, b.id)) return false; b.x = x; b.y = y; clearFlowerUnder(b); rebuildOcc(); return true; }
 function demolish(b) {
   const d = BUILD[b.type];
   if (b.fetch) { whAdd(b.fetch.item, b.fetch.qty); b.fetch = null; }
@@ -1182,7 +1287,7 @@ function showWelcomeBack(acc) {
   modal('おかえりなさい', `<div>留守の間：約 ${hrs ? hrs + '時間' : ''}${mins}分${acc.elapsed >= CONFIG.OFFLINE_MAX_SEC ? '（上限12時間分）' : ''}</div><div>🪙 販売収入 +${acc.coins}</div><div>👤 住民 +${acc.pop}</div><div>📦 つくった品：${items}</div><div class="hint" style="text-align:left">倉庫に入りきらない完成品は施設内に残っています。</div>`);
 }
 function load() {
-  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; for (const sl of S.slots) if (sl.min === undefined) sl.min = CONFIG.SLOT_MIN; if (S.areaStage === undefined) S.areaStage = 2; S.recipes = S.recipes || []; for (const b of S.buildings) { if (b.inv && b.inv.c === undefined && BUILD[b.type].kind === 'prod') b.inv.c = 0; if (b.bags === undefined) b.bags = 0; if (b.inv && b.dest === undefined) b.dest = 'warehouse'; if (b.fetch === undefined) b.fetch = null; } if (!S.residents) { S.residents = []; S.maxStage = 0; for (let i = 0; i < S.pop; i++) addResident(); } rebuildOcc(); return true; } catch (e) { return false; }
+  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); S.newTypes = S.newTypes || []; S.notified = S.notified || {}; for (const sl of S.slots) if (sl.min === undefined) sl.min = CONFIG.SLOT_MIN; if (S.areaStage === undefined) S.areaStage = 2; S.recipes = S.recipes || []; for (const b of S.buildings) { if (b.inv && b.inv.c === undefined && BUILD[b.type].kind === 'prod') b.inv.c = 0; if (b.inv && b.inv.d === undefined && BUILD[b.type].kind === 'prod') b.inv.d = 0; if (b.bags === undefined) b.bags = 0; if (b.inv && b.dest === undefined) b.dest = 'warehouse'; if (b.fetch === undefined) b.fetch = null; } if (!S.residents) { S.residents = []; S.maxStage = 0; for (let i = 0; i < S.pop; i++) addResident(); } rebuildOcc(); return true; } catch (e) { return false; }
 }
 
 // ============================================================
@@ -1225,7 +1330,7 @@ function draw() {
     const t = S.tiles[idx(x, y)];
     ctx.fillStyle = ((x + y) & 1) ? '#6db85a' : '#64ad52'; ctx.fillRect(sx, sy, ts + 0.5, ts + 0.5);
     if (t.unl && t.res && !occ[idx(x, y)]) {
-      const nm = { wood: 'tree', stone: 'rock', cotton: 'cotton', wheat: 'wheat', orange: 'orangetree' }[t.res.t];
+      const nm = { wood: 'tree', stone: 'rock', cotton: 'cotton', wheat: 'wheat', orange: 'orangetree', flower: 'flower' }[t.res.t];
       if (t.res.amt > 0) ctx.drawImage(sprite(nm), sx, sy, ts, ts);
       else { ctx.globalAlpha = 0.3; ctx.drawImage(sprite(nm), sx + ts * 0.15, sy + ts * 0.15, ts * 0.7, ts * 0.7); ctx.globalAlpha = 1; }
     }
@@ -1233,7 +1338,7 @@ function draw() {
   // 採集範囲
   if (UI.sel && BUILD[UI.sel.type].kind === 'gather' && UI.mode === 'normal') {
     const R = CONFIG.GATHER_RANGE, [rx, ry] = toScreen((UI.sel.x - R) * T, (UI.sel.y - R) * T), rs = ts * (R * 2 + 1);
-    if (!noRes(UI.sel)) { ctx.fillStyle = 'rgba(255,255,120,.25)'; ctx.fillRect(rx, ry, rs, rs);
+    if (!noRes(UI.sel) || isHive(UI.sel)) { ctx.fillStyle = 'rgba(255,255,120,.25)'; ctx.fillRect(rx, ry, rs, rs);
     ctx.strokeStyle = 'rgba(255,230,80,.9)'; ctx.lineWidth = 2; ctx.strokeRect(rx, ry, rs, rs); }
   }
   // 建物
@@ -1413,7 +1518,7 @@ function onTap(sx, sy) {
   if (!t.unl) { const [bx, by] = blockOf(x, y); if (canUnlockBlock(bx, by)) { UI.land = [bx, by]; closeAll(false); openLand(); } else closeAll(); return; }
   const id = occ[idx(x, y)];
   if (id) { UI.sel = getB(id); closeAll(false); openInfo(); }
-  else { closeAll(); if (t.res) toast(`${ITEMS[t.res.t].name} ${t.res.amt}/${t.res.max}`); }
+  else { closeAll(); if (t.res) toast(t.res.t === "flower" ? "花畑（蜂の巣箱の周りに置くとハチミツが早くたまります）" : `${resName(t.res.t)} ${t.res.amt}/${t.res.max}`); }
 }
 
 // ============================================================
@@ -1499,14 +1604,12 @@ function openBuildMenu() {
 function showBlueprint(type) {
   const d = BUILD[type], why = bpBlocker(type);
   const outs = d.kind === 'prod' ? d.recipes.filter(r => !RECIPES[r].buy).map(r => RECIPES[r].out) : d.res ? [d.res] : [];
-  const buyNow = d.kind === 'prod' ? d.recipes.filter(r => RECIPES[r].buy && !RECIPES[r].up).map(r => RECIPES[r].out) : [];
-  const later = d.kind === 'prod' ? d.recipes.filter(r => RECIPES[r].up).map(r => RECIPES[r].out) : [];
+  const buyNow = d.kind === 'prod' ? d.recipes.filter(r => RECIPES[r].buy).map(r => RECIPES[r].out) : [];
   const stg = outs.length ? Math.max(...outs.map(k => ITEMS[k].stage)) : 0;
   let h = `<div>${d.desc}</div><div class="line"><span class="lbl">設計図</span><span class="val ${S.coins < d.bp ? 'red' : ''}">🪙${d.bp} <small>(所持 ${S.coins})</small></span></div>`;
   h += `<div class="line"><span class="lbl">建てる費用</span><span class="val">${Object.entries(d.cost).map(([k, v]) => (k === 'coins' ? '🪙' : ITEMS[k].name) + v).join(' ') || '無料'}</span></div>`;
   if (outs.length) h += `<div class="line"><span class="lbl">つくれる品</span><span class="val">${outs.map(k => ITEMS[k].name + `<small>(第${ITEMS[k].stage}段階)</small>`).join(' ')}</span></div>`;
   if (buyNow.length) h += `<div class="line"><span class="lbl">レシピ購入で</span><span class="val">${buyNow.map(k => ITEMS[k].name + `<small>(第${ITEMS[k].stage}段階)</small>`).join(' ')}</span></div>`;
-  if (later.length) h += `<div class="line"><span class="lbl">施設Lv2＋レシピ購入</span><span class="val">${later.map(k => ITEMS[k].name + `<small>(第${ITEMS[k].stage}段階)</small>`).join(' ')}</span></div>`;
   if (stg > (S.maxStage || 0)) h += `<div class="hint red" style="text-align:left">買うと第${stg}段階が解放され、幸福度の分母が上がります（幸福度が下がります）</div>`;
   if (why) h += `<div class="hint red" style="text-align:left">${why}</div>`;
   modal(`${d.name}の設計図`, h, () => { if (buyBlueprint(type)) { save(); openBuildMenu(); } }, !why && S.coins >= d.bp);
@@ -1559,15 +1662,16 @@ function renderInfo() {
     const c = nextLevelCost(b), lv = lvOf(b), key = b.type === 'market' ? 'workers' : 'slots', nm = b.type === 'market' ? '作業員' : 'スロット';
     return `<div class="line lvline"><span class="lbl">規模Lv ${lv} <small>${nm}${L[key][lv - 1]}${c === null ? '' : ` → ${L[key][lv]}`}</small></span>` + (c === null ? '<span class="val">最大</span>' : `<button class="btn small" id="lv-up" ${S.coins >= c ? '' : 'disabled'}>⬆ 🪙${c}</button>`) + `</div>`;
   };
-  const facLine = () => { const d0 = BUILD[b.type]; if (!d0.upCost) return ''; const c = facUpCost(b); return `<div class="line"><span class="lbl">施設Lv ${b.lv || 1} <small>${c === null ? '上位レシピを購入・使用できます' : 'Lv2で上位レシピが買えます'}</small></span>` + (c === null ? '<span class="val">最大</span>' : `<button class="btn small" id="fac-up" ${S.coins >= c ? '' : 'disabled'}>⬆ 🪙${c}</button>`) + `</div>`; };
   const destLine = () => CONFIG.FETCH_MODE ? `<div class="line"><span class="lbl">搬送先</span>` + ['none', 'warehouse', 'market'].map(k => `<button class="btn small dest ${b.dest === k ? 'on' : ''}" data-d="${k}">${DEST_NAMES[k]}</button>`).join('') + `</div>` : '';
   const tripLine = () => {
     if (!CONFIG.FETCH_MODE) return '';
     let st;
-    if (b.workers === 0) st = `<span class="lbl">⏸ 停止（作業員なし）</span>`;
+    if (isHive(b) && b.workers === 0) st = `<span class="lbl">${hiveFlowers(b) ? (b.inv.out >= CONFIG.INV_CAP ? '📦 棚が満杯（作業員を置くと運びます）' : '🐝 ハチミツをためています（作業員を置くと運びます）') : '🌼 周りに花畑がありません'}</span>`;
+    else if (b.workers === 0) st = `<span class="lbl">⏸ 停止（作業員なし）</span>`;
     else if (b.fetch) { const fo = getB(b.fetch.from); st = `<span class="lbl">🚶 ${ITEMS[b.fetch.item].name}×${b.fetch.qty} ${b.fetch.mode === 'in' ? '←' : '→'} ${fo ? bname(fo) : '?'}</span><div class="gauge prog"><div style="width:${Math.min(100, b.fetch.prog / b.fetch.time * 100)}%"></div></div><span class="val">${Math.max(0, Math.ceil((b.fetch.time - b.fetch.prog) / Math.max(1, b.workers)))}秒</span>`; }
     else if (b.inv && b.inv.out >= CONFIG.INV_CAP) st = `<span class="lbl">📦 完成品が満杯${b.dest === 'none' ? '（搬送先なし）' : '（搬送先に空きがありません）'}</span>`;
     else if (b.active) st = `<span class="lbl">⚙️ 生産中</span>`;
+    else if (isHive(b)) st = `<span class="lbl">${hiveFlowers(b) ? '🐝 ハチミツをためています' : '🌼 周りに花畑がありません'}</span>`;
     else if (d.kind === 'gather') st = `<span class="lbl">${gatherTarget(b) ? '⛏ 採集中' : '🔍 資源待ち'}</span>`;
     else if (b.recipe && !recipeMats(b).every((m, i) => b.inv[MK[i]] >= RECIPES[b.recipe].need[m])) st = `<span class="lbl">🔍 材料待ち（在庫なし）</span>`;
     else st = `<span class="lbl">…</span>`;
@@ -1581,10 +1685,19 @@ function renderInfo() {
     if (b.type === 'collect') h += `<div class="line"><span class="lbl">採るもの</span></div><div class="resbtns">` + GATHERABLE.map(r => { const ok = resFound(r); return `<button class="btn small resb ${gRes(b) === r ? 'on' : ''}" data-r="${r}" ${ok ? '' : 'disabled'}>${ok ? ITEMS[r].name : '？'}</button>`; }).join('') + `</div>`;
     else h += `<div class="line"><span class="lbl">採るもの</span><span class="val">${ITEMS[gRes(b)].name}</span></div>`;
     if (!noRes(b)) h += `<div class="line"><span class="lbl">範囲内の資源量</span><span class="val">${sum[0]}/${sum[1]}${tgt ? '' : ' <small>(採集できる資源なし)</small>'}</span></div>`;
+    if (isHive(b)) {
+      const n = hiveFlowers(b);
+      h += `<div class="line"><span class="lbl">周りの花畑</span><span class="val">${n}マス <small>(${CONFIG.HIVE_BASE_FLOWERS}マスで${CONFIG.HIVE_BASE_SEC}秒/個)</small></span></div>`;
+      h += `<div class="line"><span class="lbl">生産速度</span><span class="val">${n ? Math.round(hiveSec(b)) + '秒/個' : '停止（花畑なし）'} <small>作業員は運ぶだけ</small></span></div>`;
+      h += workersLine(); h += destLine(); if (CONFIG.FETCH_MODE) h += bagLine(); h += tripLine();
+      h += gaugeLine('生産進捗', n && b.inv.out < CONFIG.INV_CAP ? b.prog * 100 : 0, 100, 'prog');
+      h += gaugeLine(`完成品 ${ITEMS[gRes(b)].name}`, b.inv.out, CONFIG.INV_CAP);
+    } else {
     h += workersLine(); h += destLine(); if (CONFIG.FETCH_MODE) h += bagLine(); h += tripLine();
     h += `<div class="line"><span class="lbl">採集速度</span><span class="val">${b.workers ? (workSec(b) / b.workers).toFixed(0) + '秒/個' : '停止'}</span></div>`;
     if (!noRes(b)) h += `<div class="line"><span class="lbl">採集範囲</span><span class="val">周り${(R * 2 + 1) ** 2 - 1}マス</span></div>`;
     h += gaugeLine(`完成品 ${ITEMS[gRes(b)].name}`, b.inv.out, CONFIG.INV_CAP);
+    }
   } else if (d.kind === 'prod' && !b.recipe) {
     h += `<div class="line"><span class="lbl">レシピ</span><button class="recipe-btn" id="recipe-btn">レシピを選ぶ／買う</button></div>`;
     h += workersLine(); h += destLine();
@@ -1592,7 +1705,7 @@ function renderInfo() {
     const r = RECIPES[b.recipe], mats = Object.keys(r.need);
     h += `<div class="line"><span class="lbl">レシピ</span><button class="recipe-btn" id="recipe-btn">${mats.map(m => ITEMS[m].name + r.need[m]).join('＋')} → ${ITEMS[r.out].name}</button></div>`;
     h += workersLine();
-    h += facLine(); h += destLine(); if (CONFIG.FETCH_MODE) h += bagLine(); h += tripLine();
+    h += destLine(); if (CONFIG.FETCH_MODE) h += bagLine(); h += tripLine();
     h += `<div class="line"><span class="lbl">生産速度</span><span class="val">${b.workers ? (workSec(b) / b.workers).toFixed(0) + '秒/個' : '停止'}${r.fuel ? ' <small>(' + ITEMS[r.fuel].name + 'は火)</small>' : ''}</span></div>`;
     h += gaugeLine('生産進捗', b.active ? b.prog * 100 : 0, 100, 'prog');
     mats.forEach((m, i) => { h += gaugeLine(ITEMS[m].name + (m === r.fuel ? '（燃料）' : ''), b.inv[MK[i]] || 0, CONFIG.INV_CAP); });
@@ -1641,7 +1754,6 @@ function renderInfo() {
   document.querySelectorAll('.dest').forEach(el => el.onclick = () => { setDest(b, el.dataset.d); save(); renderInfo(); });
   document.querySelectorAll('.resb').forEach(el => el.onclick = () => { setRes(b, el.dataset.r); save(); renderInfo(); });
   const cu = $('carry-up'); if (cu) cu.onclick = () => { carryUp(b); save(); renderInfo(); };
-  const fu = $('fac-up'); if (fu) fu.onclick = () => { facUp(b); save(); renderInfo(); };
   const lu = $('lv-up'); if (lu) lu.onclick = () => { if (levelUp(b)) save(); renderInfo(); };
 
   document.querySelectorAll('.mk-item').forEach(el => el.onclick = () => pickMarketItem(b, +el.dataset.i));
@@ -1661,15 +1773,29 @@ function pickRecipe(b) {
   if (list.length === 1 && !RECIPES[list[0]].buy) { toast('このレシピのみです'); return; }
   let h = '';
   for (const r of list) {
-    const rc = RECIPES[r], label = `${Object.entries(rc.need).map(([k, v]) => ITEMS[k].name + v + (k === rc.fuel ? '(燃料)' : '')).join('＋')} → ${ITEMS[rc.out].name}<small>（第${ITEMS[rc.out].stage}段階）</small>`;
+    const rc = RECIPES[r], it = ITEMS[rc.out], label = `${Object.entries(rc.need).map(([k, v]) => ITEMS[k].name + v + (k === rc.fuel ? '(燃料)' : '')).join('＋')} → ${it.name}<small>（${it.pts}pt・第${it.stage}段階）</small>`;
     if (recipeUsable(b, r)) h += `<div class="line"><button class="recipe-btn pick" data-r="${r}">${label}${b.recipe === r ? '　✔' : ''}</button></div>`;
-    else if (rc.up && (b.lv || 1) < 2) h += `<div class="line"><span class="lbl">🔒 ${label}</span><span class="val"><small>施設Lv2で購入可</small></span></div>`;
-    else if (!recipeOwned(r)) h += `<div class="line"><span class="lbl">${label}</span><button class="btn small buy" data-r="${r}" ${S.coins >= rc.buy ? '' : 'disabled'}>🪙${rc.buy}で購入</button></div>`;
+    else { const c = recipePrice(r), up = recipeRaisesStage(r); h += `<div class="line"><span class="lbl">${label}${up ? `<br><small class="red">⚠ 買うと第${it.stage}段階に上がります</small>` : ''}</span><button class="btn small buy" data-r="${r}" ${S.coins >= c ? '' : 'disabled'}>🪙${c}で購入</button></div>`; }
   }
-  h += `<div class="hint" style="text-align:left">新しい段階のレシピを買うと、その段階が解放されて幸福度の分母が上がります</div>`;
+  h += `<div class="hint" style="text-align:left">レシピを買うと作れる品が増え、幸福度の分母（全部届いたときのポイント）が上がります。今の段階は第${S.maxStage || 0}段階です</div>`;
   modal('レシピを選択', h);
   document.querySelectorAll('.pick').forEach(el => el.onclick = () => { changeRecipe(b, el.dataset.r); $('modal').classList.add('hidden'); renderInfo(); save(); });
-  document.querySelectorAll('.buy').forEach(el => el.onclick = () => { if (buyRecipe(b, el.dataset.r)) save(); pickRecipe(b); });
+  document.querySelectorAll('.buy').forEach(el => el.onclick = () => {
+    const r = el.dataset.r;
+    if (!recipeRaisesStage(r)) { if (buyRecipe(b, r)) save(); pickRecipe(b); return; }
+    confirmStageUp(r, () => { if (buyRecipe(b, r)) save(); pickRecipe(b); }, () => pickRecipe(b));
+  });
+}
+// 段階が上がるレシピの購入確認
+function denomIfBought(r) { const out = RECIPES[r].out, ul = unlockedItems(); let s = 0; for (const k of ul) s += itemPoints(k); if (!ul.includes(out)) s += itemPoints(out); return Math.max(happyDenom(), s); }
+function confirmStageUp(r, onYes, onNo) {
+  const it = ITEMS[RECIPES[r].out], d0 = happyDenom(), d1 = denomIfBought(r);
+  const h = `<div>「${it.name}」のレシピを買うと、島が<b>第${it.stage}段階</b>に上がります。</div>` +
+    `<div>幸福度の分母が <b>${d0} → ${d1}</b> に上がるため、<span class="red">幸福度の維持が難しくなります</span>（いろいろな品を届けないと幸福度が下がったままになることがあります）。</div>` +
+    `<div class="hint" style="text-align:left">第${it.stage}段階になると、人口をさらに増やせる段に進めます。</div><div>購入しますか？（🪙${recipePrice(r)}）</div>`;
+  modal('段階が上がります', h, onYes, true);
+  $('modal-ok').textContent = '購入する';
+  $('modal-cancel').onclick = () => { $('modal').classList.add('hidden'); onNo && onNo(); };
 }
 function pickMarketItem(b, i) {
   let h = `<div class="line"><button class="recipe-btn pick" data-it="">（なし）</button></div>`;
