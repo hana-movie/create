@@ -20,9 +20,9 @@
   <div class="stat" id="st-happy">😊 <span>0</span></div>
   <div class="spacer"></div>
   <button class="icon-btn" id="btn-goal" title="目標">🎯</button>
-  <button class="icon-btn" id="btn-store" title="倉庫">📦</button>
+  <button class="icon-btn" id="btn-store" title="インベントリ">📦</button>
   <button class="icon-btn wide" id="btn-speed" title="時間加速">⏩×1</button>
-  <button class="icon-btn" id="btn-reset" title="最初からやり直す">⚙️</button>
+  <button class="icon-btn" id="btn-reset" title="設定">⚙️</button>
 </div>
 
 <!-- 目標（常時表示） -->
@@ -63,22 +63,10 @@
   <div class="row" id="info-actions"></div>
 </div>
 
-<!-- 土地開放 -->
-<div id="landpanel" class="sheet hidden">
-  <div class="sheet-head"><div class="title">エリアを開放</div><button class="close" data-close="landpanel">✕</button></div>
-  <div id="land-cost"></div>
-  <div class="row"><button class="btn primary" id="land-ok">開放する</button></div>
-</div>
-
-<!-- 倉庫パネル -->
+<!-- インベントリ -->
 <div id="storepanel" class="sheet hidden">
-  <div class="sheet-head">
-    <div class="tabs" id="store-tabs"><button class="tab active" data-tab="items">品物</button><button class="tab" data-tab="slots">倉庫スロット</button></div>
-    <button class="close" data-close="storepanel">✕</button>
-  </div>
-  <div id="store-items"></div>
-  <div id="store-slots" class="hidden"></div>
-  <div class="hint hidden" id="store-hint">「確保」＝市場や生産に出さずに残す数（建築用）。確保を100にすると何も出せなくなります</div>
+  <div class="sheet-head"><div class="title">インベントリ</div><button class="close" data-close="storepanel">✕</button></div>
+  <div id="store-body"></div>
 </div>
 
 <!-- 住民パネル -->

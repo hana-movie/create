@@ -179,3 +179,23 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .line.buyable { background: #fff4d6; border-radius: 8px; padding: 6px 8px; border-bottom: 0; margin: 4px 0; }
 #st-pop.full { background: rgba(217,72,59,.75); }
 #goalbar .gb-sub.warn { color: #b03020; font-weight: bold; }
+
+/* v0.20 */
+.bitem.short .bcost { color: #d33; }
+.mkslot { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px dashed #e0d4b4; }
+.mkslot .recipe-btn { flex: 1; text-align: left; }
+.mkslot .mkst { font-variant-numeric: tabular-nums; min-width: 46px; text-align: right; }
+.btn.small.on { background: #f0b63c; }
+.invrow { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "n q" "r s"; gap: 4px 8px; padding: 6px 0; border-bottom: 1px dashed #e0d4b4; align-items: center; }
+.invrow .invname { grid-area: n; font-weight: bold; }
+.invrow .invname small { font-weight: normal; color: #888; margin-left: 6px; }
+.invrow .invq { grid-area: q; font-variant-numeric: tabular-nums; }
+.invrow .invres { grid-area: r; display: flex; align-items: center; gap: 4px; }
+.invrow .invres span { min-width: 22px; text-align: center; }
+.invrow .invsell { grid-area: s; display: flex; gap: 4px; }
+.goal.done { opacity: .6; }
+.goal.locked { opacity: .45; }
+.goal + .goal { margin-top: 6px; }
+.btn.diff { flex: 1; line-height: 1.2; }
+.invrow .invsell small { color: #888; }
+.invrow .btn.small { white-space: nowrap; }
