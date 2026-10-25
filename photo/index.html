@@ -1,0 +1,1050 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#ffe9c7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="たからもの">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>ぱしゃっ！ぼくの宝物のおへや</title>
+<style>
+  :root {
+    --barh: calc(112px + env(safe-area-inset-bottom));
+    --ink: #4a3b5c;
+    --wood: #c98b52; --wood-d: #9c6634; --wood-l: #e2a96f;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #ffe9c7; color: var(--ink);
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  button { font-family: inherit; color: inherit; }
+
+  /* ===== おへや ===== */
+  #room { position: fixed; left: 0; right: 0; top: 0; bottom: var(--barh); overflow: hidden; touch-action: none; }
+  .wall {
+    position: absolute; left: 0; right: 0; top: 0; height: 74%;
+    background-color: #fff3e2;
+    background-image: radial-gradient(#ffd9e6 18%, transparent 19%), radial-gradient(#d9ecff 18%, transparent 19%);
+    background-size: 56px 56px; background-position: 0 0, 28px 28px;
+  }
+  .floor {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 26%;
+    background: repeating-linear-gradient(90deg, #e9b87f 0 46px, #e2ae73 46px 92px);
+    box-shadow: inset 0 8px 0 #d39a5c;
+  }
+  .rug { position: absolute; left: 50%; bottom: 2%; width: 78%; height: 15%; transform: translateX(-50%); border-radius: 50%;
+    background: #ffb3c9; box-shadow: inset 0 0 0 8px #ff9bb8, inset 0 0 0 14px #ffd0de; }
+  .window {
+    position: absolute; left: 50%; top: max(12px, env(safe-area-inset-top)); width: 34%; height: 15%; transform: translateX(-50%);
+    border-radius: 16px; background: linear-gradient(#9fd8ff, #d6f0ff); border: 7px solid #fff; box-shadow: 0 4px 0 rgba(0,0,0,.08);
+    overflow: hidden;
+  }
+  .window::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; margin-left: -3px; background: #fff; }
+  .window::after { content: ''; position: absolute; left: 14%; top: 26%; width: 34%; height: 28%; border-radius: 999px; background: #fff; box-shadow: 70px 18px 0 -4px #fff; }
+  .sun { position: absolute; right: 10%; top: 12%; width: 22%; aspect-ratio: 1; border-radius: 50%; background: #ffd23f; }
+  .board {
+    position: absolute; height: 16px; border-radius: 6px;
+    background: linear-gradient(var(--wood-l), var(--wood) 45%, var(--wood-d));
+    box-shadow: 0 8px 0 rgba(0,0,0,.08);
+  }
+  .board::before, .board::after { content: ''; position: absolute; top: 14px; width: 14px; height: 26px; background: var(--wood-d); border-radius: 0 0 6px 6px; }
+  .board::before { left: 10%; } .board::after { right: 10%; }
+  .slot {
+    position: absolute; border-radius: 22%; border: 4px dashed rgba(255, 140, 180, .0); transition: border-color .2s, background .2s;
+    pointer-events: none;
+  }
+  #room.show-slots .slot { border-color: rgba(255, 120, 170, .55); background: rgba(255, 255, 255, .35); }
+  #room.show-slots .slot.hot { border-color: #ff6fa0; background: rgba(255, 220, 235, .8); transform: scale(1.06); }
+
+  /* ===== アイテム（シール） ===== */
+  .item {
+    position: absolute; border-radius: 22%; background: #fff; padding: 5px;
+    box-shadow: 0 6px 0 rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.12);
+    transition: left .38s cubic-bezier(.3, 1.4, .5, 1), top .38s cubic-bezier(.3, 1.4, .5, 1), transform .2s, opacity .3s;
+    touch-action: none; z-index: 5; cursor: grab;
+  }
+  .item img { display: block; width: 100%; height: 100%; border-radius: 18%; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }
+  .item.dragging { transition: transform .15s; z-index: 60; transform: scale(1.15) rotate(-5deg); box-shadow: 0 16px 20px rgba(0,0,0,.2); }
+  .item.selected { z-index: 40; animation: wiggle 1.1s ease-in-out infinite; box-shadow: 0 0 0 6px #ffd23f, 0 6px 0 rgba(0,0,0,.12); }
+  .item.boing { animation: boing .5s ease-out; }
+  .item.settle { animation: settle .4s ease-out; }
+  .item.leaving { z-index: 55; pointer-events: none; transition: left .45s ease-in, top .45s ease-in, transform .45s ease-in, opacity .45s ease-in; }
+  @keyframes boing { 0% { transform: scale(1); } 30% { transform: scale(1.22, .86); } 55% { transform: scale(.92, 1.12); } 80% { transform: scale(1.05, .97); } 100% { transform: scale(1); } }
+  @keyframes settle { 0% { transform: scale(1.1, .9); } 60% { transform: scale(.96, 1.05); } 100% { transform: scale(1); } }
+  @keyframes wiggle { 0%, 100% { transform: rotate(-4deg) scale(1.06); } 50% { transform: rotate(4deg) scale(1.06); } }
+
+  /* ===== はこ ===== */
+  #box { position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); z-index: 4; }
+  #box svg { display: block; width: 100%; height: 100%; overflow: visible; position: relative; z-index: 2; }
+  #box .peek { position: absolute; left: 12%; right: 12%; top: -6%; height: 40%; z-index: 1; }
+  #box .peek img { position: absolute; bottom: 0; width: 38%; aspect-ratio: 1; object-fit: cover; border-radius: 20%; border: 3px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,.15); }
+  #box .badge {
+    position: absolute; right: -8px; top: 14%; z-index: 3; min-width: 40px; height: 40px; padding: 0 8px; border-radius: 999px;
+    background: #ff6fa0; color: #fff; font-weight: bold; font-size: 22px; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 0 #d94a7c;
+  }
+  #box.shake { animation: shake .5s ease-in-out; }
+  #box.glow svg { filter: drop-shadow(0 0 10px #ffd23f) drop-shadow(0 0 4px #ffd23f); }
+  @keyframes shake { 0%, 100% { transform: translateX(-50%) rotate(0); } 20% { transform: translateX(-50%) rotate(-6deg) scale(1.05); } 40% { transform: translateX(-50%) rotate(5deg); } 60% { transform: translateX(-50%) rotate(-3deg); } 80% { transform: translateX(-50%) rotate(2deg); } }
+
+  /* もっている アイテム（いちらんから えらんだ とき） */
+  #carry {
+    position: absolute; left: 50%; top: max(10px, env(safe-area-inset-top)); z-index: 70; transform: translateX(-50%);
+    display: none; align-items: center; gap: 10px; padding: 8px 10px 8px 8px; border-radius: 999px;
+    background: #fff; box-shadow: 0 6px 0 rgba(0,0,0,.1);
+  }
+  #carry.on { display: flex; animation: boing .5s; }
+  #carry img { width: 72px; height: 72px; border-radius: 22%; object-fit: cover; border: 4px solid #ffd23f; }
+  #carry .arrow { font-size: 34px; animation: nudge 1s ease-in-out infinite; }
+  #carry button { width: 56px; height: 56px; border-radius: 50%; border: none; background: #eef1f7; font-size: 26px; }
+  @keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+
+  /* おうちのかた ボタン */
+  #gear {
+    position: absolute; right: max(10px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top)); z-index: 30;
+    width: 52px; height: 52px; border-radius: 50%; border: none; background: rgba(255,255,255,.75); font-size: 24px;
+    touch-action: none;
+  }
+  #gear svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  #gear circle { fill: none; stroke: #ff6fa0; stroke-width: 4; stroke-dasharray: 151; stroke-dashoffset: 151; }
+  #gear.hold circle { transition: stroke-dashoffset 1.5s linear; stroke-dashoffset: 0; }
+  #gearTip { position: absolute; right: 8px; top: calc(max(10px, env(safe-area-inset-top)) + 56px); z-index: 30; font-size: 11px; color: #a08a70; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #gearTip.on { opacity: 1; }
+
+  /* ===== したの ボタン ===== */
+  #bar {
+    position: fixed; left: 0; right: 0; bottom: 0; height: var(--barh); padding-bottom: env(safe-area-inset-bottom);
+    display: flex; align-items: center; justify-content: space-around; background: #fff7ea; box-shadow: 0 -4px 0 #f3dcb8; z-index: 20;
+  }
+  .bbtn {
+    position: relative; width: 80px; height: 80px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center;
+    font-size: 40px; box-shadow: 0 6px 0 rgba(0,0,0,.15); touch-action: manipulation; cursor: pointer;
+  }
+  .bbtn:active { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.15); }
+  .bbtn.cam { width: 96px; height: 96px; font-size: 48px; background: #ff6fa0; box-shadow: 0 6px 0 #d94a7c; }
+  .bbtn.list { background: #7cc8ff; box-shadow: 0 6px 0 #4b9ad6; }
+  .bbtn.tidy { background: #8fdc7a; box-shadow: 0 6px 0 #5daa4a; }
+
+  /* ===== かさねる がめん ===== */
+  .overlay { position: fixed; inset: 0; z-index: 100; display: none; }
+  .overlay.on { display: flex; }
+
+  /* いちらん */
+  #sheet { background: rgba(60, 40, 70, .35); align-items: flex-end; }
+  #sheet .panel {
+    width: 100%; max-height: 82%; background: #fff7ea; border-radius: 28px 28px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; animation: up .3s ease-out;
+  }
+  @keyframes up { from { transform: translateY(40%); opacity: .4; } }
+  #sheet .head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .tab { height: 64px; min-width: 88px; padding: 0 14px; border-radius: 20px; border: 4px solid transparent; background: #fff; font-size: 30px; box-shadow: 0 4px 0 #f0d9b5; }
+  .tab.on { border-color: #ffb238; background: #fff2d6; }
+  .tab small { font-size: 18px; font-weight: bold; margin-left: 4px; }
+  .xbtn { margin-left: auto; width: 64px; height: 64px; border-radius: 50%; border: none; background: #eef1f7; font-size: 30px; }
+  #grid { overflow: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 4px 2px 8px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+  .cell { position: relative; aspect-ratio: 1; border: none; padding: 5px; border-radius: 22%; background: #fff; box-shadow: 0 5px 0 rgba(0,0,0,.1); }
+  .cell img { width: 100%; height: 100%; border-radius: 18%; object-fit: cover; display: block; pointer-events: none; }
+  .cell .where { position: absolute; right: -4px; bottom: -4px; width: 34px; height: 34px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,.15); }
+  .empty { grid-column: 1 / -1; text-align: center; font-size: 60px; padding: 30px 0; opacity: .6; }
+
+  /* カメラ */
+  #cam { background: #2b2233; flex-direction: column; align-items: center; justify-content: center; padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom); gap: 20px; }
+  .stage { position: relative; width: min(88vw, 56vh); aspect-ratio: 1; border-radius: 22%; overflow: hidden; background: #000; border: 8px solid #fff; box-shadow: 0 10px 0 rgba(0,0,0,.25); }
+  .stage video, .stage img, .stage .fail { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .stage img { display: none; }
+  .stage.preview img { display: block; animation: settle .4s ease-out; }
+  .stage .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+  .stage .flash.on { animation: flash .35s ease-out; }
+  @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+  .stage .fail { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #fff3e2; color: var(--ink); font-size: 18px; text-align: center; padding: 16px; }
+  .stage.failed .fail { display: flex; }
+  .stage .fail .big { font-size: 64px; }
+  .stage .wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 56px; color: #fff; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .4; } }
+  .camrow { display: flex; align-items: center; justify-content: center; gap: 22px; }
+  .cbtn { width: 80px; height: 80px; border-radius: 50%; border: none; font-size: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 6px 0 rgba(0,0,0,.3); }
+  .cbtn small { font-size: 12px; font-weight: bold; margin-top: 2px; }
+  .cbtn:active { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.3); }
+  .shutter { width: 104px; height: 104px; background: #fff; border: 10px solid #ff6fa0; font-size: 0; }
+  .c-close { background: #eef1f7; }
+  .c-file { background: #7cc8ff; }
+  .c-again { background: #ffd23f; width: 96px; height: 96px; }
+  .c-ok { background: #8fdc7a; width: 112px; height: 112px; font-size: 48px; }
+  .c-sample { background: #ffb3c9; }
+  .c-ok:disabled { opacity: .5; }
+
+  /* ぽんっ */
+  #pop { position: fixed; inset: 0; z-index: 120; display: none; align-items: center; justify-content: center; pointer-events: none; }
+  #pop.on { display: flex; }
+  #pop .st { width: 52vmin; aspect-ratio: 1; padding: 8px; border-radius: 22%; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.25); animation: popin .7s cubic-bezier(.3, 1.6, .5, 1); }
+  #pop .st img { width: 100%; height: 100%; border-radius: 18%; object-fit: cover; display: block; }
+  #pop .spark { position: absolute; left: 50%; top: 50%; font-size: 34px; animation: spark .9s ease-out forwards; }
+  @keyframes popin { 0% { transform: scale(0) rotate(-20deg); } 70% { transform: scale(1.12) rotate(4deg); } 100% { transform: scale(1); } }
+  @keyframes spark { 0% { transform: translate(-50%, -50%) scale(.3); opacity: 1; } 100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1); opacity: 0; } }
+
+  /* おうちのかた */
+  #parent { background: rgba(40, 30, 50, .45); align-items: center; justify-content: center; padding: 16px; }
+  #parent .panel { width: 100%; max-width: 560px; max-height: 92%; overflow: auto; background: #fff; border-radius: 20px; padding: 18px; font-size: 15px; line-height: 1.6; color: #333; -webkit-user-select: text; user-select: text; }
+  #parent h2 { margin: 0 0 8px; font-size: 19px; }
+  #parent h3 { margin: 18px 0 6px; font-size: 15px; color: #c2507c; }
+  #parent p { margin: 4px 0; font-size: 13px; color: #555; }
+  .prow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #f0e6da; }
+  .prow img { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; flex: none; }
+  .prow .meta { flex: 1; font-size: 13px; color: #555; }
+  .pbtn { min-height: 44px; padding: 8px 14px; border-radius: 10px; border: none; background: #eef1f7; font-size: 14px; font-weight: bold; }
+  .pbtn.red { background: #ffe1e5; color: #c4283d; }
+  .pbtn.main { background: #ff6fa0; color: #fff; }
+  #vol { width: 100%; height: 36px; }
+  #parent .close { float: right; }
+
+  #confirm { background: rgba(40, 30, 50, .55); z-index: 140; align-items: center; justify-content: center; padding: 20px; }
+  #confirm .panel { background: #fff; border-radius: 18px; padding: 20px; max-width: 360px; width: 100%; text-align: center; color: #333; }
+  #confirm p { font-size: 16px; line-height: 1.6; margin: 0 0 16px; }
+  #confirm .row { display: flex; gap: 10px; justify-content: center; }
+
+  #toast { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%); z-index: 150; font-size: 64px; pointer-events: none; opacity: 0; }
+  #toast.on { animation: toast 1.4s ease-out; }
+  @keyframes toast { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.5); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -70%); } }
+</style>
+</head>
+<body>
+<div id="room">
+  <div class="wall"></div>
+  <div class="window"><div class="sun"></div></div>
+  <div class="floor"></div>
+  <div class="rug"></div>
+  <div id="boards"></div>
+  <div id="box" aria-label="はこ">
+    <div class="peek" id="peek"></div>
+    <svg viewBox="0 0 200 140" aria-hidden="true">
+      <path d="M8 34 L192 34 L182 136 L18 136 Z" fill="#ff9f43"/>
+      <path d="M8 34 L192 34 L186 60 L14 60 Z" fill="#ffb86b"/>
+      <rect x="2" y="22" width="196" height="20" rx="8" fill="#ff8a2a"/>
+      <circle cx="100" cy="92" r="24" fill="#fff3c4"/>
+      <path d="M100 76 l5 11 12 1 -9 8 3 12 -11 -6 -11 6 3 -12 -9 -8 12 -1z" fill="#ffcc33"/>
+      <circle cx="44" cy="104" r="8" fill="#ffd0a0"/><circle cx="156" cy="104" r="8" fill="#ffd0a0"/>
+    </svg>
+    <div class="badge" id="badge">0</div>
+  </div>
+  <div id="carry"><img id="carryImg" alt=""><span class="arrow">👇</span><button id="carryX" aria-label="やめる">✕</button></div>
+  <button id="gear" aria-label="おうちのかた むけ せってい（ながおし）">⚙️<svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/></svg></button>
+  <div id="gearTip">おうちのかた：ながおし</div>
+</div>
+
+<div id="bar">
+  <button class="bbtn list" id="listBtn" aria-label="たからもの いちらん">🖼️</button>
+  <button class="bbtn cam" id="camBtn" aria-label="しゃしんを とる">📷</button>
+  <button class="bbtn tidy" id="tidyBtn" aria-label="ぜんぶ おかたづけ">🧹</button>
+</div>
+
+<!-- いちらん -->
+<div class="overlay" id="sheet">
+  <div class="panel">
+    <div class="head">
+      <button class="tab on" data-f="all" aria-label="ぜんぶ">🖼️<small id="cntAll">0</small></button>
+      <button class="tab" data-f="box" aria-label="はこの なか">📦<small id="cntBox">0</small></button>
+      <button class="xbtn" id="sheetX" aria-label="とじる">✕</button>
+    </div>
+    <div id="grid"></div>
+  </div>
+</div>
+
+<!-- カメラ -->
+<div class="overlay" id="cam">
+  <div class="stage" id="stage">
+    <video id="video" playsinline muted autoplay></video>
+    <img id="shot" alt="">
+    <div class="wait" id="camWait">📷</div>
+    <div class="fail">
+      <div class="big">📷💤</div>
+      <div>カメラが つかえないよ</div>
+    </div>
+    <div class="flash" id="flash"></div>
+  </div>
+  <div class="camrow" id="rowLive">
+    <button class="cbtn c-close" id="camX" aria-label="もどる">✕</button>
+    <button class="cbtn shutter" id="shutter" aria-label="ぱしゃっ">ぱしゃ</button>
+    <button class="cbtn c-file" id="fileBtn" aria-label="しゃしんを えらぶ">🖼️</button>
+  </div>
+  <div class="camrow" id="rowFail" style="display:none">
+    <button class="cbtn c-close" id="failX" aria-label="もどる">✕</button>
+    <button class="cbtn c-file" id="failFile" aria-label="しゃしんを えらぶ">📁<small>しゃしん</small></button>
+    <button class="cbtn c-sample" id="failSample" aria-label="みほんで あそぶ">🧸<small>みほん</small></button>
+  </div>
+  <div class="camrow" id="rowPrev" style="display:none">
+    <button class="cbtn c-again" id="againBtn" aria-label="もういっかい">🔁<small>もういっかい</small></button>
+    <button class="cbtn c-ok" id="okBtn" aria-label="これにする">⭕<small>これにする</small></button>
+  </div>
+  <input type="file" id="fileIn" accept="image/*" capture="environment" style="display:none">
+</div>
+
+<div id="pop"><div class="st"><img id="popImg" alt=""></div></div>
+
+<!-- おうちのかた -->
+<div class="overlay" id="parent">
+  <div class="panel">
+    <button class="pbtn close" id="parentX">とじる</button>
+    <h2>おうちの方へ（設定）</h2>
+    <h3>音量</h3>
+    <input type="range" id="vol" min="0" max="1" step="0.05">
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="pbtn" id="volTest">♪ 音を確認</button></div>
+    <h3>保存したアイテム（<span id="pCount">0</span>）</h3>
+    <div id="pList"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="pbtn red" id="delAll">すべて削除</button>
+      <button class="pbtn" id="addSamples">見本アイテムを追加</button>
+    </div>
+    <h3>写真と保存について</h3>
+    <p>撮影した写真は、この端末のブラウザの中（IndexedDB）だけに保存されます。外部のサーバーやクラウドには送信しません。広告・アクセス解析・SNS共有の機能はありません。</p>
+    <p id="storeInfo"></p>
+    <p>iPhone / iPad では、Safari で長い間このページを開かないと、保存データが消されることがあります。「ホーム画面に追加」して使うと消えにくくなります（ホーム画面から開いたときと Safari で開いたときは、別々の保存場所になります）。</p>
+    <h3>その他</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="pbtn" href="../gameselect.html" style="text-decoration:none;display:inline-flex;align-items:center">ゲーム選択画面へ</a></div>
+  </div>
+</div>
+
+<div class="overlay" id="confirm">
+  <div class="panel">
+    <p id="confirmMsg"></p>
+    <div class="row"><button class="pbtn" id="confirmNo">やめる</button><button class="pbtn red" id="confirmYes">削除する</button></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const room = $('room');
+  const SHELVES = ['shelf1', 'shelf2'];
+  const SLOTS = 4;
+
+  // ===== 保存（IndexedDB） =====
+  let db = null;
+  function openDB() {
+    return new Promise((res, rej) => {
+      if (!('indexedDB' in window)) { rej(new Error('no indexedDB')); return; }
+      const r = indexedDB.open('pashatto-room', 1);
+      r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('photos'); d.createObjectStore('state'); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+      r.onblocked = () => rej(new Error('blocked'));
+    });
+  }
+  function idb(store, mode, fn) {
+    return new Promise((res, rej) => {
+      if (!db) { rej(new Error('no db')); return; }
+      let req;
+      try {
+        const tx = db.transaction(store, mode);
+        req = fn(tx.objectStore(store));
+        tx.oncomplete = () => res(req ? req.result : undefined);
+        tx.onerror = () => rej(tx.error);
+        tx.onabort = () => rej(tx.error || new Error('abort'));
+      } catch (e) { rej(e); }
+    });
+  }
+  const getRec = (store, key) => idb(store, 'readonly', s => s.get(key));
+  const putRec = (store, key, val) => idb(store, 'readwrite', s => s.put(val, key));
+  const delRec = (store, key) => idb(store, 'readwrite', s => s.delete(key));
+  const allKeys = store => idb(store, 'readonly', s => s.getAllKeys ? s.getAllKeys() : null);
+
+  function blobToBuffer(blob) {
+    if (blob.arrayBuffer) return blob.arrayBuffer();
+    return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsArrayBuffer(blob); });
+  }
+
+  // ===== ゲームの じょうたい =====
+  // アイテムの 置き場所は item.loc だけで管理する（棚・箱・未配置）。別の表を持たないので、削除しても食い違いが起きない。
+  let state = null;
+  const urls = {};      // id -> 表示用URL
+  const els = {};       // id -> 棚の上の要素
+  const freshState = () => ({ version: 1, items: {}, order: [], settings: { volume: 0.7 } });
+  let saveTimer = 0, memoryOnly = false;
+  function save() {
+    clearTimeout(saveTimer);
+    return new Promise(res => { saveTimer = setTimeout(async () => { await saveNow(); res(); }, 150); });
+  }
+  async function saveNow() {
+    if (!db) { memoryOnly = true; return false; }
+    try { await putRec('state', 'main', JSON.parse(JSON.stringify(state))); return true; }
+    catch (e) { memoryOnly = true; console.warn('save failed', e); return false; }
+  }
+
+  // ===== おと =====
+  let actx = null, master = null;
+  function audio() {
+    try {
+      if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); master = actx.createGain(); master.connect(actx.destination); }
+      if (actx.state === 'suspended') actx.resume();
+      master.gain.value = state ? state.settings.volume : 0.7;
+    } catch (e) {}
+  }
+  function tone(f, dur, type, vol, f2, delay) {
+    if (!actx || !state || state.settings.volume <= 0) return;
+    const t0 = actx.currentTime + (delay || 0);
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(f, t0);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol || 0.15, t0 + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(master); o.start(t0); o.stop(t0 + dur + 0.03);
+  }
+  function noise(dur, vol) {
+    if (!actx || !state || state.settings.volume <= 0) return;
+    const n = Math.floor(actx.sampleRate * dur), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+    const s = actx.createBufferSource(), g = actx.createGain(), f = actx.createBiquadFilter();
+    f.type = 'highpass'; f.frequency.value = 1500; g.gain.value = vol;
+    s.buffer = buf; s.connect(f).connect(g).connect(master); s.start();
+  }
+  const sfx = {
+    tap: () => { tone(520, 0.12, 'sine', 0.14, 820); },
+    place: () => { tone(380, 0.1, 'triangle', 0.16, 260); tone(760, 0.12, 'sine', 0.06, null, 0.06); },
+    box: () => { tone(700, 0.3, 'sine', 0.12, 180); tone(160, 0.16, 'triangle', 0.12, 110, 0.22); },
+    shutter: () => { noise(0.12, 0.35); tone(1800, 0.05, 'square', 0.04, null, 0.06); },
+    pop: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.12, null, i * 0.07)); },
+    soft: () => { tone(440, 0.15, 'sine', 0.08, 520); },
+  };
+
+  // ===== みほん アイテム（キャンバスで えがく） =====
+  const SAMPLE_KINDS = ['apple', 'ball', 'bear', 'car', 'star', 'flower'];
+  function drawSample(kind) {
+    const S = 512, c = document.createElement('canvas'); c.width = S; c.height = S;
+    const g = c.getContext('2d');
+    const bgs = { apple: '#fff1e6', ball: '#e9f5ff', bear: '#fff6df', car: '#eaf8ea', star: '#efe9ff', flower: '#ffeef5' };
+    g.fillStyle = bgs[kind]; g.fillRect(0, 0, S, S);
+    g.fillStyle = 'rgba(255,255,255,.6)';
+    for (let i = 0; i < 14; i++) { g.beginPath(); g.arc((i * 97) % S, (i * 151) % S, 14, 0, Math.PI * 2); g.fill(); }
+    const circ = (x, y, r, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    switch (kind) {
+      case 'apple':
+        circ(256, 290, 150, '#e8404a'); circ(200, 230, 40, 'rgba(255,255,255,.35)');
+        g.strokeStyle = '#7a4a2a'; g.lineWidth = 18; g.beginPath(); g.moveTo(256, 150); g.lineTo(270, 95); g.stroke();
+        g.fillStyle = '#4caf50'; g.beginPath(); g.ellipse(320, 110, 52, 24, -0.4, 0, Math.PI * 2); g.fill();
+        break;
+      case 'ball':
+        circ(256, 270, 170, '#4da3ff');
+        g.save(); g.beginPath(); g.arc(256, 270, 170, 0, Math.PI * 2); g.clip();
+        g.fillStyle = '#fff'; g.fillRect(80, 240, 360, 60); g.fillStyle = '#ffcc33'; g.fillRect(80, 300, 360, 30); g.restore();
+        circ(195, 195, 34, 'rgba(255,255,255,.5)');
+        break;
+      case 'bear':
+        circ(150, 150, 60, '#b9824f'); circ(362, 150, 60, '#b9824f'); circ(150, 150, 30, '#e7b98a'); circ(362, 150, 30, '#e7b98a');
+        circ(256, 280, 165, '#c98f58'); circ(256, 330, 70, '#efcfa6');
+        circ(196, 255, 16, '#3a2a40'); circ(316, 255, 16, '#3a2a40'); circ(256, 312, 20, '#3a2a40');
+        g.strokeStyle = '#3a2a40'; g.lineWidth = 9; g.beginPath(); g.arc(240, 340, 16, 0.2, Math.PI - 0.6); g.stroke(); g.beginPath(); g.arc(272, 340, 16, 0.6, Math.PI - 0.2); g.stroke();
+        circ(170, 300, 18, 'rgba(255,120,150,.4)'); circ(342, 300, 18, 'rgba(255,120,150,.4)');
+        break;
+      case 'car':
+        g.fillStyle = '#ff5a5f';
+        g.beginPath(); g.moveTo(80, 330); g.lineTo(80, 270); g.quadraticCurveTo(80, 240, 120, 236); g.lineTo(170, 236); g.lineTo(215, 170); g.lineTo(330, 170); g.lineTo(380, 236); g.lineTo(420, 240); g.quadraticCurveTo(440, 250, 440, 290); g.lineTo(440, 330); g.closePath(); g.fill();
+        g.fillStyle = '#bfe6ff'; g.beginPath(); g.moveTo(190, 236); g.lineTo(225, 188); g.lineTo(268, 188); g.lineTo(268, 236); g.closePath(); g.fill();
+        g.beginPath(); g.moveTo(284, 236); g.lineTo(284, 188); g.lineTo(322, 188); g.lineTo(356, 236); g.closePath(); g.fill();
+        circ(160, 340, 42, '#2f2a3a'); circ(360, 340, 42, '#2f2a3a'); circ(160, 340, 18, '#c9cfdd'); circ(360, 340, 18, '#c9cfdd');
+        circ(425, 270, 12, '#fff6b0');
+        break;
+      case 'star': {
+        g.fillStyle = '#ffcc33'; g.beginPath();
+        for (let i = 0; i < 10; i++) { const r = i % 2 ? 80 : 190, a = i * Math.PI / 5 - Math.PI / 2; g.lineTo(256 + Math.cos(a) * r, 270 + Math.sin(a) * r); }
+        g.closePath(); g.fill(); g.strokeStyle = '#f5a623'; g.lineWidth = 12; g.stroke();
+        circ(215, 265, 14, '#3a2a40'); circ(297, 265, 14, '#3a2a40');
+        g.strokeStyle = '#3a2a40'; g.lineWidth = 9; g.beginPath(); g.arc(256, 290, 26, 0.3, Math.PI - 0.3); g.stroke();
+        break;
+      }
+      case 'flower':
+        g.strokeStyle = '#3a9a4a'; g.lineWidth = 22; g.beginPath(); g.moveTo(256, 470); g.lineTo(256, 260); g.stroke();
+        g.fillStyle = '#4caf50'; g.beginPath(); g.ellipse(310, 400, 60, 26, -0.5, 0, Math.PI * 2); g.fill();
+        for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; circ(256 + Math.cos(a) * 80, 220 + Math.sin(a) * 80, 62, '#ff8fb5'); }
+        circ(256, 220, 56, '#ffd23f');
+        break;
+    }
+    return new Promise((res, rej) => c.toBlob(b => (b ? res(b) : rej(new Error('toBlob'))), 'image/png'));
+  }
+
+  // ===== アイテムを つくる・けす =====
+  const newId = () => 'it_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  async function createItem(blob, opts) {
+    opts = opts || {};
+    if (!blob || !blob.size) throw new Error('empty photo');
+    const id = newId();
+    const rec = { type: blob.type || 'image/jpeg', buf: await blobToBuffer(blob) };
+    if (db) await putRec('photos', id, rec);   // 写真の保存に失敗したら ここで止まり、アイテムは作られない
+    else memoryOnly = true;
+    const item = { id, photoKey: id, createdAt: new Date().toISOString(), sample: opts.sample || null, loc: { where: 'none' } };
+    state.items[id] = item;
+    state.order.push(id);
+    urls[id] = URL.createObjectURL(blob);
+    if (opts.loc) item.loc = opts.loc;
+    await saveNow();
+    return item;
+  }
+  async function deleteItem(id) {
+    const it = state.items[id];
+    if (!it) return;
+    if (sel === id) setSel(null);
+    delete state.items[id];
+    state.order = state.order.filter(x => x !== id);
+    if (els[id]) { els[id].remove(); delete els[id]; }
+    await saveNow();
+    try { if (db) await delRec('photos', it.photoKey); } catch (e) {}
+    if (urls[id]) { URL.revokeObjectURL(urls[id]); delete urls[id]; }
+  }
+
+  // ===== 置き場所 =====
+  let G = null;  // 画面の寸法
+  function geom() {
+    const W = room.clientWidth, H = room.clientHeight;
+    const left = W * 0.05, right = W * 0.95, sw = (right - left) / SLOTS;
+    const boards = [H * 0.35, H * 0.62];
+    const S = Math.max(56, Math.min(sw - 10, H * 0.2, 170));
+    return { W, H, left, right, sw, boards, S };
+  }
+  function slotXY(si, k) { return { x: G.left + G.sw * (k + 0.5) - G.S / 2, y: G.boards[si] - G.S - 4 }; }
+  function shelfLoc(shelfId, slot) {
+    // 位置と大きさは 画面に対する比率で保存する
+    return { where: 'shelf', shelfId, slot, x: +((slot + 0.5) / SLOTS).toFixed(4), size: +(G.S / G.W).toFixed(4) };
+  }
+  function shelfMap() {
+    const m = {}; SHELVES.forEach(s => (m[s] = Array(SLOTS).fill(null)));
+    for (const id of state.order) {
+      const it = state.items[id];
+      if (it && it.loc.where === 'shelf' && m[it.loc.shelfId] && it.loc.slot >= 0 && it.loc.slot < SLOTS) {
+        if (m[it.loc.shelfId][it.loc.slot]) it.loc = { where: 'none' };   // 重なっていたら 片方を はずす
+        else m[it.loc.shelfId][it.loc.slot] = id;
+      }
+    }
+    return m;
+  }
+  function nearestEmpty(shelfId, slot, exclude) {
+    const m = shelfMap(); let best = null, bd = 1e9;
+    SHELVES.forEach((s, si) => {
+      for (let k = 0; k < SLOTS; k++) {
+        if (m[s][k] && m[s][k] !== exclude) continue;
+        if (s === shelfId && k === slot) continue;
+        const d = Math.abs(k - slot) + (s === shelfId ? 0 : 2.5);
+        if (d < bd) { bd = d; best = { shelfId: s, slot: k }; }
+      }
+    });
+    return best;
+  }
+  function firstEmpty() {
+    const m = shelfMap();
+    for (const s of SHELVES) for (let k = 0; k < SLOTS; k++) if (!m[s][k]) return { shelfId: s, slot: k };
+    return null;
+  }
+  // 棚に置く。すでに だれかが いたら 入れかえ（または となりの空きへ）
+  function placeOnShelf(id, shelfId, slot) {
+    const it = state.items[id]; if (!it) return;
+    const m = shelfMap(), occ = m[shelfId][slot];
+    const from = it.loc;
+    if (occ && occ !== id) {
+      const o = state.items[occ];
+      if (from.where === 'shelf') o.loc = shelfLoc(from.shelfId, from.slot);
+      else { const e = nearestEmpty(shelfId, slot, id); o.loc = e ? shelfLoc(e.shelfId, e.slot) : { where: 'box', order: Date.now() }; }
+    }
+    it.loc = shelfLoc(shelfId, slot);
+  }
+  let boxSeq = 0;
+  function putInBox(id) { const it = state.items[id]; if (it) it.loc = { where: 'box', order: Date.now() * 10 + (boxSeq++ % 10) }; }
+
+  // ===== えがく =====
+  function buildBoards() {
+    G = geom();
+    const b = $('boards'); b.innerHTML = '';
+    G.boards.forEach((y, si) => {
+      const d = document.createElement('div'); d.className = 'board';
+      d.style.left = (G.left - 6) + 'px'; d.style.width = (G.right - G.left + 12) + 'px'; d.style.top = y + 'px';
+      b.appendChild(d);
+      for (let k = 0; k < SLOTS; k++) {
+        const s = document.createElement('div'); s.className = 'slot'; s.dataset.s = SHELVES[si]; s.dataset.k = k;
+        const p = slotXY(si, k); s.style.left = p.x + 'px'; s.style.top = p.y + 'px'; s.style.width = s.style.height = G.S + 'px';
+        b.appendChild(s);
+      }
+    });
+    const bw = Math.min(G.W * 0.5, 240, room.clientHeight * 0.32 / 0.7);
+    const box = $('box'); box.style.width = bw + 'px'; box.style.height = bw * 0.7 + 'px';
+  }
+  function makeEl(id) {
+    const el = document.createElement('div');
+    el.className = 'item'; el.dataset.id = id;
+    const img = document.createElement('img'); img.src = urls[id]; img.alt = ''; img.draggable = false;
+    el.appendChild(img);
+    el.addEventListener('pointerdown', onItemDown);
+    room.appendChild(el);
+    els[id] = el;
+    return el;
+  }
+  function render(opts) {
+    opts = opts || {};
+    shelfMap();
+    for (const id of state.order) {
+      const it = state.items[id];
+      if (it.loc.where === 'shelf') {
+        const si = SHELVES.indexOf(it.loc.shelfId);
+        let el = els[id];
+        const p = slotXY(si, it.loc.slot);
+        if (!el) {
+          el = makeEl(id);
+          const from = opts.from && opts.from[id];
+          el.style.transition = 'none';
+          el.style.left = (from ? from.x : p.x) + 'px'; el.style.top = (from ? from.y : p.y) + 'px';
+          el.style.width = el.style.height = G.S + 'px';
+          void el.offsetWidth; el.style.transition = '';
+        }
+        if (el.classList.contains('leaving')) continue;
+        if (!el.classList.contains('dragging')) { el.style.left = p.x + 'px'; el.style.top = p.y + 'px'; }
+        el.style.width = el.style.height = G.S + 'px';
+        el.classList.toggle('selected', sel === id);
+      } else if (els[id] && !els[id].classList.contains('leaving')) {
+        els[id].remove(); delete els[id];
+      }
+    }
+    // はこ
+    const inBox = state.order.filter(id => state.items[id].loc.where === 'box').sort((a, b) => state.items[a].loc.order - state.items[b].loc.order);
+    $('badge').textContent = inBox.length;
+    $('badge').style.display = inBox.length ? 'flex' : 'none';
+    const peek = $('peek'); peek.innerHTML = '';
+    inBox.slice(-3).forEach((id, i) => {
+      const im = document.createElement('img'); im.src = urls[id]; im.alt = '';
+      im.style.left = (i * 31) + '%'; im.style.transform = `rotate(${[-10, 4, 12][i]}deg)`; im.style.bottom = (i % 2 ? 4 : 0) + 'px';
+      peek.appendChild(im);
+    });
+    room.classList.toggle('show-slots', !!sel || !!drag);
+    $('box').classList.toggle('glow', !!sel && state.items[sel] && state.items[sel].loc.where !== 'box');
+  }
+
+  // ===== えらぶ（タップ → タップ） =====
+  let sel = null;
+  function setSel(id, fromList) {
+    sel = id;
+    const c = $('carry');
+    if (id && fromList && state.items[id].loc.where !== 'shelf') { $('carryImg').src = urls[id]; c.classList.remove('on'); void c.offsetWidth; c.classList.add('on'); }
+    else c.classList.remove('on');
+    render();
+  }
+  $('carryX').addEventListener('pointerup', e => { e.stopPropagation(); setSel(null); sfx.soft(); });
+  $('carryX').addEventListener('pointerdown', e => e.stopPropagation());
+
+  function boing(el) { if (!el) return; el.classList.remove('boing', 'settle'); void el.offsetWidth; el.classList.add('boing'); }
+  function settle(id) { const el = els[id]; if (!el) return; el.classList.remove('boing', 'settle'); void el.offsetWidth; el.classList.add('settle'); }
+
+  // ===== どこに おとすか =====
+  function roomXY(e) { const r = room.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  function boxHit(x, y, pad) {
+    const r = $('box').getBoundingClientRect(), rr = room.getBoundingClientRect();
+    const l = r.left - rr.left, t = r.top - rr.top, px = r.width * pad, py = r.height * pad;
+    return x > l - px && x < l + r.width + px && y > t - py * 1.6 && y < t + r.height + py;
+  }
+  function targetAt(x, y) {
+    if (boxHit(x, y, 0.25)) return { type: 'box' };
+    for (let si = 0; si < SHELVES.length; si++) {
+      const top = G.boards[si] - G.S * 1.55, bottom = G.boards[si] + G.S * 0.45;
+      if (y >= top && y <= bottom) {
+        const k = Math.max(0, Math.min(SLOTS - 1, Math.floor((x - G.left) / G.sw)));
+        return { type: 'slot', shelfId: SHELVES[si], slot: k };
+      }
+    }
+    return null;
+  }
+  function hot(t) {
+    room.querySelectorAll('.slot.hot').forEach(s => s.classList.remove('hot'));
+    $('box').classList.toggle('glow', !!(t && t.type === 'box'));
+    if (t && t.type === 'slot') { const s = room.querySelector(`.slot[data-s="${t.shelfId}"][data-k="${t.slot}"]`); if (s) s.classList.add('hot'); }
+  }
+
+  // ===== ドラッグ =====
+  let drag = null;
+  function onItemDown(e) {
+    e.stopPropagation(); e.preventDefault();
+    audio();
+    if (drag || busy) return;
+    const el = e.currentTarget, id = el.dataset.id;
+    if (el.classList.contains('leaving')) return;
+    const p = roomXY(e);
+    drag = { id, el, pid: e.pointerId, sx: p.x, sy: p.y, ox: parseFloat(el.style.left), oy: parseFloat(el.style.top), moved: false };
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    el.addEventListener('pointermove', onItemMove);
+    el.addEventListener('pointerup', onItemUp);
+    el.addEventListener('pointercancel', onItemUp);
+  }
+  function onItemMove(e) {
+    if (!drag || e.pointerId !== drag.pid) return;
+    const p = roomXY(e), dx = p.x - drag.sx, dy = p.y - drag.sy;
+    if (!drag.moved && Math.hypot(dx, dy) > 10) {
+      drag.moved = true; drag.el.classList.remove('selected', 'boing', 'settle'); drag.el.classList.add('dragging');
+      if (sel) setSel(null); else render();
+    }
+    if (drag.moved) {
+      const x = Math.max(-G.S * 0.2, Math.min(G.W - G.S * 0.8, drag.ox + dx));
+      const y = Math.max(0, Math.min(G.H - G.S * 0.8, drag.oy + dy));
+      drag.el.style.left = x + 'px'; drag.el.style.top = y + 'px';
+      drag.last = p;
+      hot(targetAt(p.x, p.y));
+    }
+  }
+  function onItemUp(e) {
+    if (!drag || e.pointerId !== drag.pid) return;
+    const d = drag; drag = null;
+    d.el.removeEventListener('pointermove', onItemMove);
+    d.el.removeEventListener('pointerup', onItemUp);
+    d.el.removeEventListener('pointercancel', onItemUp);
+    hot(null);
+    if (!d.moved) { onItemTap(d.id); return; }
+    d.el.classList.remove('dragging');
+    const t = e.type === 'pointercancel' ? null : targetAt(d.last.x, d.last.y);
+    if (t && t.type === 'box') { boxIt(d.id); save(); }
+    else if (t && t.type === 'slot') { placeOnShelf(d.id, t.shelfId, t.slot); sfx.place(); render(); settle(d.id); save(); }
+    else { sfx.soft(); render(); }   // 近くに 何もなければ もとの場所へ もどる（しからない）
+  }
+  function onItemTap(id) {
+    sfx.tap();
+    if (sel && sel !== id) {
+      // えらんでいる アイテムを この場所へ
+      const t = state.items[id].loc;
+      const s = sel; setSel(null);
+      placeOnShelf(s, t.shelfId, t.slot);
+      render({ from: carryFrom(s) }); settle(s); settle(id); sfx.place(); save();
+      return;
+    }
+    boing(els[id]);
+    setSel(sel === id ? null : id);
+  }
+  function carryFrom(id) {
+    // いちらんから えらんだ アイテムは 上の ふきだしから とんでくる
+    const r = $('carryImg').getBoundingClientRect(), rr = room.getBoundingClientRect();
+    const o = {}; o[id] = { x: r.left - rr.left, y: r.top - rr.top }; return o;
+  }
+
+  // はこへ しまう（ちぢみながら はこへ）
+  function boxIt(id, delay) {
+    const el = els[id];
+    putInBox(id);
+    if (el) {
+      el.classList.remove('selected', 'dragging', 'boing', 'settle');
+      el.classList.add('leaving');
+      const br = $('box').getBoundingClientRect(), rr = room.getBoundingClientRect();
+      const cx = br.left - rr.left + br.width / 2 - G.S / 2, cy = br.top - rr.top + br.height * 0.25 - G.S / 2;
+      setTimeout(() => {
+        el.style.left = cx + 'px'; el.style.top = cy + 'px'; el.style.transform = 'scale(.15) rotate(25deg)'; el.style.opacity = '0';
+        setTimeout(() => {
+          el.remove(); if (els[id] === el) delete els[id];
+          shakeBox(); sfx.box(); render();
+        }, 450);
+      }, delay || 0);
+    } else { shakeBox(); sfx.box(); }
+    render();
+  }
+  function shakeBox() { const b = $('box'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); }
+
+  // ===== へやを タップ =====
+  let roomDown = null;
+  room.addEventListener('pointerdown', e => { audio(); roomDown = { id: e.pointerId, ...roomXY(e) }; });
+  room.addEventListener('pointerup', e => {
+    if (!roomDown || roomDown.id !== e.pointerId) return;
+    const p = roomXY(e), moved = Math.hypot(p.x - roomDown.x, p.y - roomDown.y) > 14;
+    roomDown = null;
+    if (moved || busy) return;
+    const t = targetAt(p.x, p.y);
+    if (sel) {
+      const id = sel, fromList = $('carry').classList.contains('on');
+      if (t && t.type === 'slot') {
+        const from = fromList ? carryFrom(id) : null;
+        setSel(null); placeOnShelf(id, t.shelfId, t.slot); render({ from }); settle(id); sfx.place(); save();
+      } else if (t && t.type === 'box') {
+        setSel(null);
+        if (state.items[id].loc.where === 'box') { shakeBox(); sfx.box(); }
+        else { boxIt(id); save(); }
+      } else { setSel(null); sfx.soft(); }
+      return;
+    }
+    if (t && t.type === 'box' && boxHit(p.x, p.y, 0)) { shakeBox(); sfx.tap(); openSheet('box'); }
+  });
+
+  // ===== ぜんぶ おかたづけ =====
+  let busy = false;
+  $('tidyBtn').addEventListener('click', () => {
+    audio();
+    if (busy) return;
+    setSel(null);
+    const onShelf = state.order.filter(id => state.items[id].loc.where === 'shelf');
+    if (!onShelf.length) { shakeBox(); sfx.soft(); return; }
+    busy = true;
+    onShelf.forEach((id, i) => boxIt(id, i * 140));
+    setTimeout(() => { busy = false; render(); save(); showToast('✨'); }, onShelf.length * 140 + 600);
+  });
+
+  // ===== いちらん =====
+  let filter = 'all';
+  function openSheet(f) {
+    audio();
+    filter = f || 'all';
+    renderSheet();
+    $('sheet').classList.add('on');
+  }
+  function closeSheet() { $('sheet').classList.remove('on'); }
+  function renderSheet() {
+    document.querySelectorAll('#sheet .tab').forEach(t => t.classList.toggle('on', t.dataset.f === filter));
+    const all = state.order.slice().reverse();
+    const box = all.filter(id => state.items[id].loc.where === 'box');
+    $('cntAll').textContent = all.length; $('cntBox').textContent = box.length;
+    const list = filter === 'box' ? box : all;
+    const grid = $('grid'); grid.innerHTML = '';
+    if (!list.length) { grid.innerHTML = `<div class="empty">${filter === 'box' ? '📦' : '📷'}</div>`; return; }
+    for (const id of list) {
+      const it = state.items[id];
+      const b = document.createElement('button'); b.className = 'cell'; b.setAttribute('aria-label', 'たからもの');
+      b.innerHTML = `<img src="${urls[id]}" alt="">` + (it.loc.where === 'shelf' ? '<span class="where">🪵</span>' : it.loc.where === 'box' ? '<span class="where">📦</span>' : '');
+      b.addEventListener('click', () => {
+        sfx.tap(); closeSheet();
+        if (it.loc.where === 'shelf') { boing(els[id]); setSel(id); }
+        else setSel(id, true);
+      });
+      grid.appendChild(b);
+    }
+  }
+  document.querySelectorAll('#sheet .tab').forEach(t => t.addEventListener('click', () => { sfx.tap(); filter = t.dataset.f; renderSheet(); }));
+  $('sheetX').addEventListener('click', () => { sfx.soft(); closeSheet(); });
+  $('sheet').addEventListener('click', e => { if (e.target.id === 'sheet') closeSheet(); });
+  $('listBtn').addEventListener('click', () => { setSel(null); openSheet('all'); });
+
+  // ===== カメラ =====
+  let stream = null, shotBlob = null, saving = false;
+  const video = $('video'), stage = $('stage');
+  function camMode(m) {
+    $('rowLive').style.display = m === 'live' ? 'flex' : 'none';
+    $('rowPrev').style.display = m === 'prev' ? 'flex' : 'none';
+    $('rowFail').style.display = m === 'fail' ? 'flex' : 'none';
+    stage.classList.toggle('preview', m === 'prev');
+    stage.classList.toggle('failed', m === 'fail');
+    $('camWait').style.display = m === 'wait' ? 'flex' : 'none';
+    if (m === 'wait') $('rowLive').style.display = 'flex';
+  }
+  async function openCam() {
+    audio(); setSel(null);
+    $('cam').classList.add('on');
+    shotBlob = null;
+    if (stream) { camMode('live'); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.isSecureContext) { camMode('fail'); return; }
+    camMode('wait');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false });
+      if (!$('cam').classList.contains('on')) { stopCam(); return; }
+      video.srcObject = stream;
+      try { await video.play(); } catch (_) {}
+      camMode('live');
+    } catch (e) { stopCam(); camMode('fail'); }
+  }
+  function stopCam() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    video.srcObject = null;
+  }
+  function closeCam() { stopCam(); $('cam').classList.remove('on'); shotBlob = null; }
+  function squareBlob(src, sw, sh) {
+    const s = Math.min(sw, sh), N = Math.min(640, s), c = document.createElement('canvas');
+    c.width = N; c.height = N;
+    c.getContext('2d').drawImage(src, (sw - s) / 2, (sh - s) / 2, s, s, 0, 0, N, N);
+    return new Promise(res => c.toBlob(b => res(b), 'image/jpeg', 0.86));
+  }
+  async function showPreview(blob) {
+    if (!blob) { camMode(stream ? 'live' : 'fail'); return; }
+    shotBlob = blob;
+    const im = $('shot'); if (im.src) URL.revokeObjectURL(im.src);
+    im.src = URL.createObjectURL(blob);
+    camMode('prev');
+    $('okBtn').disabled = false;
+  }
+  $('camBtn').addEventListener('click', openCam);
+  $('camX').addEventListener('click', () => { sfx.soft(); closeCam(); });
+  $('failX').addEventListener('click', () => { sfx.soft(); closeCam(); });
+  $('failSample').addEventListener('click', () => { sfx.soft(); closeCam(); openSheet('all'); });
+  $('shutter').addEventListener('click', async () => {
+    if (!stream || !video.videoWidth) return;
+    sfx.shutter();
+    const f = $('flash'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
+    showPreview(await squareBlob(video, video.videoWidth, video.videoHeight));
+  });
+  $('againBtn').addEventListener('click', () => { sfx.soft(); shotBlob = null; camMode(stream ? 'live' : 'fail'); });
+  const pickFile = () => { $('fileIn').value = ''; $('fileIn').click(); };
+  $('fileBtn').addEventListener('click', pickFile);
+  $('failFile').addEventListener('click', pickFile);
+  $('fileIn').addEventListener('change', () => {
+    const f = $('fileIn').files && $('fileIn').files[0];
+    if (!f) return;
+    const img = new Image(), u = URL.createObjectURL(f);
+    img.onload = async () => { const b = await squareBlob(img, img.naturalWidth, img.naturalHeight); URL.revokeObjectURL(u); showPreview(b); };
+    img.onerror = () => { URL.revokeObjectURL(u); sfx.soft(); };
+    img.src = u;
+  });
+  $('okBtn').addEventListener('click', async () => {
+    if (!shotBlob || saving) return;
+    saving = true; $('okBtn').disabled = true;
+    const blob = shotBlob;
+    try {
+      const e = firstEmpty();
+      const item = await createItem(blob, { loc: e ? shelfLoc(e.shelfId, e.slot) : { where: 'box', order: Date.now() } });
+      closeCam();
+      await popIn(item.id);
+    } catch (err) {
+      console.warn(err);
+      showToast('💦');   // 保存できなかったときは アイテムを作らない
+      $('okBtn').disabled = false;
+    } finally { saving = false; }
+  });
+
+  // ぽんっ と とうじょう
+  function popIn(id) {
+    return new Promise(res => {
+      const pop = $('pop');
+      $('popImg').src = urls[id];
+      pop.querySelectorAll('.spark').forEach(s => s.remove());
+      pop.classList.remove('on'); void pop.offsetWidth; pop.classList.add('on');
+      sfx.pop();
+      const marks = ['✨', '⭐', '💖', '✨', '🌟', '💫', '⭐', '✨'];
+      marks.forEach((m, i) => {
+        const s = document.createElement('span'); s.className = 'spark'; s.textContent = m;
+        const a = i / marks.length * Math.PI * 2, r = Math.min(innerWidth, innerHeight) * 0.38;
+        s.style.setProperty('--dx', Math.cos(a) * r + 'px'); s.style.setProperty('--dy', Math.sin(a) * r + 'px');
+        s.style.animationDelay = '.15s';
+        pop.appendChild(s);
+      });
+      setTimeout(() => {
+        const st = pop.querySelector('.st').getBoundingClientRect(), rr = room.getBoundingClientRect();
+        const from = {}; from[id] = { x: st.left - rr.left + st.width / 2 - G.S / 2, y: st.top - rr.top + st.height / 2 - G.S / 2 };
+        pop.classList.remove('on');
+        if (state.items[id].loc.where === 'shelf') { render({ from }); setTimeout(() => settle(id), 380); sfx.place(); }
+        else { render(); shakeBox(); sfx.box(); }
+        res();
+      }, 1100);
+    });
+  }
+
+  function showToast(t) { const el = $('toast'); el.textContent = t; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); }
+
+  // ===== おうちのかた =====
+  let gearTimer = 0;
+  const gear = $('gear');
+  gear.addEventListener('pointerdown', e => {
+    e.stopPropagation(); e.preventDefault();
+    gear.classList.add('hold'); $('gearTip').classList.add('on');
+    gearTimer = setTimeout(() => { gear.classList.remove('hold'); $('gearTip').classList.remove('on'); openParent(); }, 1500);
+  });
+  const gearCancel = e => { if (e) e.stopPropagation(); clearTimeout(gearTimer); gear.classList.remove('hold'); setTimeout(() => $('gearTip').classList.remove('on'), 1200); };
+  gear.addEventListener('pointerup', gearCancel);
+  gear.addEventListener('pointerleave', gearCancel);
+  gear.addEventListener('pointercancel', gearCancel);
+  gear.addEventListener('contextmenu', e => e.preventDefault());
+
+  function openParent() {
+    setSel(null);
+    $('vol').value = state.settings.volume;
+    renderParent();
+    $('parent').classList.add('on');
+  }
+  function locText(it) {
+    if (it.loc.where === 'shelf') return `棚${SHELVES.indexOf(it.loc.shelfId) + 1}段目・${it.loc.slot + 1}番目`;
+    if (it.loc.where === 'box') return '箱の中';
+    return '未配置';
+  }
+  async function renderParent() {
+    const list = $('pList'); list.innerHTML = '';
+    const ids = state.order.slice().reverse();
+    $('pCount').textContent = ids.length;
+    for (const id of ids) {
+      const it = state.items[id];
+      const row = document.createElement('div'); row.className = 'prow';
+      const d = new Date(it.createdAt);
+      row.innerHTML = `<img src="${urls[id]}" alt=""><div class="meta">${it.sample ? '見本' : '写真'}・${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}<br>${locText(it)}</div><button class="pbtn red">削除</button>`;
+      row.querySelector('button').addEventListener('click', () => ask('このアイテムを削除しますか？<br>写真も端末から消えます。', async () => { await deleteItem(id); render(); renderParent(); }));
+      list.appendChild(row);
+    }
+    let info = memoryOnly || !db ? '⚠️ この環境では保存ができません（プライベートブラウズなど）。閉じると消えます。' : '✅ この端末に保存されています。';
+    try {
+      if (navigator.storage && navigator.storage.persisted) info += (await navigator.storage.persisted()) ? '（消えにくい保存に設定済み）' : '';
+    } catch (_) {}
+    $('storeInfo').textContent = info;
+  }
+  $('parentX').addEventListener('click', () => $('parent').classList.remove('on'));
+  $('vol').addEventListener('input', e => { state.settings.volume = +e.target.value; audio(); });
+  $('vol').addEventListener('change', () => { save(); sfx.tap(); });
+  $('volTest').addEventListener('click', () => { audio(); sfx.pop(); });
+  $('delAll').addEventListener('click', () => ask('保存したアイテムを<b>すべて</b>削除しますか？<br>撮った写真も端末から消えます。', async () => {
+    for (const id of state.order.slice()) await deleteItem(id);
+    render(); renderParent();
+  }));
+  $('addSamples').addEventListener('click', async () => {
+    await addSamples(false); render(); renderParent(); sfx.pop();
+  });
+  let askFn = null;
+  function ask(msg, fn) { $('confirmMsg').innerHTML = msg; askFn = fn; $('confirm').classList.add('on'); }
+  $('confirmNo').addEventListener('click', () => { askFn = null; $('confirm').classList.remove('on'); });
+  $('confirmYes').addEventListener('click', async () => { const f = askFn; askFn = null; $('confirm').classList.remove('on'); if (f) await f(); });
+
+  // ===== はじめる =====
+  async function addSamples(initial) {
+    for (let i = 0; i < SAMPLE_KINDS.length; i++) {
+      const kind = SAMPLE_KINDS[i];
+      let loc;
+      if (initial) loc = i < 4 ? shelfLoc(i < 2 ? 'shelf1' : 'shelf2', i < 2 ? i * 2 + 1 : (i - 2) * 2) : { where: 'box', order: Date.now() + i };
+      else { loc = { where: 'box', order: Date.now() + i }; }
+      try { await createItem(await drawSample(kind), { sample: kind, loc }); } catch (e) { console.warn(e); }
+    }
+  }
+  async function boot() {
+    try { db = await openDB(); } catch (e) { db = null; memoryOnly = true; }
+    G = geom();
+    let saved = null;
+    if (db) { try { saved = await getRec('state', 'main'); } catch (e) { saved = null; } }
+    if (saved && saved.items && Array.isArray(saved.order)) {
+      state = saved;
+      state.settings = Object.assign({ volume: 0.7 }, state.settings || {});
+      // 写真が見つからない アイテムは とりのぞく（こわれたデータを のこさない）
+      let changed = false;
+      for (const id of state.order.slice()) {
+        const it = state.items[id];
+        let rec = null;
+        try { rec = it ? await getRec('photos', it.photoKey) : null; } catch (_) {}
+        if (!it || !rec || !rec.buf) { delete state.items[id]; state.order = state.order.filter(x => x !== id); changed = true; continue; }
+        urls[id] = URL.createObjectURL(new Blob([rec.buf], { type: rec.type || 'image/jpeg' }));
+      }
+      for (const id of Object.keys(state.items)) if (!state.order.includes(id)) { delete state.items[id]; changed = true; }
+      // どこからも つかわれていない 写真を おそうじ
+      try {
+        const keys = await allKeys('photos');
+        if (keys) { const used = new Set(state.order.map(id => state.items[id].photoKey)); for (const k of keys) if (!used.has(k)) await delRec('photos', k); }
+      } catch (_) {}
+      if (changed) await saveNow();
+    } else {
+      state = freshState();
+      await addSamples(true);
+      await saveNow();
+    }
+    buildBoards();
+    render();
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (_) {}
+  }
+
+  let rz = 0;
+  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!state) return; buildBoards(); for (const id in els) { els[id].style.transition = 'none'; } render(); requestAnimationFrame(() => { for (const id in els) els[id].style.transition = ''; }); }, 120); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { if (stream) closeCam(); if (state) saveNow(); } });
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('dblclick', e => e.preventDefault());
+
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
+  boot();
+  window.__room = { get state() { return state; }, get G() { return G; }, saveNow };
+})();
+</script>
+</body>
+</html>

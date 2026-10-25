@@ -29,12 +29,12 @@
     gap: clamp(14px, 3vh, 28px);
   }
   h1 {
-    margin: 0; font-size: clamp(36px, 6.5vw, 64px); color: #ff6fa0; letter-spacing: .06em;
+    margin: 0; font-size: clamp(32px, 5.5vw, 56px); color: #ff6fa0; letter-spacing: .06em;
     text-shadow: 0 4px 0 #fff;
   }
   .games {
-    display: grid; gap: clamp(14px, 2.5vw, 26px); width: 100%; max-width: 1240px;
-    grid-template-columns: repeat(4, 1fr);
+    display: grid; gap: clamp(14px, 2.5vw, 26px); width: 100%; max-width: 940px;
+    grid-template-columns: repeat(3, 1fr);
   }
   @media (orientation: portrait), (max-width: 700px) {
     .games { grid-template-columns: 1fr; max-width: 560px; }
@@ -51,11 +51,11 @@
     transition: transform .08s;
   }
   .game:active { transform: translateY(8px); box-shadow: 0 2px 0 var(--d); }
-  .game .thumb { width: 100%; aspect-ratio: 4 / 3; background: var(--bg); display: block; }
-  .game .body { padding: 14px 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
-  .game .name { font-size: clamp(18px, 1.9vw, 28px); font-weight: bold; color: var(--d); overflow-wrap: anywhere; }
-  @media (orientation: portrait), (max-width: 700px) { .game .name { font-size: clamp(22px, 3.6vw, 32px); } }
-  .game .desc { font-size: clamp(16px, 2.1vw, 21px); line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; }
+  .game .thumb { width: 100%; aspect-ratio: 2 / 1; object-fit: cover; background: var(--bg); display: block; }
+  .game .body { padding: 10px 12px 12px; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+  .game .name { font-size: clamp(18px, 2.2vw, 28px); font-weight: bold; color: var(--d); overflow-wrap: anywhere; }
+  @media (orientation: portrait), (max-width: 700px) { .game .name { font-size: clamp(22px, 3.6vw, 32px); } .game .desc { font-size: clamp(16px, 2.6vw, 21px); } }
+  .game .desc { font-size: clamp(13px, 1.6vw, 18px); line-height: 1.35; word-break: keep-all; overflow-wrap: anywhere; }
   .game .name { word-break: keep-all; }
   .game .stars { font-size: clamp(16px, 2vw, 20px); color: #ffb000; letter-spacing: .1em; }
   .game .note { font-size: clamp(12px, 1.5vw, 15px); color: #8a93b0; }
@@ -63,13 +63,15 @@
   .g2 { --c: #ffb46b; --d: #e07d1e; --bg: #fff5e8; }
   .g3 { --c: #79b2ff; --d: #2f6fd1; --bg: #eaf3ff; }
   .g4 { --c: #b48cff; --d: #7b4fe0; --bg: #f1fbe9; }
+  .g5 { --c: #ffa8c5; --d: #e0578a; --bg: #fff3e2; }
+  .g6 { --c: #ffd36b; --d: #d9a21f; --bg: #fdf2f8; }
 </style>
 </head>
 <body>
 <main>
   <h1>どれで あそぶ？</h1>
   <div class="games">
-    <a class="game g1" href="puzzle/">
+    <a class="game g1" href="puzzle/index.html">
       <canvas class="thumb" id="th1"></canvas>
       <div class="body">
         <div class="name">まるまるドロップ</div>
@@ -77,7 +79,7 @@
         <div class="stars">★☆☆</div>
       </div>
     </a>
-    <a class="game g2" href="soccer/">
+    <a class="game g2" href="soccer/index.html">
       <canvas class="thumb" id="th2"></canvas>
       <div class="body">
         <div class="name">ブンブンサッカー</div>
@@ -85,20 +87,36 @@
         <div class="stars">★★☆</div>
       </div>
     </a>
-    <a class="game g3" href="soccer3d/">
+    <a class="game g3" href="soccer3d/index.html">
       <canvas class="thumb" id="th3"></canvas>
       <div class="body">
         <div class="name">ブンブンサッカー3D</div>
-        <div class="desc">パトカーや しょうぼうしゃで かべも てんじょうも！</div>
+        <div class="desc">かべも てんじょうも はしれる！</div>
         <div class="stars">★★★</div>
-        <div class="note">インターネットに つないで あそんでね</div>
+        <div class="note">🌐 ネットに つないでね</div>
       </div>
     </a>
-    <a class="game g4" href="hole/">
+    <a class="game g4" href="hole/index.html">
       <canvas class="thumb" id="th4"></canvas>
       <div class="body">
         <div class="name">ぱくぱくホール</div>
         <div class="desc">あなを うごかして まちを ぜんぶ たべちゃおう！</div>
+        <div class="stars">★☆☆</div>
+      </div>
+    </a>
+    <a class="game g5" href="photo/index.html">
+      <canvas class="thumb" id="th5"></canvas>
+      <div class="body">
+        <div class="name">ぱしゃっ！たからもの</div>
+        <div class="desc">しゃしんを とって おへやに かざろう！</div>
+        <div class="stars">★☆☆</div>
+      </div>
+    </a>
+    <a class="game g6" href="henkao/index.html">
+      <canvas class="thumb" id="th6"></canvas>
+      <div class="body">
+        <div class="name">変顔ボール</div>
+        <div class="desc">じぶんの かおが ボールに なって ぽよーん！</div>
         <div class="stars">★☆☆</div>
       </div>
     </a>
@@ -330,6 +348,73 @@
       for (let i = 0; i < 10; i++) { const r = i % 2 ? sz * 0.45 : sz, a = i * Math.PI / 5 - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
       c.closePath(); c.fill(); c.restore();
     }
+  }
+
+  // 5. ぱしゃっ！たからもの
+  {
+    const c = setup('th5');
+    c.fillStyle = '#fff3e2'; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#ffd9e6';
+    for (let y = 10; y < 230; y += 34) for (let x = (y / 34 % 2) * 17 + 8; x < W; x += 34) { c.beginPath(); c.arc(x, y, 5, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = '#e9b87f'; c.fillRect(0, 230, W, 70);
+    const board = y => { c.fillStyle = '#c98b52'; rr(c, 20, y, 360, 12, 5); c.fill(); c.fillStyle = '#9c6634'; c.fillRect(50, y + 10, 10, 16); c.fillRect(340, y + 10, 10, 16); };
+    board(100); board(190);
+    const sticker = (x, y, bg, draw) => { c.fillStyle = '#fff'; rr(c, x, y, 64, 64, 15); c.fill(); c.fillStyle = bg; rr(c, x + 5, y + 5, 54, 54, 12); c.fill(); draw(x + 32, y + 32); };
+    const ci = (x, y, r, col) => { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); };
+    sticker(40, 34, '#fff1e6', (x, y) => { ci(x, y + 3, 17, '#e8404a'); c.fillStyle = '#4caf50'; c.beginPath(); c.ellipse(x + 7, y - 15, 7, 3, -0.4, 0, Math.PI * 2); c.fill(); });
+    sticker(250, 34, '#e9f5ff', (x, y) => { ci(x, y, 19, '#4da3ff'); c.fillStyle = '#fff'; c.fillRect(x - 19, y - 3, 38, 6); });
+    sticker(120, 124, '#fff6df', (x, y) => { ci(x - 12, y - 12, 7, '#b9824f'); ci(x + 12, y - 12, 7, '#b9824f'); ci(x, y + 2, 17, '#c98f58'); ci(x - 6, y, 2.5, '#3a2a40'); ci(x + 6, y, 2.5, '#3a2a40'); });
+    // カメラ
+    c.save(); c.translate(300, 150); c.rotate(-0.15);
+    c.fillStyle = '#ff6fa0'; rr(c, -46, -30, 92, 62, 14); c.fill(); rr(c, -18, -42, 36, 16, 6); c.fill();
+    ci(0, 2, 22, '#fff'); ci(0, 2, 13, '#4a3b5c'); ci(-4, -2, 4, '#fff');
+    c.restore();
+    c.fillStyle = '#ffd23f';
+    for (const [sx, sy, sz] of [[360, 92, 9], [250, 196, 7], [214, 120, 6]]) {
+      c.save(); c.translate(sx, sy); c.beginPath();
+      for (let i = 0; i < 10; i++) { const r = i % 2 ? sz * 0.45 : sz, a = i * Math.PI / 5 - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      c.closePath(); c.fill(); c.restore();
+    }
+    // はこ
+    c.fillStyle = '#ff9f43'; c.beginPath(); c.moveTo(130, 238); c.lineTo(270, 238); c.lineTo(262, 296); c.lineTo(138, 296); c.closePath(); c.fill();
+    c.fillStyle = '#ff8a2a'; rr(c, 124, 230, 152, 14, 6); c.fill();
+    ci(200, 268, 14, '#fff3c4');
+  }
+
+  // 6. 変顔ボール
+  {
+    const c = setup('th6');
+    const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#fdf2f8'); bg.addColorStop(1, '#e0f2fe');
+    c.fillStyle = bg; c.fillRect(0, 0, W, H);
+    const face = (x, y, r, ring, sx, sy, kind) => {
+      c.fillStyle = 'rgba(90,60,90,.14)'; c.beginPath(); c.ellipse(x, 292, r * 0.8, r * 0.12, 0, 0, Math.PI * 2); c.fill();
+      c.save(); c.translate(x, y); c.scale(sx, sy);
+      const g = c.createRadialGradient(-r * .2, -r * .3, r * .1, 0, 0, r); g.addColorStop(0, '#ffe9b8'); g.addColorStop(1, '#ffc46b');
+      c.fillStyle = g; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill();
+      c.fillStyle = 'rgba(255,120,140,.45)';
+      c.beginPath(); c.ellipse(-r * .52, r * .2, r * .18, r * .12, 0, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.ellipse(r * .52, r * .2, r * .18, r * .12, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#4a3b47'; c.strokeStyle = '#4a3b47'; c.lineWidth = r * .07; c.lineCap = 'round';
+      if (kind === 0) {
+        c.beginPath(); c.ellipse(-r * .32, -r * .2, r * .12, r * .16, 0, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.moveTo(r * .2, -r * .24); c.quadraticCurveTo(r * .34, -r * .12, r * .48, -r * .24); c.stroke();
+        c.fillStyle = '#7a2e3b'; c.beginPath(); c.ellipse(0, r * .4, r * .28, r * .18, 0, 0, Math.PI); c.fill();
+        c.fillStyle = '#ff7f96'; c.beginPath(); c.ellipse(r * .08, r * .56, r * .14, r * .18, .2, 0, Math.PI * 2); c.fill();
+      } else {
+        c.beginPath(); c.arc(-r * .3, -r * .2, r * .12, 0, Math.PI * 2); c.fill(); c.beginPath(); c.arc(r * .3, -r * .2, r * .12, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#7a2e3b'; c.beginPath(); c.ellipse(0, r * .35, r * .16, r * .22, 0, 0, Math.PI * 2); c.fill();
+      }
+      c.restore();
+      c.save(); c.translate(x, y); c.scale(sx, sy);
+      c.lineWidth = r * .08; c.strokeStyle = '#fff'; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.stroke();
+      c.lineWidth = r * .05; c.strokeStyle = ring; c.beginPath(); c.arc(0, 0, r * 1.06, 0, Math.PI * 2); c.stroke();
+      c.restore();
+    };
+    face(110, 230, 56, '#ff8fab', 1.18, 0.82, 0);
+    face(265, 110, 50, '#7cc4f2', 0.92, 1.08, 1);
+    face(345, 228, 38, '#f5c24c', 1, 1, 1);
+    c.strokeStyle = 'rgba(255,127,163,.6)'; c.lineWidth = 4; c.setLineDash([6, 8]);
+    c.beginPath(); c.moveTo(150, 175); c.quadraticCurveTo(190, 90, 220, 100); c.stroke(); c.setLineDash([]);
   }
 })();
 </script>

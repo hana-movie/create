@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#fdf2f8">
+<title>変顔ボール</title>
+<style>
+  :root{
+    --bg1:#fdf2f8; --bg2:#e0f2fe;
+    --pink:#ffb3c6; --pink-d:#ef8aa8;
+    --blue:#bde0fe; --blue-d:#86bfee;
+    --yellow:#ffe08a; --yellow-d:#e9bf4f;
+    --ink:#5b4a5e;
+    --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:var(--ink);
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Rounded Mplus 1c","Yu Gothic",system-ui,sans-serif;overscroll-behavior:none}
+  .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    padding:calc(16px + var(--safe-t)) 16px calc(16px + var(--safe-b));touch-action:none}
+  .screen.active{display:flex;animation:fadein .35s ease}
+  @keyframes fadein{from{opacity:0}to{opacity:1}}
+
+  button{font:inherit;color:var(--ink);border:none;cursor:pointer;touch-action:manipulation}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:.4em;min-height:72px;padding:0 28px;border-radius:999px;
+    font-size:26px;font-weight:800;background:var(--pink);box-shadow:0 6px 0 var(--pink-d);transition:transform .08s,box-shadow .08s}
+  .btn:active{transform:translateY(5px);box-shadow:0 1px 0 var(--pink-d)}
+  .btn.blue{background:var(--blue);box-shadow:0 6px 0 var(--blue-d)}
+  .btn.blue:active{box-shadow:0 1px 0 var(--blue-d)}
+  .btn.yellow{background:var(--yellow);box-shadow:0 6px 0 var(--yellow-d)}
+  .btn.yellow:active{box-shadow:0 1px 0 var(--yellow-d)}
+  .btn.small{min-height:60px;font-size:20px;padding:0 18px}
+  .btn:disabled{opacity:.45}
+  .row{display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap;width:100%}
+  .pulse{animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{50%{transform:scale(1.07)}}
+  [hidden]{display:none!important}
+
+  /* タイトル */
+  #title canvas{position:absolute;inset:0;width:100%;height:100%}
+  #title .content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;height:100%;width:100%;pointer-events:none}
+  #title .content > *{pointer-events:auto}
+  h1{margin:24px 0 0;font-size:clamp(40px,12vw,64px);letter-spacing:.06em;color:#ff7fa3;
+    text-shadow:3px 3px 0 #fff,-3px -3px 0 #fff,3px -3px 0 #fff,-3px 3px 0 #fff,0 6px 0 rgba(0,0,0,.08)}
+  #title .buttons{display:flex;flex-direction:column;gap:18px;align-items:center;margin-bottom:24px}
+
+  /* 撮影・確認 */
+  .camwrap{position:relative;flex:none}
+  .circle{width:min(84vw,56vh);height:min(84vw,56vh);border-radius:50%;overflow:hidden;background:#fff;
+    border:8px solid #fff;box-shadow:0 0 0 6px var(--pink),0 10px 24px rgba(0,0,0,.12);position:relative;flex:none}
+  #video{width:100%;height:100%;object-fit:cover;display:block}
+  #video.mirror{transform:scaleX(-1)}
+  #btnFlip{position:absolute;right:-6px;bottom:-6px;z-index:2}
+  #adjustCanvas{width:100%;height:100%;display:block;touch-action:none}
+  .msg{min-height:3.2em;margin:18px 8px 10px;font-size:20px;font-weight:700;text-align:center;line-height:1.5}
+  .shutter{width:96px;height:96px;border-radius:50%;background:#fff;box-shadow:0 0 0 8px var(--pink),0 8px 0 8px var(--pink-d);
+    font-size:40px;transition:transform .08s}
+  .shutter:active{transform:scale(.92)}
+  .shutter:disabled{opacity:.4}
+  .zoomrow{display:flex;align-items:center;gap:12px;width:min(84vw,420px);margin:6px 0 18px;font-size:28px}
+  input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:14px;border-radius:7px;background:#fff;box-shadow:inset 0 0 0 3px var(--blue)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:38px;height:38px;border-radius:50%;background:var(--pink);border:4px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+
+  /* ゲーム */
+  #game{padding:0}
+  #gameCanvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+  .hud{position:absolute;left:0;right:0;display:flex;justify-content:space-between;padding:0 14px;pointer-events:none}
+  .hud > *{pointer-events:auto}
+  .hud.top{top:calc(12px + var(--safe-t))}
+  .hud.bottom{bottom:calc(18px + var(--safe-b));justify-content:center;gap:12px}
+  .round{width:60px;height:60px;border-radius:50%;font-size:28px;background:rgba(255,255,255,.88);box-shadow:0 4px 0 rgba(0,0,0,.1)}
+  .round:active{transform:translateY(3px)}
+  .round small{display:block;font-size:11px;font-weight:800;margin-top:-4px}
+  .hud .right{display:flex;gap:10px}
+  .dots{font-size:13px;letter-spacing:2px;margin-left:2px}
+
+  #settings{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90vw,400px);background:#fff;border-radius:28px;
+    padding:20px 22px 22px;box-shadow:0 12px 40px rgba(0,0,0,.18);display:none;z-index:5}
+  #settings.open{display:block}
+  #settings label{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:800;margin:12px 0}
+  #settings label span{width:6.2em;flex:none}
+  #settings .row{margin-top:16px}
+
+  #rotate{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;flex-direction:column;
+    background:linear-gradient(180deg,var(--bg1),var(--bg2));font-size:26px;font-weight:800;gap:12px}
+  @media (orientation:landscape) and (max-height:520px){ #rotate{display:flex} }
+</style>
+</head>
+<body>
+
+<!-- A. タイトル -->
+<section id="title" class="screen active">
+  <canvas id="titleCanvas"></canvas>
+  <div class="content">
+    <h1>変顔ボール</h1>
+    <div class="buttons">
+      <button class="btn" id="btnStart">📷 かおをとる</button>
+      <button class="btn blue small" id="btnSample">🙂 おためし</button>
+      <a class="btn yellow small" id="btnSelect" href="../gameselect.html" style="text-decoration:none;color:var(--ink)">🏠 ゲームを えらぶ</a>
+    </div>
+  </div>
+</section>
+
+<!-- B-1. 撮影 -->
+<section id="camera" class="screen">
+  <div class="camwrap">
+    <div class="circle"><video id="video" class="mirror" playsinline muted autoplay></video></div>
+    <button class="round" id="btnFlip" aria-label="カメラを きりかえ" hidden>🔁<small>きりかえ</small></button>
+  </div>
+  <p class="msg" id="camMsg">まるの なかに かおを いれてね</p>
+  <div class="row">
+    <button class="round" id="btnCamBack" aria-label="もどる">🏠</button>
+    <button class="shutter" id="btnShutter" aria-label="とる" disabled>📸</button>
+    <button class="round" id="btnPick" aria-label="しゃしんをえらぶ">🖼️<small>しゃしん</small></button>
+  </div>
+  <input type="file" id="fileInput" accept="image/*" hidden>
+</section>
+
+<!-- B-2. 確認・位置調整 -->
+<section id="confirm" class="screen">
+  <div class="circle"><canvas id="adjustCanvas"></canvas></div>
+  <p class="msg">ゆびで うごかして<br>かおを まんなかに してね</p>
+  <div class="zoomrow">🔍<input type="range" id="zoom" min="1" max="4" step="0.01" value="1.2">🔎</div>
+  <div class="row">
+    <button class="btn blue small" id="btnRetake">🔄 とりなおす</button>
+    <button class="btn" id="btnUse">⭐ これであそぶ</button>
+  </div>
+</section>
+
+<!-- C. ゲーム -->
+<section id="game" class="screen">
+  <canvas id="gameCanvas"></canvas>
+  <div class="hud top">
+    <button class="round" id="btnHome" aria-label="はじめに もどる">🏠</button>
+    <div class="right">
+      <button class="round" id="btnSettings" aria-label="せってい">⚙️</button>
+      <button class="round" id="btnSound" aria-label="おと"><span id="soundIcon">🔊</span><small>おと</small></button>
+    </div>
+  </div>
+  <div class="hud bottom">
+    <button class="btn blue small" id="btnAdd">➕ ふやす<span class="dots" id="dots"></span></button>
+    <button class="btn yellow small" id="btnAgain">🔄 もういちど</button>
+  </div>
+  <div id="settings">
+    <label><span>🪨 おもさ</span><input type="range" id="sGravity" min="0" max="2" step="0.05"></label>
+    <label><span>🏀 はずみ</span><input type="range" id="sBounce" min="0.6" max="1" step="0.01"></label>
+    <label><span>⚡ はやさ</span><input type="range" id="sSpeed" min="0.4" max="2" step="0.05"></label>
+    <label><span>🫠 ぐにゃぐにゃ</span><input type="range" id="sSquish" min="0.3" max="2" step="0.05"></label>
+    <div class="row">
+      <button class="btn blue small" id="btnReset">↩️ もとに</button>
+      <button class="btn small" id="btnClose">✖️ とじる</button>
+    </div>
+  </div>
+</section>
+
+<div id="rotate"><div style="font-size:64px">📱</div>たてに してね</div>
+
+<script>
+'use strict';
+/* =========================================================
+   変顔ボール v0.3
+   - 写真は端末内のメモリだけで処理し、外部へは送信しません。
+   - 外部ライブラリ・外部通信なし（GitHub Pages に置くだけで動作）
+   - v0.2: 外カメラ切り替え / ボール最大3こ（ボール同士もぶつかる）
+   - v0.3: ボール最大5こ / ゲーム選択画面へもどるボタン
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const TAU = Math.PI * 2;
+const MAX_BALLS = 5;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('henkao_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('henkao_' + k, JSON.stringify(v)); } catch (e) {} }
+};
+
+/* ---------- 調整パラメータ（重力・速度・反発・変形） ---------- */
+const DEFAULTS = { gravity: 1, bounce: 0.92, speed: 1, squish: 1 };
+const settings = Object.assign({}, DEFAULTS, store.get('settings', {}));
+
+/* ---------- 効果音（Web Audio で合成。ファイル不要） ---------- */
+const Sound = {
+  ctx: null, on: store.get('sound', true), last: 0,
+  unlock() {
+    try {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        this.ctx = new AC();
+      }
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+    } catch (e) {}
+  },
+  boing(strength = 0.5) {
+    if (!this.on || !this.ctx || this.ctx.state !== 'running') return;
+    const c = this.ctx, now = c.currentTime;
+    if (now - this.last < 0.09) return;          // 連続衝突で重なりすぎないように
+    this.last = now;
+    const vol = 0.06 + 0.2 * clamp(strength, 0, 1);
+    const base = rnd(200, 360);
+    const o = c.createOscillator(), g = c.createGain();
+    const lfo = c.createOscillator(), lg = c.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(base * 1.9, now);
+    o.frequency.exponentialRampToValueAtTime(base * 0.5, now + 0.28);
+    lfo.frequency.value = rnd(16, 26);
+    lg.gain.value = base * 0.15;
+    lfo.connect(lg); lg.connect(o.frequency);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(vol, now + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+    o.connect(g); g.connect(c.destination);
+    o.start(now); lfo.start(now);
+    o.stop(now + 0.34); lfo.stop(now + 0.34);
+  },
+  pop() {
+    if (!this.on || !this.ctx || this.ctx.state !== 'running') return;
+    const c = this.ctx, now = c.currentTime;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(500, now);
+    o.frequency.exponentialRampToValueAtTime(1100, now + 0.08);
+    g.gain.setValueAtTime(0.15, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+    o.connect(g); g.connect(c.destination);
+    o.start(now); o.stop(now + 0.13);
+  }
+};
+// 自動再生制限対策：最初のユーザー操作で音を有効化
+['pointerdown', 'touchend', 'click'].forEach(ev =>
+  document.addEventListener(ev, () => Sound.unlock(), { capture: true, passive: true }));
+document.addEventListener('gesturestart', e => e.preventDefault());
+
+/* ---------- 仮の顔（おためし・タイトル用） ---------- */
+function makeSampleFace(size = 512) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const x = c.getContext('2d'), s = size / 100;
+  const grad = x.createRadialGradient(40 * s, 35 * s, 5 * s, 50 * s, 50 * s, 55 * s);
+  grad.addColorStop(0, '#ffe9b8'); grad.addColorStop(1, '#ffc46b');
+  x.fillStyle = grad; x.fillRect(0, 0, size, size);
+  x.fillStyle = 'rgba(255,120,140,.45)';
+  x.beginPath(); x.ellipse(24 * s, 60 * s, 9 * s, 6 * s, 0, 0, TAU); x.fill();
+  x.beginPath(); x.ellipse(76 * s, 60 * s, 9 * s, 6 * s, 0, 0, TAU); x.fill();
+  x.fillStyle = '#4a3b47';
+  x.beginPath(); x.ellipse(34 * s, 40 * s, 6 * s, 8 * s, 0, 0, TAU); x.fill();
+  x.fillStyle = '#fff'; x.beginPath(); x.arc(36 * s, 37 * s, 2.2 * s, 0, TAU); x.fill();
+  x.strokeStyle = '#4a3b47'; x.lineWidth = 3.5 * s; x.lineCap = 'round';
+  x.beginPath(); x.moveTo(60 * s, 38 * s); x.quadraticCurveTo(67 * s, 44 * s, 74 * s, 38 * s); x.stroke();
+  x.fillStyle = '#7a2e3b';
+  x.beginPath(); x.ellipse(50 * s, 70 * s, 14 * s, 9 * s, 0, 0, Math.PI); x.fill();
+  x.fillStyle = '#ff7f96';
+  x.beginPath(); x.ellipse(54 * s, 78 * s, 7 * s, 9 * s, 0.2, 0, TAU); x.fill();
+  x.strokeStyle = '#e25a73'; x.lineWidth = 1.5 * s;
+  x.beginPath(); x.moveTo(54 * s, 72 * s); x.lineTo(55 * s, 82 * s); x.stroke();
+  return c;
+}
+
+/* ---------- 写真 → 円形ボール画像 ---------- */
+function drawFace(ctx, size, src, zoom, ox, oy) {
+  const sc = size / Math.min(src.width, src.height) * zoom;
+  const w = src.width * sc, h = src.height * sc;
+  ctx.save();
+  ctx.clearRect(0, 0, size, size);
+  ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2, 0, TAU); ctx.clip();
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+  ctx.drawImage(src, size / 2 - w / 2 + ox * sc, size / 2 - h / 2 + oy * sc, w, h);
+  ctx.restore();
+}
+function makeBall(src, zoom, ox, oy) {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  drawFace(c.getContext('2d'), 512, src, zoom, ox, oy);
+  return c;
+}
+
+/* ---------- ボール1こ分の状態 ---------- */
+const RING_COLORS = ['#ff8fab', '#7cc4f2', '#f5c24c', '#8fd67a', '#b49cf0'];
+class Ball {
+  constructor(img, fx, fy, ring) {
+    this.img = img; this.ring = ring;
+    this.fx = fx; this.fy = fy; this.fresh = true;     // 画面サイズ確定後に配置
+    this.x = 0; this.y = 0; this.vx = 0; this.vy = 0; this.r = 50;
+    this.s = 0; this.sv = 0; this.k = 480; this.axis = 0;  // 変形量（＋つぶれ／−伸び）とバネ
+    this.pdx = 0; this.pdy = 0; this.pressT = 9; this.tilt = 0;
+  }
+}
+
+/* ---------- 物理 + 変形シミュレーション（複数ボール） ---------- */
+class World {
+  constructor(canvas, { interactive = false, sound = false, ratios = [0.17] } = {}) {
+    this.cv = canvas; this.ctx = canvas.getContext('2d');
+    this.sound = sound; this.ratios = ratios;
+    this.balls = []; this.running = false;
+    this.W = 300; this.H = 300; this.dpr = 1;
+    this.loop = this.loop.bind(this);
+    if (interactive) canvas.addEventListener('pointerdown', e => this.tap(e));
+  }
+  setImages(imgs) {
+    const n = imgs.length;
+    this.balls = imgs.map((img, i) => new Ball(img, (i + 1) / (n + 1), rnd(0.2, 0.4), RING_COLORS[i % RING_COLORS.length]));
+    this.resize();
+  }
+  addImage(img) {
+    if (this.balls.length >= MAX_BALLS) return;
+    this.balls.push(new Ball(img, rnd(0.35, 0.65), 0, RING_COLORS[this.balls.length % RING_COLORS.length]));
+    this.resize();
+  }
+  relaunch() { this.balls.forEach(b => { b.fresh = true; b.fy = rnd(0.2, 0.4); }); this.resize(); }
+  launch(b) {
+    b.x = clamp(this.W * b.fx, b.r, this.W - b.r);
+    b.y = clamp(this.H * b.fy, b.r, this.H - b.r);
+    b.vx = (Math.random() < 0.5 ? -1 : 1) * this.W * rnd(0.6, 0.95);
+    b.vy = -this.H * rnd(0.1, 0.4);
+    b.s = 0; b.sv = 0; b.pressT = 9; b.fresh = false;
+  }
+  resize() {
+    const rect = this.cv.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;      // 非表示中はあとで
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    this.W = rect.width; this.H = rect.height;
+    this.cv.width = Math.round(this.W * this.dpr);
+    this.cv.height = Math.round(this.H * this.dpr);
+    // ボールが増えるほど少し小さく
+    const n = Math.max(1, this.balls.length);
+    const ratio = this.ratios[Math.min(n, this.ratios.length) - 1];
+    const r = Math.max(32, Math.min(this.W, this.H) * ratio);
+    for (const b of this.balls) {
+      b.r = r;
+      if (b.fresh) this.launch(b);
+      // 画面サイズが変わっても画面外に取り残されない
+      b.x = clamp(b.x, b.r, this.W - b.r);
+      b.y = clamp(b.y, b.r, this.H - b.r);
+    }
+  }
+  start() {
+    if (this.running) return;
+    this.running = true; this.last = performance.now();
+    requestAnimationFrame(this.loop);
+  }
+  stop() { this.running = false; }
+  loop(ts) {
+    if (!this.running) return;
+    let dt = Math.min(0.033, Math.max(0, (ts - this.last) / 1000));
+    this.last = ts;
+    dt *= settings.speed;
+    const n = 4;
+    for (let i = 0; i < n; i++) this.step(dt / n);
+    this.draw();
+    requestAnimationFrame(this.loop);
+  }
+  step(dt) {
+    const { W, H } = this;
+    const g = H * 1.5 * settings.gravity, e = settings.bounce;
+    const balls = this.balls;
+
+    for (const b of balls) {
+      b.vy += g * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt;
+    }
+
+    // ボール同士の衝突
+    for (let i = 0; i < balls.length; i++) {
+      for (let j = i + 1; j < balls.length; j++) {
+        const a = balls[i], c = balls[j];
+        let dx = c.x - a.x, dy = c.y - a.y, d = Math.hypot(dx, dy);
+        const min = a.r + c.r;
+        if (d >= min) continue;
+        if (d < 0.01) { dx = rnd(-1, 1); dy = rnd(-1, 1); d = Math.hypot(dx, dy) || 1; }
+        const nx = dx / d, ny = dy / d, ov = (min - d) / 2;
+        a.x -= nx * ov; a.y -= ny * ov;
+        c.x += nx * ov; c.y += ny * ov;
+        const rv = (c.vx - a.vx) * nx + (c.vy - a.vy) * ny;
+        if (rv < 0) {
+          const imp = -(1 + e) * rv / 2;
+          a.vx -= imp * nx; a.vy -= imp * ny;
+          c.vx += imp * nx; c.vy += imp * ny;
+          this.hit(a, nx, ny, -rv * 1.3);
+          this.hit(c, -nx, -ny, -rv * 1.3);
+        }
+      }
+    }
+
+    for (const b of balls) {
+      const r = b.r;
+      if (b.x < r) { b.x = r; this.hit(b, -1, 0, Math.abs(b.vx)); b.vx = Math.abs(b.vx) * e * rnd(0.95, 1.08); }
+      if (b.x > W - r) { b.x = W - r; this.hit(b, 1, 0, Math.abs(b.vx)); b.vx = -Math.abs(b.vx) * e * rnd(0.95, 1.08); }
+      if (b.y < r) { b.y = r; this.hit(b, 0, -1, Math.abs(b.vy)); b.vy = Math.abs(b.vy) * e; }
+      if (b.y > H - r) {
+        b.y = H - r; this.hit(b, 0, 1, Math.abs(b.vy));
+        b.vy = -Math.abs(b.vy) * e * rnd(0.95, 1.05);
+        // 止まらないよう最低限の跳ね上がりを保証
+        const minV = Math.sqrt(2 * g * H * rnd(0.3, 0.5)) + (settings.gravity < 0.05 ? H * 0.4 : 0);
+        if (-b.vy < minV) b.vy = -minV;
+        b.vx += rnd(-0.12, 0.12) * W;             // 毎回少し方向を変える
+      }
+      // 横に動き続ける／暴走しない
+      const minVx = W * 0.22;
+      if (Math.abs(b.vx) < minVx) b.vx = (b.vx < 0 ? -1 : 1) * minVx;
+      const sp = Math.hypot(b.vx, b.vy), maxV = Math.max(W, H) * 3;
+      if (sp > maxV) { b.vx *= maxV / sp; b.vy *= maxV / sp; }
+
+      // 変形のバネ（つぶれ → 伸び → ぷるぷる戻る）
+      const damp = 2 * 0.2 * Math.sqrt(b.k);
+      b.sv += (-b.k * b.s - damp * b.sv) * dt;
+      b.s += b.sv * dt;
+      b.pressT += dt;
+      b.tilt += (clamp(b.vx / W, -1.5, 1.5) * 0.12 - b.tilt) * Math.min(1, dt * 6);
+    }
+  }
+  // 衝突：nx,ny はぶつかった相手（壁・ボール）の方向
+  hit(b, nx, ny, impact, press = true) {
+    const strength = clamp(impact / (this.H * 2.2), 0, 1);
+    if (strength < 0.04) return;
+    b.axis = Math.atan2(ny, nx);
+    const amt = (0.14 + 0.4 * strength) * settings.squish * rnd(0.85, 1.15);
+    b.s = clamp(amt, 0, 0.7);
+    b.sv = rnd(-0.5, 0.5);
+    b.k = 480 * rnd(0.75, 1.3);                   // 戻るタイミングに変化
+    if (press) { b.pdx = nx; b.pdy = ny; b.pressT = 0; } else { b.pressT = 9; }
+    if (this.sound) Sound.boing(strength);
+  }
+  tap(e) {
+    if (!this.balls.length) return;
+    const rect = this.cv.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const g = this.H * 1.5 * Math.max(settings.gravity, 0.3);
+    // いちばん近いボール
+    let best = null, bd = Infinity;
+    for (const b of this.balls) {
+      const d = Math.hypot(b.x - px, b.y - py);
+      if (d < bd) { bd = d; best = b; }
+    }
+    if (bd < best.r * 1.3) {                       // ボールをタップ → ぴょーん
+      best.vy = -Math.sqrt(2 * g * this.H * 0.7) - this.H * 0.3;
+      best.vx += rnd(-0.6, 0.6) * this.W;
+      this.hit(best, 0, 1, this.H * 2, false);
+    } else {                                       // 他の場所 → みんな反対へはじく
+      for (const b of this.balls) {
+        const dx = b.x - px, dy = b.y - py, d = Math.hypot(dx, dy) || 1;
+        b.vx += dx / d * this.W * 1.2;
+        b.vy += dy / d * this.H * 0.9 - this.H * 0.3;
+        this.hit(b, -dx / d, -dy / d, this.H * 1.4, false);
+      }
+    }
+  }
+  draw() {
+    const { ctx, W, H } = this;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    // 影
+    for (const b of this.balls) {
+      const hgt = clamp((H - b.r - b.y) / H, 0, 1);
+      ctx.fillStyle = `rgba(90,60,90,${0.16 * (1 - hgt * 0.7)})`;
+      ctx.beginPath(); ctx.ellipse(b.x, H - 4, b.r * (1 - hgt * 0.5), b.r * 0.12, 0, 0, TAU); ctx.fill();
+    }
+    for (const b of this.balls) {
+      const r = b.r, s = clamp(b.s, -0.45, 0.7);
+      const shift = r * Math.max(0, s) * Math.exp(-b.pressT / 0.07);  // 押し付けられて見える
+      ctx.save();
+      ctx.translate(b.x + b.pdx * shift, b.y + b.pdy * shift);
+      ctx.rotate(b.axis);
+      ctx.scale(1 - s, 1 + s * 0.75);             // 衝突方向につぶれ、直角方向へ広がる
+      ctx.rotate(-b.axis);
+      ctx.rotate(b.tilt);
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU);
+      ctx.save(); ctx.clip();
+      ctx.drawImage(b.img, -r, -r, r * 2, r * 2);
+      ctx.restore();
+      ctx.lineWidth = r * 0.08; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, r * 1.05, 0, TAU);
+      ctx.lineWidth = r * 0.035; ctx.strokeStyle = b.ring; ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+/* ---------- 画面遷移 ---------- */
+const titleWorld = new World($('#titleCanvas'), { ratios: [0.13] });
+const gameWorld = new World($('#gameCanvas'), { interactive: true, sound: true, ratios: [0.18, 0.15, 0.13, 0.12, 0.11] });
+const sample = makeSampleFace();
+titleWorld.setImages([sample]);
+let current = 'title';
+let addMode = false;      // true: ゲームに顔を「ふやす」ための撮影中
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.toggle('active', el.id === id));
+  current = id;
+  titleWorld.stop(); gameWorld.stop();
+  if (id !== 'camera') stopCamera();
+  if (id === 'game') updateAddButton();
+  requestAnimationFrame(() => {
+    if (id === 'title') { titleWorld.relaunch(); titleWorld.start(); }
+    if (id === 'game') { gameWorld.resize(); gameWorld.start(); }
+    if (id === 'confirm') sizeAdjust();
+  });
+}
+window.addEventListener('resize', () => {
+  if (current === 'title') titleWorld.resize();
+  if (current === 'game') gameWorld.resize();
+  if (current === 'confirm') sizeAdjust();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { titleWorld.stop(); gameWorld.stop(); stopCamera(); }
+  else if (current === 'title') titleWorld.start();
+  else if (current === 'game') gameWorld.start();
+  else if (current === 'camera') startStream();
+});
+
+/* ---------- カメラ（内カメラ／外カメラ） ---------- */
+const video = $('#video');
+let stream = null, facing = store.get('facing', 'user'), mirrored = true, camToken = 0;
+
+function openCamera(add) {
+  addMode = add;
+  $('#btnCamBack').textContent = add ? '⬅️' : '🏠';
+  show('camera');
+  startStream();
+}
+async function startStream() {
+  const token = ++camToken;
+  stopCamera();
+  $('#camMsg').textContent = facing === 'user' ? 'まるの なかに かおを いれてね' : 'まるの なかに かおを いれて とってね';
+  $('#btnPick').classList.remove('pulse');
+  $('#btnShutter').disabled = true;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { camFail(); return; }
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false
+    });
+    if (token !== camToken || current !== 'camera') { s.getTracks().forEach(t => t.stop()); return; }
+    stream = s;
+    // 実際に使われたカメラの向きで鏡像にするか決める（内カメラだけ鏡像）
+    const tr = s.getVideoTracks()[0];
+    const real = tr && tr.getSettings ? tr.getSettings().facingMode : '';
+    mirrored = (real || facing) === 'user';
+    video.classList.toggle('mirror', mirrored);
+    video.srcObject = s;
+    await video.play();
+    if (token !== camToken) return;
+    $('#btnShutter').disabled = false;
+    checkCameras();
+  } catch (err) { if (token === camToken) camFail(); }
+}
+async function checkCameras() {
+  try {
+    const list = await navigator.mediaDevices.enumerateDevices();
+    $('#btnFlip').hidden = list.filter(d => d.kind === 'videoinput').length < 2;
+  } catch (e) { $('#btnFlip').hidden = true; }
+}
+function camFail() {
+  stopCamera();
+  $('#camMsg').textContent = 'カメラが つかえないよ。🖼️ から しゃしんを えらんでね';
+  $('#btnPick').classList.add('pulse');
+}
+function stopCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; video.srcObject = null;
+}
+$('#btnFlip').addEventListener('click', () => {
+  facing = facing === 'user' ? 'environment' : 'user';
+  store.set('facing', facing);
+  Sound.pop();
+  startStream();
+});
+$('#btnShutter').addEventListener('click', () => {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw || !vh) return;
+  const s = Math.min(vw, vh), out = Math.min(s, 1024);
+  const c = document.createElement('canvas'); c.width = c.height = out;
+  const x = c.getContext('2d');
+  if (mirrored) { x.translate(out, 0); x.scale(-1, 1); }   // 内カメラはプレビューと同じ鏡像で
+  x.drawImage(video, (vw - s) / 2, (vh - s) / 2, s, s, 0, 0, out, out);
+  Sound.pop();
+  stopCamera();
+  openConfirm(c, 1.15);
+});
+$('#btnPick').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const max = 1200, k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);   // iOSは向き(EXIF)を自動で反映
+    URL.revokeObjectURL(url);
+    openConfirm(c, 1.0);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); $('#camMsg').textContent = 'よみこめなかったよ。ほかの しゃしんに してね'; };
+  img.src = url;
+});
+$('#btnCamBack').addEventListener('click', () => {
+  if (addMode && gameWorld.balls.length) show('game'); else show('title');
+});
+
+/* ---------- 位置・拡大率の調整 ---------- */
+const adjCv = $('#adjustCanvas'), adjCtx = adjCv.getContext('2d'), zoomEl = $('#zoom');
+const adj = { src: null, zoom: 1.2, ox: 0, oy: 0, D: 300 };
+function openConfirm(src, zoom) {
+  adj.src = src; adj.zoom = zoom; adj.ox = 0; adj.oy = 0;
+  zoomEl.value = zoom;
+  show('confirm');
+}
+function sizeAdjust() {
+  const rect = adjCv.getBoundingClientRect();
+  if (!rect.width) return;
+  adj.D = rect.width;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  adjCv.width = adjCv.height = Math.round(rect.width * dpr);
+  drawAdjust();
+}
+function clampAdj() {
+  const m = Math.min(adj.src.width, adj.src.height) / adj.zoom;
+  adj.ox = clamp(adj.ox, -(adj.src.width - m) / 2, (adj.src.width - m) / 2);
+  adj.oy = clamp(adj.oy, -(adj.src.height - m) / 2, (adj.src.height - m) / 2);
+}
+function drawAdjust() {
+  if (!adj.src) return;
+  clampAdj();
+  drawFace(adjCtx, adjCv.width, adj.src, adj.zoom, adj.ox, adj.oy);
+}
+zoomEl.addEventListener('input', () => { adj.zoom = +zoomEl.value; drawAdjust(); });
+const pointers = new Map();
+let pinch = null;
+adjCv.addEventListener('pointerdown', e => {
+  adjCv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, zoom: adj.zoom };
+  }
+});
+adjCv.addEventListener('pointermove', e => {
+  const p = pointers.get(e.pointerId);
+  if (!p || !adj.src) return;
+  const sc = adj.D / Math.min(adj.src.width, adj.src.height) * adj.zoom;
+  if (pointers.size === 1) {
+    adj.ox += (e.clientX - p.x) / sc;
+    adj.oy += (e.clientY - p.y) / sc;
+  }
+  p.x = e.clientX; p.y = e.clientY;
+  if (pointers.size === 2 && pinch) {
+    const [a, b] = [...pointers.values()];
+    adj.zoom = clamp(pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d, 1, 4);
+    zoomEl.value = adj.zoom;
+  }
+  drawAdjust();
+});
+['pointerup', 'pointercancel'].forEach(ev => adjCv.addEventListener(ev, e => {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+}));
+$('#btnRetake').addEventListener('click', () => { adj.src = null; openCamera(addMode); });
+$('#btnUse').addEventListener('click', () => {
+  if (!adj.src) return;
+  const img = makeBall(adj.src, adj.zoom, adj.ox, adj.oy);
+  adj.src = null;                                  // 元写真はメモリから解放
+  if (addMode) gameWorld.addImage(img); else gameWorld.setImages([img]);
+  Sound.pop();
+  show('game');
+});
+
+/* ---------- タイトル・ゲームのボタン ---------- */
+function updateAddButton() {
+  const n = gameWorld.balls.length;
+  $('#btnAdd').hidden = n >= MAX_BALLS;
+  $('#dots').textContent = '●'.repeat(n) + '○'.repeat(MAX_BALLS - n);
+}
+function clearGame() { gameWorld.balls = []; closeSettings(); }
+
+$('#btnStart').addEventListener('click', () => openCamera(false));
+$('#btnSample').addEventListener('click', () => { gameWorld.setImages([sample]); show('game'); });
+$('#btnAdd').addEventListener('click', () => {
+  if (gameWorld.balls.length >= MAX_BALLS) return;
+  closeSettings(); openCamera(true);
+});
+$('#btnAgain').addEventListener('click', () => { clearGame(); openCamera(false); });
+$('#btnHome').addEventListener('click', () => { clearGame(); show('title'); });
+
+function renderSound() { $('#soundIcon').textContent = Sound.on ? '🔊' : '🔇'; }
+$('#btnSound').addEventListener('click', () => {
+  Sound.on = !Sound.on; store.set('sound', Sound.on); renderSound();
+  if (Sound.on) { Sound.unlock(); Sound.pop(); }
+});
+renderSound();
+
+const sliders = { gravity: '#sGravity', bounce: '#sBounce', speed: '#sSpeed', squish: '#sSquish' };
+function syncSliders() { for (const k in sliders) $(sliders[k]).value = settings[k]; }
+for (const k in sliders) {
+  $(sliders[k]).addEventListener('input', e => { settings[k] = +e.target.value; store.set('settings', settings); });
+}
+function closeSettings() { $('#settings').classList.remove('open'); }
+$('#btnSettings').addEventListener('click', () => { syncSliders(); $('#settings').classList.toggle('open'); });
+$('#btnClose').addEventListener('click', closeSettings);
+$('#btnReset').addEventListener('click', () => { Object.assign(settings, DEFAULTS); store.set('settings', settings); syncSliders(); });
+
+show('title');
+</script>
+</body>
+</html>
