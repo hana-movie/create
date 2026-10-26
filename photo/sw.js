@@ -1,5 +1,5 @@
 // オフラインで あそべるように ファイルを しまっておく
-const CACHE = 'pashatto-room-v1';
+const CACHE = 'pashatto-room-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

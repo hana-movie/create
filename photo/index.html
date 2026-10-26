@@ -95,6 +95,28 @@
   #box.glow svg { filter: drop-shadow(0 0 10px #ffd23f) drop-shadow(0 0 4px #ffd23f); }
   @keyframes shake { 0%, 100% { transform: translateX(-50%) rotate(0); } 20% { transform: translateX(-50%) rotate(-6deg) scale(1.05); } 40% { transform: translateX(-50%) rotate(5deg); } 60% { transform: translateX(-50%) rotate(-3deg); } 80% { transform: translateX(-50%) rotate(2deg); } }
 
+  /* 片付けボックスの中身（よこ1れつ） */
+  #tray {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 35; display: none; align-items: center; gap: 8px;
+    padding: 10px 8px 10px 10px; background: rgba(255, 247, 234, .96); border-radius: 26px 26px 0 0;
+    box-shadow: 0 -6px 0 #ffb86b, 0 -10px 20px rgba(0,0,0,.08); touch-action: pan-x;
+  }
+  #tray.on { display: flex; animation: up .25s ease-out; }
+  #room.tray-on #box { visibility: hidden; }
+  #tray.glow { box-shadow: 0 -6px 0 #ffd23f, 0 0 0 6px #ffd23f inset, 0 -10px 20px rgba(0,0,0,.08); }
+  .tray-head { flex: none; width: 64px; display: flex; flex-direction: column; align-items: center; font-size: 38px; line-height: 1.1; }
+  .tray-head b { font-size: 18px; color: #e0578a; }
+  #trayList { flex: 1; min-width: 0; display: flex; gap: 12px; overflow-x: auto; overflow-y: hidden; padding: 6px 4px 10px; touch-action: pan-x;
+    -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; overscroll-behavior: contain; }
+  .tcell { flex: none; width: 84px; height: 84px; padding: 5px; border-radius: 22%; background: #fff; box-shadow: 0 5px 0 rgba(0,0,0,.12);
+    touch-action: pan-x; scroll-snap-align: start; }
+  .tcell img { width: 100%; height: 100%; border-radius: 18%; object-fit: cover; display: block; pointer-events: none; -webkit-user-drag: none; }
+  .tcell.lift { opacity: .3; }
+  .tcell.picked { box-shadow: 0 0 0 5px #ffd23f, 0 5px 0 rgba(0,0,0,.12); animation: boing .5s; }
+  .tray-empty { flex: 1; text-align: center; font-size: 30px; opacity: .5; padding: 20px 0; }
+  #trayX { flex: none; width: 64px; height: 64px; border-radius: 50%; border: none; background: #eef1f7; font-size: 28px; }
+  .item.ghost { z-index: 80; pointer-events: none; transition: none; transform: scale(1.15) rotate(-5deg); box-shadow: 0 16px 20px rgba(0,0,0,.2); }
+
   /* もっている アイテム（いちらんから えらんだ とき） */
   #carry {
     position: absolute; left: 50%; top: max(10px, env(safe-area-inset-top)); z-index: 70; transform: translateX(-50%);
@@ -132,6 +154,9 @@
   .bbtn.cam { width: 96px; height: 96px; font-size: 48px; background: #ff6fa0; box-shadow: 0 6px 0 #d94a7c; }
   .bbtn.list { background: #7cc8ff; box-shadow: 0 6px 0 #4b9ad6; }
   .bbtn.tidy { background: #8fdc7a; box-shadow: 0 6px 0 #5daa4a; }
+  .bbtn.boxb { background: #ffb86b; box-shadow: 0 6px 0 #e08a2e; }
+  .bbtn.on { outline: 5px solid #ffd23f; outline-offset: 3px; }
+  @media (max-width: 400px) { .bbtn { width: 70px; height: 70px; font-size: 34px; } .bbtn.cam { width: 88px; height: 88px; font-size: 44px; } }
 
   /* ===== かさねる がめん ===== */
   .overlay { position: fixed; inset: 0; z-index: 100; display: none; }
@@ -145,6 +170,8 @@
   }
   @keyframes up { from { transform: translateY(40%); opacity: .4; } }
   #sheet .head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .sheet-title { font-size: 34px; display: flex; align-items: center; gap: 6px; }
+  .sheet-title b { font-size: 22px; color: #4b9ad6; }
   .tab { height: 64px; min-width: 88px; padding: 0 14px; border-radius: 20px; border: 4px solid transparent; background: #fff; font-size: 30px; box-shadow: 0 4px 0 #f0d9b5; }
   .tab.on { border-color: #ffb238; background: #fff2d6; }
   .tab small { font-size: 18px; font-weight: bold; margin-left: 4px; }
@@ -234,14 +261,20 @@
     </svg>
     <div class="badge" id="badge">0</div>
   </div>
+  <div id="tray" aria-label="かたづけた もの">
+    <div class="tray-head">📦<b id="trayCount">0</b></div>
+    <div id="trayList"></div>
+    <button id="trayX" aria-label="とじる">✕</button>
+  </div>
   <div id="carry"><img id="carryImg" alt=""><span class="arrow">👇</span><button id="carryX" aria-label="やめる">✕</button></div>
   <button id="gear" aria-label="おうちのかた むけ せってい（ながおし）">⚙️<svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/></svg></button>
   <div id="gearTip">おうちのかた：ながおし</div>
 </div>
 
 <div id="bar">
-  <button class="bbtn list" id="listBtn" aria-label="たからもの いちらん">🖼️</button>
+  <button class="bbtn list" id="listBtn" aria-label="かざってある もの">🖼️</button>
   <button class="bbtn cam" id="camBtn" aria-label="しゃしんを とる">📷</button>
+  <button class="bbtn boxb" id="boxBtn" aria-label="かたづけた もの">📦</button>
   <button class="bbtn tidy" id="tidyBtn" aria-label="ぜんぶ おかたづけ">🧹</button>
 </div>
 
@@ -249,8 +282,7 @@
 <div class="overlay" id="sheet">
   <div class="panel">
     <div class="head">
-      <button class="tab on" data-f="all" aria-label="ぜんぶ">🖼️<small id="cntAll">0</small></button>
-      <button class="tab" data-f="box" aria-label="はこの なか">📦<small id="cntBox">0</small></button>
+      <div class="sheet-title" aria-label="かざってある もの">🖼️<b id="cntAll">0</b></div>
       <button class="xbtn" id="sheetX" aria-label="とじる">✕</button>
     </div>
     <div id="grid"></div>
@@ -618,7 +650,8 @@
       im.style.left = (i * 31) + '%'; im.style.transform = `rotate(${[-10, 4, 12][i]}deg)`; im.style.bottom = (i % 2 ? 4 : 0) + 'px';
       peek.appendChild(im);
     });
-    room.classList.toggle('show-slots', !!sel || !!drag);
+    room.classList.toggle('show-slots', !!sel || !!drag || !!tdrag);
+    if ($('tray').classList.contains('on')) renderTray();
     $('box').classList.toggle('glow', !!sel && state.items[sel] && state.items[sel].loc.where !== 'box');
   }
 
@@ -640,7 +673,9 @@
   // ===== どこに おとすか =====
   function roomXY(e) { const r = room.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   function boxHit(x, y, pad) {
-    const r = $('box').getBoundingClientRect(), rr = room.getBoundingClientRect();
+    const trayOn = $('tray').classList.contains('on');
+    if (trayOn) pad = Math.min(pad, 0.05);
+    const r = (trayOn ? $('tray') : $('box')).getBoundingClientRect(), rr = room.getBoundingClientRect();
     const l = r.left - rr.left, t = r.top - rr.top, px = r.width * pad, py = r.height * pad;
     return x > l - px && x < l + r.width + px && y > t - py * 1.6 && y < t + r.height + py;
   }
@@ -658,6 +693,7 @@
   function hot(t) {
     room.querySelectorAll('.slot.hot').forEach(s => s.classList.remove('hot'));
     $('box').classList.toggle('glow', !!(t && t.type === 'box'));
+    $('tray').classList.toggle('glow', !!(t && t.type === 'box'));
     if (t && t.type === 'slot') { const s = room.querySelector(`.slot[data-s="${t.shelfId}"][data-k="${t.slot}"]`); if (s) s.classList.add('hot'); }
   }
 
@@ -766,7 +802,7 @@
       } else { setSel(null); sfx.soft(); }
       return;
     }
-    if (t && t.type === 'box' && boxHit(p.x, p.y, 0)) { shakeBox(); sfx.tap(); openSheet('box'); }
+    if (t && t.type === 'box' && boxHit(p.x, p.y, 0)) { shakeBox(); sfx.tap(); openTray(); }
   });
 
   // ===== ぜんぶ おかたづけ =====
@@ -782,39 +818,122 @@
     setTimeout(() => { busy = false; render(); save(); showToast('✨'); }, onShelf.length * 140 + 600);
   });
 
-  // ===== いちらん =====
-  let filter = 'all';
-  function openSheet(f) {
-    audio();
-    filter = f || 'all';
-    renderSheet();
-    $('sheet').classList.add('on');
-  }
+  // ===== かざってある もの いちらん（🖼️） =====
+  const onShelfIds = () => state.order.filter(id => state.items[id].loc.where === 'shelf');
+  const inBoxIds = () => state.order.filter(id => state.items[id].loc.where !== 'shelf')
+    .sort((a, b) => (state.items[b].loc.order || 0) - (state.items[a].loc.order || 0));   // あたらしく しまった じゅん
+  function openSheet() { audio(); closeTray(); renderSheet(); $('sheet').classList.add('on'); }
   function closeSheet() { $('sheet').classList.remove('on'); }
   function renderSheet() {
-    document.querySelectorAll('#sheet .tab').forEach(t => t.classList.toggle('on', t.dataset.f === filter));
-    const all = state.order.slice().reverse();
-    const box = all.filter(id => state.items[id].loc.where === 'box');
-    $('cntAll').textContent = all.length; $('cntBox').textContent = box.length;
-    const list = filter === 'box' ? box : all;
+    const list = onShelfIds();
+    $('cntAll').textContent = list.length;
     const grid = $('grid'); grid.innerHTML = '';
-    if (!list.length) { grid.innerHTML = `<div class="empty">${filter === 'box' ? '📦' : '📷'}</div>`; return; }
+    if (!list.length) { grid.innerHTML = '<div class="empty">🪵</div>'; return; }
     for (const id of list) {
-      const it = state.items[id];
-      const b = document.createElement('button'); b.className = 'cell'; b.setAttribute('aria-label', 'たからもの');
-      b.innerHTML = `<img src="${urls[id]}" alt="">` + (it.loc.where === 'shelf' ? '<span class="where">🪵</span>' : it.loc.where === 'box' ? '<span class="where">📦</span>' : '');
-      b.addEventListener('click', () => {
-        sfx.tap(); closeSheet();
-        if (it.loc.where === 'shelf') { boing(els[id]); setSel(id); }
-        else setSel(id, true);
-      });
+      const b = document.createElement('button'); b.className = 'cell'; b.setAttribute('aria-label', 'かざってある たからもの');
+      b.innerHTML = `<img src="${urls[id]}" alt="">`;
+      b.addEventListener('click', () => { sfx.tap(); closeSheet(); boing(els[id]); setSel(id); });
       grid.appendChild(b);
     }
   }
-  document.querySelectorAll('#sheet .tab').forEach(t => t.addEventListener('click', () => { sfx.tap(); filter = t.dataset.f; renderSheet(); }));
   $('sheetX').addEventListener('click', () => { sfx.soft(); closeSheet(); });
   $('sheet').addEventListener('click', e => { if (e.target.id === 'sheet') closeSheet(); });
-  $('listBtn').addEventListener('click', () => { setSel(null); openSheet('all'); });
+  $('listBtn').addEventListener('click', () => { setSel(null); openSheet(); });
+
+  // ===== かたづけた もの（📦 よこ1れつ） =====
+  const tray = $('tray'), trayList = $('trayList');
+  function openTray() { audio(); tray.classList.add('on'); room.classList.add('tray-on'); $('boxBtn').classList.add('on'); renderTray(true); }
+  function closeTray() { tray.classList.remove('on'); room.classList.remove('tray-on'); $('boxBtn').classList.remove('on'); }
+  let trayKey = '';
+  function renderTray(force) {
+    const ids = inBoxIds();
+    const key = ids.join(',') + '|' + sel;
+    $('trayCount').textContent = ids.length;
+    if (!force && key === trayKey) return;
+    trayKey = key;
+    const keepScroll = trayList.scrollLeft;
+    trayList.innerHTML = '';
+    if (!ids.length) { trayList.innerHTML = '<div class="tray-empty">✨</div>'; return; }
+    for (const id of ids) {
+      const c = document.createElement('div'); c.className = 'tcell' + (sel === id ? ' picked' : ''); c.dataset.id = id;
+      c.innerHTML = `<img src="${urls[id]}" alt="" draggable="false">`;
+      c.addEventListener('pointerdown', onTrayDown);
+      trayList.appendChild(c);
+    }
+    trayList.scrollLeft = keepScroll;
+  }
+  tray.addEventListener('pointerdown', e => e.stopPropagation());
+  tray.addEventListener('pointerup', e => e.stopPropagation());
+  $('trayX').addEventListener('click', () => { sfx.soft(); setSel(null); closeTray(); });
+  $('boxBtn').addEventListener('click', () => { if (tray.classList.contains('on')) { sfx.soft(); setSel(null); closeTray(); } else { setSel(null); sfx.tap(); shakeBox(); openTray(); } });
+
+  // はこから ゆびで ひっぱりだす（よこに うごかすと スクロール、うえに うごかすと ドラッグ）
+  let tdrag = null;
+  function onTrayDown(e) {
+    audio();
+    if (tdrag || busy || drag) return;
+    const c = e.currentTarget;
+    tdrag = { id: c.dataset.id, cell: c, pid: e.pointerId, sx: e.clientX, sy: e.clientY, mode: 'wait', ghost: null };
+    c.addEventListener('pointermove', onTrayMove);
+    c.addEventListener('pointerup', onTrayUp);
+    c.addEventListener('pointercancel', onTrayUp);
+    try { c.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+  function onTrayMove(e) {
+    if (!tdrag || e.pointerId !== tdrag.pid) return;
+    const dx = e.clientX - tdrag.sx, dy = e.clientY - tdrag.sy;
+    if (tdrag.mode === 'wait') {
+      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) { tdrag.mode = 'scroll'; return; }
+      if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) startTrayDrag(e);
+    }
+    if (tdrag && tdrag.mode === 'drag') {
+      e.preventDefault();
+      const p = roomXY(e);
+      tdrag.last = p;
+      const x = Math.max(-G.S * 0.2, Math.min(G.W - G.S * 0.8, p.x - G.S / 2));
+      const y = Math.max(0, Math.min(G.H - G.S * 0.8, p.y - G.S * 0.75));
+      tdrag.ghost.style.left = x + 'px'; tdrag.ghost.style.top = y + 'px';
+      hot(targetAt(p.x, p.y));
+    }
+  }
+  function startTrayDrag(e) {
+    tdrag.mode = 'drag';
+    if (sel) setSel(null);
+    tdrag.cell.classList.add('lift');
+    const g = document.createElement('div'); g.className = 'item ghost';
+    g.innerHTML = `<img src="${urls[tdrag.id]}" alt="">`;
+    g.style.width = g.style.height = G.S + 'px';
+    room.appendChild(g);
+    tdrag.ghost = g;
+    room.classList.add('show-slots');
+    sfx.tap();
+  }
+  function onTrayUp(e) {
+    if (!tdrag || e.pointerId !== tdrag.pid) return;
+    const d = tdrag; tdrag = null;
+    d.cell.removeEventListener('pointermove', onTrayMove);
+    d.cell.removeEventListener('pointerup', onTrayUp);
+    d.cell.removeEventListener('pointercancel', onTrayUp);
+    if (d.mode === 'wait' && e.type === 'pointerup') {
+      // タップ → えらぶ（つぎに 棚を タップして おく）
+      sfx.tap();
+      setSel(sel === d.id ? null : d.id, true);
+      return;
+    }
+    if (d.mode !== 'drag') return;
+    hot(null);
+    const t = e.type === 'pointercancel' || !d.last ? null : targetAt(d.last.x, d.last.y);
+    const gx = parseFloat(d.ghost.style.left), gy = parseFloat(d.ghost.style.top);
+    d.ghost.remove();
+    if (t && t.type === 'slot') {
+      const from = {}; from[d.id] = { x: gx, y: gy };
+      placeOnShelf(d.id, t.shelfId, t.slot);
+      sfx.place(); render({ from }); settle(d.id); save();
+    } else {
+      d.cell.classList.remove('lift');   // 棚の上で はなさなかったら はこに もどる（しからない）
+      sfx.soft(); render();
+    }
+  }
 
   // ===== カメラ =====
   let stream = null, shotBlob = null, saving = false;
@@ -865,7 +984,7 @@
   $('camBtn').addEventListener('click', openCam);
   $('camX').addEventListener('click', () => { sfx.soft(); closeCam(); });
   $('failX').addEventListener('click', () => { sfx.soft(); closeCam(); });
-  $('failSample').addEventListener('click', () => { sfx.soft(); closeCam(); openSheet('all'); });
+  $('failSample').addEventListener('click', () => { sfx.soft(); closeCam(); openTray(); });
   $('shutter').addEventListener('click', async () => {
     if (!stream || !video.videoWidth) return;
     sfx.shutter();
