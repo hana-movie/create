@@ -200,3 +200,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
 .invrow .invsell small { color: #888; }
 .invrow .btn.small { white-space: nowrap; }
 .boostline { background: #eef6ff; border-radius: 8px; padding: 6px 8px; border-bottom: 0; margin: 4px 0; }
+
+/* ダブルタップでの拡大を防ぐ */
+button, .btn, .sheet, .modal-box, #topbar, #goalbar, .bitem { touch-action: manipulation; }
