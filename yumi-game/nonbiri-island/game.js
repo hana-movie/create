@@ -5,12 +5,13 @@
    仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.25.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.26.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数 ----------
 const CONFIG = {
-  MAP: 17,              // 17×17。外周1マスは海岸（港など専用・今は何も建てられない）。陸は中の15×15
-  COAST: 1,
+  MAP: 23,              // 23×23 のマスの中に、丸い島を置く（島の外は海）
+  CORE: 4,              // 資源を置く15×15の区画の左上（(23-15)/2）
+  ISLAND: { a: 9.4, b: 8.0, wobble: 0.05 },    // 島の形：横・縦の半径（マス幅）と、縁のでこぼこ。陸は約275マス（前の四角い島は225マス）。陸の外側1マスが砂浜（海岸）
   HEX: true,            // マスの形：true＝六角形（ハニカム。奇数行が半マス右にずれる）、false＝四角
   TILE: 32,             // ワールド座標の1マスのピクセル
   START_COINS: 100,
@@ -302,7 +303,10 @@ const N = CONFIG.MAP;
 const idx = (x, y) => y * N + x;
 const inMap = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
 // 海岸：外周1マス
-const isCoast = (x, y) => x < CONFIG.COAST || y < CONFIG.COAST || x >= N - CONFIG.COAST || y >= N - CONFIG.COAST;
+// マスの種類：2＝陸、1＝砂浜（海岸。港など専用・今は何も建てられない）、0＝海。S.land（陸=1）から作る
+let KIND = new Uint8Array(N * N);
+const isCoast = (x, y) => KIND[idx(x, y)] !== 2;   // 建てられない（砂浜か海）
+const isSea = (x, y) => KIND[idx(x, y)] === 0;
 // ---------- マスの形（六角形／四角） ----------
 // 六角形は「とがった頭」で横に並べ、奇数行を半マス右にずらす（odd-r）。マスの横幅＝T、行の間隔＝T×0.866
 const HEXMAP = CONFIG.HEX, ROW_H = HEXMAP ? Math.sqrt(3) / 2 : 1;
@@ -332,6 +336,24 @@ function worldToTile(wx, wy) {
   return best;
 }
 // ワールドの大きさ（マス幅単位）
+// 丸い島の形（陸=1）。だ円の縁に少しでこぼこをつける。形は毎回同じ
+function islandLand() {
+  const [ww, wh] = worldSize(), cx = ww / 2, cy = wh / 2, I = CONFIG.ISLAND, land = [];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const [wx, wy] = cpos(x, y), dx = (wx - cx) / I.a, dy = (wy - cy) / I.b, th = Math.atan2(dy, dx);
+    const wob = 1 + I.wobble * (0.6 * Math.sin(3 * th + 0.7) + 0.4 * Math.sin(5 * th + 2.1) + 0.3 * Math.sin(2 * th + 4));
+    land.push(Math.hypot(dx, dy) / wob <= 1 ? 1 : 0);
+  }
+  return land;
+}
+// 陸の外側1マスを砂浜にする
+function buildKinds(land) {
+  KIND = new Uint8Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = idx(x, y);
+    KIND[i] = land[i] ? 2 : (neighbors(x, y).some(([a, b]) => land[idx(a, b)]) ? 1 : 0);
+  }
+}
 function worldSize() { return [N + (HEXMAP ? 0.5 : 0), (N - 1) * ROW_H + (HEXMAP ? 2 / Math.sqrt(3) : 1)]; }
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
@@ -348,20 +370,20 @@ function placeResources(cluster, nearHome, only) {
 }
 // かたまり配置の関数を作る：ブロック(bx,by)（陸の5×5）の中に種類 t を n マス、ひとつながりで置く
 function makeClusterFn(tiles, r) {
-  const B = 5, O = CONFIG.COAST;
+  const B = 5, O = CONFIG.CORE;
   const put = (x, y, t) => { tiles[idx(x, y)].res = { t, amt: 60 + Math.floor(r() * 40), max: 100 }; };
   // かたまり配置：ブロック(bx,by)（5×5）の中に種類 t を n マス、ひとつながりで置く
   return (bx, by, t, n, avoid) => {
     const x0 = O + bx * B, y0 = O + by * B; let tries = 40;
     while (tries--) {
       const sx = x0 + Math.floor(r() * B), sy = y0 + Math.floor(r() * B);
-      if (tiles[idx(sx, sy)].res || (avoid && avoid(sx, sy))) continue;
+      if (tiles[idx(sx, sy)].res || isCoast(sx, sy) || (avoid && avoid(sx, sy))) continue;
       const cells = [[sx, sy]], set = new Set([idx(sx, sy)]); let guard = 80;
       while (cells.length < n && guard--) {
         const [cx, cy] = cells[Math.floor(r() * cells.length)];
         const nb = neighbors(cx, cy); if (!nb.length) continue;
         const [nx, ny] = nb[Math.floor(r() * nb.length)];
-        if (nx < x0 || ny < y0 || nx >= x0 + B || ny >= y0 + B || set.has(idx(nx, ny)) || tiles[idx(nx, ny)].res || (avoid && avoid(nx, ny))) continue;
+        if (nx < x0 || ny < y0 || nx >= x0 + B || ny >= y0 + B || set.has(idx(nx, ny)) || tiles[idx(nx, ny)].res || isCoast(nx, ny) || (avoid && avoid(nx, ny))) continue;
         cells.push([nx, ny]); set.add(idx(nx, ny));
       }
       if (cells.length >= Math.min(n, 4)) { for (const [x, y] of cells) put(x, y, t); return true; }
@@ -373,13 +395,13 @@ function newGame() {
   const r = rng(Date.now() & 0xffff);
   const tiles = [];
   for (let i = 0; i < N * N; i++) tiles.push({ res: null });
-  const c = Math.floor(N / 2), B = 5, O = CONFIG.COAST;
+  const c = Math.floor(N / 2), land = islandLand(); buildKinds(land);
   const cluster = makeClusterFn(tiles, r);
   const nearHome = (x, y) => tileRange(x, y, c, c) <= 1;
   placeResources(cluster, nearHome);
   S = {
     v: 20, coins: CONFIG.START_COINS, pop: CONFIG.START_POP, residents: [], stage: 1, diff: 'normal',
-    tiles, buildings: [], nextId: 1, order: 1,
+    tiles, land, buildings: [], nextId: 1, order: 1,
     inv: {}, invOrder: [], reserve: {}, invCap: CONFIG.INV_CAP,
     unlocked: [], newTypes: [], recipes: [], goalsDone: [], notified: {}, lastTab: 'gather',
     stats: { earned: 0 },
@@ -685,16 +707,20 @@ function stepBuilding(b, dt, acc) {
 
 // ---------- セーブ ----------
 function save() { S.lastSave = Date.now(); try { localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(S)); } catch (e) { } }
-// 旧セーブ（15×15、海岸なし）を17×17に移す：全体を1マスずらし、外周を海岸に。ハーブを左下・右下に足す
+// 旧セーブ（15×15・17×17の四角い島）を今の地図に移す：全体を真ん中にずらし、丸い島にする
+// 島の外になったマスに資源や施設があれば、そのマスは陸のまま残す。ハーブが無ければ左下・右下に足す
 function migrateMap() {
-  const old = Math.round(Math.sqrt(S.tiles.length)); if (old === N) return;
+  const old = Math.round(Math.sqrt(S.tiles.length));
+  if (old === N) { if (!S.land) { S.land = islandLand(); forceLand(); } buildKinds(S.land); return; }
   const d = Math.floor((N - old) / 2), tiles = [];
   for (let i = 0; i < N * N; i++) tiles.push({ res: null });
   for (let y = 0; y < old; y++) for (let x = 0; x < old; x++) tiles[idx(x + d, y + d)] = S.tiles[y * old + x];
   for (const b of S.buildings) { b.x += d; b.y += d; }
   S.tiles = tiles; rebuildOcc();
+  S.land = islandLand(); forceLand(); buildKinds(S.land);
   if (!tiles.some(t => t.res && t.res.t === 'herb')) { const cl = makeClusterFn(tiles, rng(Date.now() & 0xffff)); const freeT = (x, y) => !!occ[idx(x, y)]; cl(0, 2, 'herb', 6, freeT); cl(2, 2, 'herb', 5, freeT); }
 }
+function forceLand() { for (let i = 0; i < N * N; i++) if (S.tiles[i].res || occ[i]) S.land[i] = 1; for (const b of S.buildings) S.land[idx(b.x, b.y)] = 1; }
 function load() {
   try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); migrateMap(); S.notified = S.notified || {}; S.reserve = S.reserve || {}; S.newTypes = S.newTypes || []; for (const b of S.buildings) { const d = BUILD[b.type]; if (d.tool && b.boost === undefined) { b.boost = 0; b.autoBoost = false; } } if (S.inv.sickle) { S.inv.scissors = (S.inv.scissors || 0) + S.inv.sickle; delete S.inv.sickle; } S.invOrder = S.invOrder.map(k => k === 'sickle' ? 'scissors' : k).filter((k, i, a) => ITEMS[k] && a.indexOf(k) === i); S.recipes = S.recipes.map(r => r === 'sickle' ? 'scissors' : r); for (const b of S.buildings) if (b.recipe === 'sickle') b.recipe = 'scissors'; if (S.reserve.sickle) { S.reserve.scissors = S.reserve.sickle; delete S.reserve.sickle; } rebuildOcc(); return true; } catch (e) { return false; }
 }
@@ -1236,8 +1262,14 @@ function draw() {
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#2a7fb8'; ctx.fillRect(0, 0, W, H); // 海
   const ts = T * cam.s, [ox, oy] = toScreen(0, 0), [ww, wh] = worldSize();
-  ctx.fillStyle = '#e8d9a0'; ctx.fillRect(ox - ts * 0.4, oy - ts * 0.4, ts * ww + ts * 0.8, ts * wh + ts * 0.8); // 砂浜
+  // 島のまわりの浅い海と砂浜の縁：砂浜のマスに丸を重ねて、縁をなめらかにする
+  for (const [col, rr] of [['#4fa6d6', 1.05], ['#e8d9a0', 0.72]]) {
+    ctx.fillStyle = col; ctx.beginPath();
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (KIND[idx(x, y)] === 1) { const [cx, cy] = cpos(x, y), px = ox + cx * ts, py = oy + cy * ts; ctx.moveTo(px + ts * rr, py); ctx.arc(px, py, ts * rr, 0, Math.PI * 2); }
+    ctx.fill();
+  }
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    if (isSea(x, y)) continue;
     const [sx, sy] = tileBox(x, y, ox, oy, ts); if (sx + ts < 0 || sy + ts * 1.2 < 0 || sx > W || sy - ts * 0.2 > H) continue;
     const t = S.tiles[idx(x, y)];
     // マスの色。六角形は3色で塗り分けると隣どうしが同じ色にならない
@@ -1253,7 +1285,7 @@ function draw() {
   }
   // マスの線
   ctx.strokeStyle = 'rgba(0,0,0,.10)'; ctx.lineWidth = 1; ctx.beginPath();
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) tilePath(x, y, ox, oy, ts);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (!isSea(x, y)) tilePath(x, y, ox, oy, ts);
   ctx.stroke();
   // 範囲の表示：採集所は周りのマス（黄）、市場は配達範囲（青）
   const sel = UI.mode === 'normal' ? UI.sel : null;
@@ -1264,7 +1296,6 @@ function draw() {
   }
   if (UI.mode === 'place' && BUILD[UI.placeType].kind === 'market') rangeBox({ x: UI.px, y: UI.py }, CONFIG.MARKET.range, 'rgba(120,190,255,.18)', 'rgba(60,140,255,.7)', ox, oy, ts);
   for (const b of S.buildings.slice().sort((a, b) => a.y - b.y)) { if (UI.mode === 'move' && UI.moveB === b) continue; drawBuilding(b.type, b.x, b.y, ox, oy, ts, UI.sel === b ? 'sel' : null, b); }
-  if (!HEXMAP) { ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2; ctx.strokeRect(ox, oy, N * ts, N * ts); }
   if (UI.mode === 'place' || UI.mode === 'move') {
     const type = UI.mode === 'place' ? UI.placeType : UI.moveB.type;
     const ok = canPlace(type, UI.px, UI.py, UI.mode === 'move' ? UI.moveB.id : null) && (UI.mode === 'move' || canAfford(buildCost(type)));
@@ -1274,7 +1305,7 @@ function draw() {
 }
 // 範囲のマスを塗って、外側の縁を太線で囲む
 function rangeBox(b, R, fill, stroke, ox, oy, ts) {
-  const cells = tilesWithin(b.x, b.y, R); cells.push([b.x, b.y]);
+  const cells = tilesWithin(b.x, b.y, R).filter(([x, y]) => !isSea(x, y)); cells.push([b.x, b.y]);
   ctx.fillStyle = fill; ctx.beginPath(); for (const [x, y] of cells) tilePath(x, y, ox, oy, ts); ctx.fill();
   ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.beginPath();
   if (!HEXMAP) { const x0 = Math.max(0, b.x - R), y0 = Math.max(0, b.y - R), x1 = Math.min(N - 1, b.x + R), y1 = Math.min(N - 1, b.y + R); ctx.rect(ox + x0 * ts, oy + y0 * ts, (x1 - x0 + 1) * ts, (y1 - y0 + 1) * ts); }
@@ -1282,7 +1313,7 @@ function rangeBox(b, R, fill, stroke, ox, oy, ts) {
     const [cx, cy] = cpos(x, y), r = ts / Math.sqrt(3);
     for (let k = 0; k < 6; k++) {
       const am = Math.PI / 3 * k - Math.PI / 3, [nx, ny] = worldToTile((cx + Math.cos(am)) * T, (cy + Math.sin(am)) * T);
-      if (inMap(nx, ny) && tileRange(b.x, b.y, nx, ny) <= R) continue;
+      if (inMap(nx, ny) && !isSea(nx, ny) && tileRange(b.x, b.y, nx, ny) <= R) continue;
       const a0 = Math.PI / 3 * k - Math.PI / 2, a1 = a0 + Math.PI / 3, px = ox + cx * ts, py = oy + cy * ts;
       ctx.moveTo(px + r * Math.cos(a0), py + r * Math.sin(a0)); ctx.lineTo(px + r * Math.cos(a1), py + r * Math.sin(a1));
     }
@@ -1361,7 +1392,7 @@ function onMove(id, x, y) {
   } else if (ptrs.size === 2 && pinch0) {
     p.x = x; p.y = y;
     const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
-    cam.s = Math.max(0.6, Math.min(5, pinch0.s * d / pinch0.d));
+    cam.s = Math.max(0.45, Math.min(5, pinch0.s * d / pinch0.d));
   }
   p.x = x; p.y = y;
   clampCam();
@@ -1390,7 +1421,7 @@ if (window.PointerEvent) {
   window.addEventListener('mousemove', e => { if (mdown) onMove(1, e.clientX, e.clientY); });
   window.addEventListener('mouseup', e => { if (mdown) { mdown = false; onUp(1, e.clientX, e.clientY); } });
 }
-cv.addEventListener('wheel', e => { cam.s = Math.max(0.6, Math.min(5, cam.s * (e.deltaY < 0 ? 1.1 : 0.9))); clampCam(); }, { passive: true });
+cv.addEventListener('wheel', e => { cam.s = Math.max(0.45, Math.min(5, cam.s * (e.deltaY < 0 ? 1.1 : 0.9))); clampCam(); }, { passive: true });
 function centerCam() { const c = Math.floor(N / 2); [cam.x, cam.y] = cpos(c, c).map(v => v * T); }
 function clampCam() { const [ww, wh] = worldSize(); cam.x = Math.max(0, Math.min(T * ww, cam.x)); cam.y = Math.max(0, Math.min(T * wh, cam.y)); }
 
