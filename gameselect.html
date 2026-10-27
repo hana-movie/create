@@ -33,8 +33,8 @@
     text-shadow: 0 4px 0 #fff;
   }
   .games {
-    display: grid; gap: clamp(14px, 2.5vw, 26px); width: 100%; max-width: 940px;
-    grid-template-columns: repeat(3, 1fr);
+    display: grid; gap: clamp(14px, 2.5vw, 26px); width: 100%; max-width: 1180px;
+    grid-template-columns: repeat(4, 1fr);
   }
   @media (orientation: portrait), (max-width: 700px) {
     .games { grid-template-columns: 1fr; max-width: 560px; }
@@ -53,7 +53,7 @@
   .game:active { transform: translateY(8px); box-shadow: 0 2px 0 var(--d); }
   .game .thumb { width: 100%; aspect-ratio: 2 / 1; object-fit: cover; background: var(--bg); display: block; }
   .game .body { padding: 10px 12px 12px; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
-  .game .name { font-size: clamp(18px, 2.2vw, 28px); font-weight: bold; color: var(--d); overflow-wrap: anywhere; }
+  .game .name { font-size: clamp(18px, 2.2vw, 28px); font-weight: bold; color: var(--d); word-break: keep-all; overflow-wrap: anywhere; }
   @media (orientation: portrait), (max-width: 700px) { .game .name { font-size: clamp(22px, 3.6vw, 32px); } .game .desc { font-size: clamp(16px, 2.6vw, 21px); } }
   .game .desc { font-size: clamp(13px, 1.6vw, 18px); line-height: 1.35; word-break: keep-all; overflow-wrap: anywhere; }
   .game .name { word-break: keep-all; }
@@ -65,6 +65,8 @@
   .g4 { --c: #b48cff; --d: #7b4fe0; --bg: #f1fbe9; }
   .g5 { --c: #ffa8c5; --d: #e0578a; --bg: #fff3e2; }
   .g6 { --c: #ffd36b; --d: #d9a21f; --bg: #fdf2f8; }
+  .g7 { --c: #7fd3a8; --d: #3fa673; --bg: #fff4d6; }
+  .g8 { --c: #f0b25a; --d: #c47f1f; --bg: #fff6df; }
 </style>
 </head>
 <body>
@@ -90,7 +92,7 @@
     <a class="game g3" href="soccer3d/index.html">
       <canvas class="thumb" id="th3"></canvas>
       <div class="body">
-        <div class="name">ブンブンサッカー3D</div>
+        <div class="name">ブンブン<wbr>サッカー3D</div>
         <div class="desc">かべも てんじょうも はしれる！</div>
         <div class="stars">★★★</div>
         <div class="note">🌐 ネットに つないでね</div>
@@ -118,6 +120,22 @@
         <div class="name">変顔ボール</div>
         <div class="desc">じぶんの かおが ボールに なって ぽよーん！</div>
         <div class="stars">★☆☆</div>
+      </div>
+    </a>
+    <a class="game g7" href="rakugaki/index.html">
+      <canvas class="thumb" id="th7"></canvas>
+      <div class="body">
+        <div class="name">ぷくぷくラクガキ</div>
+        <div class="desc">かいた えが ふくらんで うごきだす！</div>
+        <div class="stars">★★☆</div>
+      </div>
+    </a>
+    <a class="game g8" href="merge/index.html">
+      <canvas class="thumb" id="th8"></canvas>
+      <div class="body">
+        <div class="name">マージ・ベーカリー</div>
+        <div class="desc">おなじ ものを かさねて ちゅうもんを かなえよう！</div>
+        <div class="stars">★★☆</div>
       </div>
     </a>
   </div>
@@ -415,6 +433,53 @@
     face(345, 228, 38, '#f5c24c', 1, 1, 1);
     c.strokeStyle = 'rgba(255,127,163,.6)'; c.lineWidth = 4; c.setLineDash([6, 8]);
     c.beginPath(); c.moveTo(150, 175); c.quadraticCurveTo(190, 90, 220, 100); c.stroke(); c.setLineDash([]);
+  }
+
+  // 7. ぷくぷくラクガキ
+  {
+    const c = setup('th7');
+    const sky = c.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#bfe6ff'); sky.addColorStop(0.55, '#e6f6ff'); sky.addColorStop(0.56, '#9fdc85'); sky.addColorStop(1, '#8fd673');
+    c.fillStyle = sky; c.fillRect(0, 0, W, H);
+    // かみと えんぴつ
+    c.save(); c.translate(70, 120); c.rotate(-0.12);
+    c.fillStyle = '#fffdf8'; rr(c, -50, -60, 110, 120, 10); c.fill();
+    c.strokeStyle = '#3d3355'; c.lineWidth = 4; c.lineCap = 'round';
+    c.beginPath(); c.arc(5, -15, 22, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.moveTo(-10, 8); c.lineTo(20, 8); c.lineTo(22, 38); c.lineTo(-12, 38); c.closePath(); c.stroke();
+    c.restore();
+    c.save(); c.translate(120, 170); c.rotate(0.7); c.fillStyle = '#ffd23f'; c.fillRect(-6, -40, 12, 60); c.fillStyle = '#f3c08a'; c.beginPath(); c.moveTo(-6, 20); c.lineTo(6, 20); c.lineTo(0, 34); c.fill(); c.restore();
+    // ぷくっと した なかま
+    const cx = 270, by = 260;
+    c.fillStyle = 'rgba(40,80,40,.2)'; c.beginPath(); c.ellipse(cx, by + 6, 60, 12, 0, 0, Math.PI * 2); c.fill();
+    const puff = (x, y, rx, ry, col) => { const g = c.createRadialGradient(x - rx * .35, y - ry * .4, 2, x, y, Math.max(rx, ry)); g.addColorStop(0, '#fff'); g.addColorStop(.25, col); g.addColorStop(1, col); c.fillStyle = g; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#3d3355'; c.lineWidth = 4; c.stroke(); };
+    puff(cx - 18, by - 22, 12, 26, '#3d3355'); puff(cx + 18, by - 22, 12, 26, '#3d3355');
+    puff(cx - 48, by - 92, 14, 32, '#3d9bff'); puff(cx + 48, by - 92, 14, 32, '#3d9bff');
+    puff(cx, by - 88, 44, 52, '#3d9bff');
+    puff(cx, by - 160, 42, 40, '#ffd9b0');
+    c.fillStyle = '#3d3355'; c.beginPath(); c.arc(cx - 14, by - 164, 5, 0, Math.PI * 2); c.arc(cx + 14, by - 164, 5, 0, Math.PI * 2); c.fill();
+    c.lineWidth = 3.5; c.beginPath(); c.arc(cx, by - 152, 10, 0.2, Math.PI - 0.2); c.stroke();
+    c.fillStyle = '#ffd23f';
+    for (const [sx, sy, sz] of [[180, 70, 10], [360, 90, 8], [330, 40, 6]]) {
+      c.save(); c.translate(sx, sy); c.beginPath();
+      for (let i = 0; i < 10; i++) { const r = i % 2 ? sz * 0.45 : sz, a = i * Math.PI / 5 - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      c.closePath(); c.fill(); c.restore();
+    }
+  }
+
+  // 8. マージ・ベーカリー
+  {
+    const c = setup('th8');
+    c.fillStyle = '#fff6df'; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#f5d9a8'; rr(c, 14, 70, 372, 160, 22); c.fill();
+    const em = ['🌾', '🍞', '', '🐟', '🍇', '🥐', '', '🍣', '🌾', '🎂'];
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '40px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    for (let r = 0; r < 2; r++) for (let k = 0; k < 5; k++) {
+      const x = 26 + k * 71, y = 82 + r * 72;
+      c.fillStyle = '#fffdf6'; rr(c, x, y, 64, 64, 12); c.fill();
+      const e = em[r * 5 + k]; if (e) { c.fillStyle = '#000'; c.fillText(e, x + 32, y + 34); }
+    }
+    c.strokeStyle = '#f08a24'; c.lineWidth = 5; c.setLineDash([8, 7]);
+    c.beginPath(); c.moveTo(70, 110); c.quadraticCurveTo(100, 64, 128, 100); c.stroke(); c.setLineDash([]);
   }
 })();
 </script>

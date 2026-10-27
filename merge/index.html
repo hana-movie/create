@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>マージ・ベーカリー(こどもむけ)</title>
+<style>
+  :root {
+    --bg: #fff6df;
+    --ink: #3a2e22;
+    --board: #f5d9a8;
+    --cell: #fffdf6;
+    --cell-hover: #cdeccb;
+    --accent: #2f9e6b;
+    --retry: #f08a24;
+    --warn: #d6442f;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 10px 10px 16px;
+    user-select: none; -webkit-user-select: none;
+    overscroll-behavior: none;
+  }
+  #app {
+    /* 盤面の幅:画面の横幅いっぱい(左右10pxの余白)。PCは最大690px(従来460pxの1.5倍)。
+       縦に収まるよう、画面の高さからも上限を決める(盤面+供給行=盤面の約1.2倍) */
+    --board-w: min(100vw - 20px, 690px, max(260px, calc((100dvh - 300px) / 1.2)));
+    --cell-h: calc((var(--board-w) - 40px) / 5);   /* 盤面1マス分の高さ */
+    width: var(--board-w);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+  .stat { font-weight: 800; font-size: 2rem; line-height: 1.1; }
+  .stat small { display: block; font-size: 1rem; font-weight: 700; }
+  .stat .goal { font-size: 1.2rem; font-weight: 700; }
+
+  button.btn {
+    font: inherit; font-weight: 800; font-size: 1.5rem;
+    min-height: 64px; padding: 12px 20px; border: 0; border-radius: 20px;
+    background: var(--accent); color: #fff; cursor: pointer;
+    box-shadow: 0 5px 0 rgba(0, 0, 0, .18);
+  }
+  button.btn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0, 0, 0, .18); }
+  button.btn:disabled { background: #b9b0a2; box-shadow: none; cursor: default; transform: none; }
+  button.btn:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
+  button.btn.retry { background: var(--retry); }
+  button.btn.sub { background: #fff; color: var(--ink); border: 4px solid var(--accent); }
+  #supplyBtn { flex: 1 1 0; min-width: 0; min-height: 0; padding: 0 10px; font-size: clamp(1.2rem, calc(var(--board-w) / 16), 2rem); }
+  #retryBtn { width: 100%; min-height: 72px; font-size: 1.8rem; }
+
+  /* 注文カード */
+  #orders { display: flex; justify-content: center; gap: 8px; }
+  .order {
+    flex: 1 1 0; min-width: 0; max-width: 200px;
+    display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px;
+    padding: 2px 6px; background: #fff; border: 4px solid var(--accent); border-radius: 16px;
+    line-height: 1.1;
+  }
+  .order .o-emoji { font-size: 2.1rem; line-height: 1.1; }
+  .order .o-lv { font-size: 1.2rem; font-weight: 800; color: var(--accent); }
+
+  #message { min-height: 1.6em; text-align: center; font-weight: 800; font-size: 1.3rem; color: var(--warn); }
+
+  #board {
+    display: grid;
+    /* minmax(0, 1fr) にして、中身の大きさで列・行が広がらないようにする */
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+    width: 100%;
+    gap: 6px; padding: 8px;
+    background: var(--board); border-radius: 20px;
+  }
+  .cell {
+    aspect-ratio: 1 / 1;
+    min-width: 0; min-height: 0; overflow: hidden;
+    container-type: inline-size;   /* 中の絵文字をマス幅に連動させる */
+    background: var(--cell); border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .cell.hover { background: var(--cell-hover); }
+  .item {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    font-size: 9vw;            /* cqw 非対応ブラウザ用の予備 */
+    font-size: 60cqw;          /* マス幅の約60% */
+    touch-action: none; cursor: grab;
+  }
+  .item.dragging { opacity: .25; }
+  .lv {
+    position: absolute; right: 5px; bottom: 2px;
+    font-size: 5vw;            /* cqw 非対応ブラウザ用の予備 */
+    font-size: 16cqw;
+    font-weight: 800; color: var(--accent);
+    pointer-events: none;
+  }
+
+  /* 供給ボタン(左)+ バイバイ(右) */
+  .bottom-row { display: flex; align-items: stretch; gap: 8px; height: max(56px, var(--cell-h)); }
+  #byeArea {
+    flex: 0 0 28%; min-width: 0;
+    border: 4px dashed #b9a98f; border-radius: 20px; background: #efe6d4;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 800; font-size: clamp(.9rem, calc(var(--board-w) / 24), 1.3rem);
+    line-height: 1.1; text-align: center; white-space: nowrap;
+    transition: transform .12s, background .12s;
+  }
+  #byeArea .icon { font-size: 1.6em; line-height: 1.1; }
+
+  /* ドラッグ中:ドロップ先(注文カード・バイバイ)を少し強調 */
+  .order { transition: transform .12s, background .12s; }
+  body.dragging .order, body.dragging #byeArea {
+    border-color: var(--retry);
+    box-shadow: 0 0 0 4px rgba(240, 138, 36, .35);
+    transform: scale(1.03);
+  }
+  body.dragging .order.hover, body.dragging #byeArea.hover {
+    background: #fff0c4;
+    transform: scale(1.07);
+  }
+
+  #ghost {
+    position: fixed; left: 0; top: 0; z-index: 10;
+    pointer-events: none; display: none;
+    transform: translate(-50%, -50%) scale(1.25);
+    font-size: 64px; line-height: 1;
+  }
+
+  .overlay {
+    position: fixed; inset: 0; z-index: 20;
+    background: rgba(58, 46, 34, .8);
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .overlay.show { display: flex; }
+  .panel {
+    background: var(--bg); border-radius: 28px; padding: 28px 20px;
+    width: min(94vw, 400px); display: flex; flex-direction: column; gap: 16px; text-align: center;
+  }
+  .panel h2 { margin: 0; font-size: 2.2rem; }
+  .panel p { margin: 0; font-size: 1.3rem; font-weight: 700; }
+  .panel .big-emoji { font-size: 4rem; line-height: 1; }
+  .panel button.btn { width: 100%; }
+  .panel .diff small { display: block; font-weight: 700; font-size: 1rem; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="stat"><small id="labelDone"></small><span id="done">0</span> <span class="goal">/ <span id="goal">0</span></span></div>
+  </div>
+  <div id="orders"></div>
+  <div id="message" aria-live="polite"></div>
+  <div id="board"></div>
+  <div class="bottom-row">
+    <button id="supplyBtn" type="button" class="btn"></button>
+    <div id="byeArea"><span class="icon" id="byeIcon"></span><span id="byeText"></span></div>
+  </div>
+  <button id="retryBtn" type="button" class="btn retry"></button>
+</div>
+<div id="ghost"></div>
+
+<div id="selectScreen" class="overlay">
+  <div class="panel">
+    <h2 id="selectTitle"></h2>
+    <div id="difficultyList" style="display:flex;flex-direction:column;gap:14px"></div>
+    <a href="../gameselect.html" style="display:flex;align-items:center;justify-content:center;min-height:64px;border-radius:20px;border:4px solid var(--accent);background:#fff;color:var(--ink);font-weight:800;font-size:1.3rem;text-decoration:none;box-shadow:0 5px 0 rgba(0,0,0,.18)">🏠 ゲームを えらぶ</a>
+  </div>
+</div>
+
+<div id="clearScreen" class="overlay">
+  <div class="panel">
+    <div class="big-emoji" id="clearIcon"></div>
+    <h2 id="clearTitle"></h2>
+    <p id="clearText"></p>
+    <button id="continueBtn" type="button" class="btn"></button>
+    <button id="toSelectBtn" type="button" class="btn sub"></button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   設定(数値・絵文字・文言はここだけ変えればOK)
+   ============================================================ */
+const CONFIG = {
+  COLS: 5,
+  ROWS: 5,
+
+  // 系統ごとの絵文字。配列の index = レベル(0は未使用)
+  LINES: [
+    [null, '🌾', '🍞', '🥐', '🎂', '🏆'],
+    [null, '🍇', '🍷', '🥂', '🍾', '👑'],
+    [null, '🐟', '🍣', '🍱', '🦞', '💎'],
+  ],
+  MAX_LEVEL: 5,
+
+  // 難易度の設定(1つの配列)
+  //   lines    : 系統数(LINESの先頭から使う。供給と注文の両方に使う)
+  //   orders   : 同時に出る注文の数
+  //   minLevel : 注文のレベルの下限
+  //   maxLevel : 注文のレベルの上限
+  //   goal     : クリアまでに達成する注文の数
+  DIFFICULTIES: [
+    { label: 'やさしい',   lines: 2, orders: 1, minLevel: 2, maxLevel: 3, goal: 3 },
+    { label: 'ふつう',     lines: 3, orders: 2, minLevel: 2, maxLevel: 4, goal: 5 },
+    { label: 'むずかしい', lines: 3, orders: 3, minLevel: 3, maxLevel: 5, goal: 8 },
+  ],
+
+  MESSAGE_MS: 1800,
+
+  // 画面で使う絵文字
+  ICONS: { BYE: '👋', CLEAR: '🎉' },
+
+  // 画面で使う文言
+  TEXT: {
+    DONE: 'たっせい',
+    LEVEL: (n) => 'Lv' + n,
+    SUPPLY_BTN: 'あたらしくだす',
+    BYE: 'バイバイ',
+    FULL: 'いっぱいだよ',
+    RETRY: 'もう一度',
+    SELECT_TITLE: 'むずかしさを えらんでね',
+    CLEAR_TITLE: 'おめでとう!',
+    CLEAR_BODY: 'やったね! だいせいこう!',
+    CONTINUE: 'つづける',
+    TO_SELECT: 'むずかしさをかえる',
+    DIFF_DETAIL: (d) => 'ぜんぶで ' + d.goal + 'こ / しゅるい ' + d.lines,
+  },
+};
+
+/* ============================================================
+   状態
+   board[i]  = null(空き) または { line, level }
+   orders[i] = { line, level }(注文カード)
+   phase: 'select' | 'play' | 'clear'
+   ============================================================ */
+const state = {
+  board: [],
+  orders: [],
+  done: 0,
+  goal: 0,
+  lineCount: 0,
+  difficulty: null,
+  phase: 'select',
+  drag: null,
+  hoverEl: null,
+};
+
+/* ============================================================
+   DOM参照
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const $board = $('board'), $orders = $('orders');
+const $done = $('done'), $goal = $('goal'), $supply = $('supplyBtn');
+const $message = $('message'), $bye = $('byeArea'), $ghost = $('ghost');
+let messageTimer = null;
+
+/* ============================================================
+   盤面ロジック(画面に依存しない処理)
+   ============================================================ */
+function findEmptyIndices() {
+  const res = [];
+  state.board.forEach((v, i) => { if (v === null) res.push(i); });
+  return res;
+}
+
+function canMerge(a, b) {
+  return !!a && !!b && a.line === b.line && a.level === b.level && a.level < CONFIG.MAX_LEVEL;
+}
+
+/* ============================================================
+   注文ロジック
+   ============================================================ */
+/* 新しい注文を決める。他のカードと同じ内容は、できるだけ避ける */
+function makeOrder(replaceIndex) {
+  const d = state.difficulty;
+  const all = [];
+  for (let line = 0; line < state.lineCount; line++) {
+    for (let level = d.minLevel; level <= d.maxLevel; level++) all.push({ line, level });
+  }
+  const others = state.orders.filter((o, i) => o && i !== replaceIndex);
+  const fresh = all.filter((c) => !others.some((o) => o.line === c.line && o.level === c.level));
+  const pool = fresh.length > 0 ? fresh : all;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function setupOrders() {
+  state.orders = [];
+  for (let i = 0; i < state.difficulty.orders; i++) state.orders.push(makeOrder(-1));
+}
+
+/* 注文カードにドロップしたアイテムが、そのカードに合えば達成。合わなければ false(元の位置に戻る) */
+function tryFulfillOrder(from, idx) {
+  const order = state.orders[idx];
+  const item = state.board[from];
+  if (!order || !item || order.line !== item.line || order.level !== item.level) return false;
+  state.board[from] = null;
+  state.done += 1;
+  state.orders[idx] = makeOrder(idx);
+  return true;
+}
+
+/* ============================================================
+   ゲーム内アクション
+   ============================================================ */
+function spawnItem() {
+  if (state.phase !== 'play') return;
+  const empties = findEmptyIndices();
+  if (empties.length === 0) { showMessage(CONFIG.TEXT.FULL); return; }
+  const idx = empties[Math.floor(Math.random() * empties.length)];
+  const line = Math.floor(Math.random() * state.lineCount);
+  state.board[idx] = { line, level: 1 };
+  afterAction();
+}
+
+function moveItem(from, to) {
+  state.board[to] = state.board[from];
+  state.board[from] = null;
+}
+
+function mergeItems(from, to) {
+  state.board[to] = { line: state.board[to].line, level: state.board[to].level + 1 };
+  state.board[from] = null;
+}
+
+function byeItem(from) {
+  state.board[from] = null;   // 確認なしで消える
+}
+
+function handleDrop(from, target) {
+  if (target.type === 'order') {
+    tryFulfillOrder(from, target.index);   // 合わないときは何もしない = 元の位置に戻る
+  } else if (target.type === 'bye') {
+    byeItem(from);
+  } else if (target.type === 'cell' && target.index !== from) {
+    const to = target.index;
+    if (state.board[to] === null) moveItem(from, to);
+    else if (canMerge(state.board[from], state.board[to])) mergeItems(from, to);
+    // それ以外は何もしない = 元の位置に戻る
+  }
+  afterAction();
+}
+
+/* ============================================================
+   クリア判定
+   ============================================================ */
+function isCleared() {
+  return state.done >= state.goal;
+}
+
+function afterAction() {
+  render();
+  if (state.phase === 'play' && isCleared()) showClear();
+}
+
+/* ============================================================
+   画面遷移
+   ============================================================ */
+function showSelect() {
+  state.phase = 'select';
+  $('clearScreen').classList.remove('show');
+  $('selectScreen').classList.add('show');
+}
+
+function startGame(difficulty) {
+  state.difficulty = difficulty;
+  state.board = new Array(CONFIG.COLS * CONFIG.ROWS).fill(null);
+  state.done = 0;
+  state.goal = difficulty.goal;
+  state.lineCount = difficulty.lines;
+  state.drag = null;
+  state.phase = 'play';
+  setupOrders();
+  setHover({ type: 'none' });
+  $ghost.style.display = 'none';
+  document.body.classList.remove('dragging');
+  $('selectScreen').classList.remove('show');
+  $('clearScreen').classList.remove('show');
+  clearTimeout(messageTimer);
+  $message.textContent = '';
+  render();
+}
+
+function restartSameDifficulty() {
+  if (state.difficulty) startGame(state.difficulty);
+}
+
+function showClear() {
+  state.phase = 'clear';
+  $('clearScreen').classList.add('show');
+}
+
+/* ============================================================
+   描画
+   ============================================================ */
+function buildBoard() {
+  $board.style.setProperty('--cols', CONFIG.COLS);
+  $board.style.setProperty('--rows', CONFIG.ROWS);
+  $board.innerHTML = '';
+  for (let i = 0; i < CONFIG.COLS * CONFIG.ROWS; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    c.dataset.index = i;
+    $board.appendChild(c);
+  }
+}
+
+function buildDifficultyButtons() {
+  const box = $('difficultyList');
+  box.innerHTML = '';
+  CONFIG.DIFFICULTIES.forEach((d) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn diff';
+    b.innerHTML = d.label + '<small>' + CONFIG.TEXT.DIFF_DETAIL(d) + '</small>';
+    b.addEventListener('click', () => startGame(d));
+    box.appendChild(b);
+  });
+}
+
+function applyStaticText() {
+  const T = CONFIG.TEXT, I = CONFIG.ICONS;
+  $('labelDone').textContent = T.DONE;
+  $supply.textContent = T.SUPPLY_BTN;
+  $('retryBtn').textContent = T.RETRY;
+  $('byeIcon').textContent = I.BYE;
+  $('byeText').textContent = T.BYE;
+  $('selectTitle').textContent = T.SELECT_TITLE;
+  $('clearIcon').textContent = I.CLEAR;
+  $('clearTitle').textContent = T.CLEAR_TITLE;
+  $('clearText').textContent = T.CLEAR_BODY;
+  $('continueBtn').textContent = T.CONTINUE;
+  $('toSelectBtn').textContent = T.TO_SELECT;
+}
+
+function renderOrders() {
+  $orders.innerHTML = '';
+  state.orders.forEach((o, i) => {
+    const card = document.createElement('div');
+    card.className = 'order';
+    card.dataset.index = i;
+    const em = document.createElement('span');
+    em.className = 'o-emoji';
+    em.textContent = CONFIG.LINES[o.line][o.level];
+    const lv = document.createElement('span');
+    lv.className = 'o-lv';
+    lv.textContent = CONFIG.TEXT.LEVEL(o.level);
+    card.appendChild(em);
+    card.appendChild(lv);
+    $orders.appendChild(card);
+  });
+}
+
+function render() {
+  const cells = $board.children;
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
+    const it = state.board[i];
+    cell.innerHTML = '';
+    if (it) {
+      const el = document.createElement('div');
+      el.className = 'item';
+      el.textContent = CONFIG.LINES[it.line][it.level];
+      el.dataset.index = i;
+      if (state.drag && state.drag.from === i) el.classList.add('dragging');
+      cell.appendChild(el);
+      const tag = document.createElement('span');
+      tag.className = 'lv';
+      tag.textContent = CONFIG.TEXT.LEVEL(it.level);
+      cell.appendChild(tag);
+    }
+  }
+  renderOrders();
+  $done.textContent = state.done;
+  $goal.textContent = state.goal;
+  $supply.disabled = state.phase !== 'play';
+}
+
+function showMessage(text) {
+  $message.textContent = text;
+  clearTimeout(messageTimer);
+  messageTimer = setTimeout(() => { $message.textContent = ''; }, CONFIG.MESSAGE_MS);
+}
+
+/* ============================================================
+   ドラッグ&ドロップ(Pointer Events)
+   ============================================================ */
+function targetAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return { type: 'none' };
+  if (el.closest('#byeArea')) return { type: 'bye', el: $bye };
+  const order = el.closest('.order');
+  if (order) return { type: 'order', index: Number(order.dataset.index), el: order };
+  const cell = el.closest('.cell');
+  if (cell) return { type: 'cell', index: Number(cell.dataset.index), el: cell };
+  return { type: 'none' };
+}
+
+function setHover(target) {
+  const next = target.type === 'none' ? null : target.el;
+  if (state.hoverEl === next) return;
+  if (state.hoverEl) state.hoverEl.classList.remove('hover');
+  state.hoverEl = next;
+  if (next) next.classList.add('hover');
+}
+
+function moveGhost(x, y) {
+  $ghost.style.left = x + 'px';
+  $ghost.style.top = y + 'px';
+}
+
+function onPointerDown(e) {
+  if (state.phase !== 'play' || state.drag) return;
+  const itemEl = e.target.closest('.item');
+  if (!itemEl) return;
+  e.preventDefault();
+  const from = Number(itemEl.dataset.index);
+  const it = state.board[from];
+  state.drag = { from, pointerId: e.pointerId };
+  $board.setPointerCapture(e.pointerId);
+  document.body.classList.add('dragging');
+  $ghost.textContent = CONFIG.LINES[it.line][it.level];
+  $ghost.style.fontSize = (itemEl.getBoundingClientRect().width * 0.6) + 'px';   // マスの大きさに連動
+  $ghost.style.display = 'block';
+  moveGhost(e.clientX, e.clientY);
+  itemEl.classList.add('dragging');
+}
+
+function onPointerMove(e) {
+  if (!state.drag || e.pointerId !== state.drag.pointerId) return;
+  moveGhost(e.clientX, e.clientY);
+  setHover(targetAt(e.clientX, e.clientY));
+}
+
+function endDrag(e, cancelled) {
+  if (!state.drag || e.pointerId !== state.drag.pointerId) return;
+  const from = state.drag.from;
+  const target = cancelled ? { type: 'none' } : targetAt(e.clientX, e.clientY);
+  setHover({ type: 'none' });
+  $ghost.style.display = 'none';
+  document.body.classList.remove('dragging');
+  state.drag = null;
+  handleDrop(from, target);
+}
+
+function setupEvents() {
+  $board.addEventListener('pointerdown', onPointerDown);
+  $board.addEventListener('pointermove', onPointerMove);
+  $board.addEventListener('pointerup', (e) => endDrag(e, false));
+  $board.addEventListener('pointercancel', (e) => endDrag(e, true));
+  $supply.addEventListener('click', spawnItem);
+  $('retryBtn').addEventListener('click', restartSameDifficulty);
+  $('continueBtn').addEventListener('click', restartSameDifficulty);
+  $('toSelectBtn').addEventListener('click', showSelect);
+}
+
+/* ============================================================
+   初期化
+   ============================================================ */
+function init() {
+  buildBoard();
+  buildDifficultyButtons();
+  applyStaticText();
+  setupEvents();
+  state.board = new Array(CONFIG.COLS * CONFIG.ROWS).fill(null);
+  render();
+  showSelect();
+}
+
+init();
+</script>
+</body>
+</html>
