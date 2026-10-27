@@ -5,7 +5,7 @@
    仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.22.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.22.1';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数 ----------
 const CONFIG = {
@@ -15,7 +15,7 @@ const CONFIG = {
   START_POP: 3,
   START_ITEMS: { wood: 10 },
   MAX_WORKERS: 5,       // 施設1棟あたりの作業員の上限（市場は MARKET.workers）
-  OFFLINE_MAX_SEC: 12 * 3600,
+  OFFLINE_MAX_SEC: 2 * 3600,   // オフラインで進むのは2時間まで
   // ---- 採集 ----
   GATHER_SEC: 10,       // 原材料1個の採集時間（作業員1人）
   TILE_SEC: 1,          // 1マス1秒（採集は資源マスまでの往復、市場は家までの往復）
@@ -29,7 +29,7 @@ const CONFIG = {
     slots: 5, stock: 20,            // 初期 5スロット×20個
     range: 2,                        // 配達範囲：市場の周り5×5マス
     workers: [3, 5],                 // 規模Lvごとの作業員の上限
-    upCost: [{ brick: 10 }],         // Lv1→2（島レベル2から）
+    upCost: [{ brick: 10, coins: 300 }],   // Lv1→2（島レベル2から）
     upStage: [2],
     handSec: 2,                      // 受け渡しの時間（＋往復 距離×2秒）
   },
@@ -48,6 +48,8 @@ const CONFIG = {
     hard:   { name: 'ハード',   need: 55 },
   },
   RECIPE_COST: 100,
+  // レシピの価格：そのレシピが使えるようになる島レベルごと（石レンガ100、小麦粉以降200、次300、次500、次800（仮））
+  RECIPE_COST_BY_LV: { 1: 100, 2: 200, 3: 300, 4: 500, 5: 800 },
   // ---- 道具のブースト ----
   BOOST_SEC: 180,       // 道具1個＝作業員1人ぶん×3分、作業時間が半分（人数で割って減る）
   BOOST_MAX: 10,        // 1施設に入れられる数
@@ -160,7 +162,7 @@ const STAGES = [
       { id: 'a4', text: '自宅を建てて全員を住居に入れる', n: 1, prog: () => (countType('house') && housedAll() ? 1 : 0), req: ['a3'], unlock: ['market'] },
       { id: 'a5', text: '市場で水を配って人口を1人増やす', n: 4, prog: () => S.pop, req: ['a4'], unlock: ['quarry'], hint: '市場の販売品に水を設定し、作業員を置きましょう' },
       { id: 'a6', text: '採石所を建てて石材を10個採る', n: 10, prog: () => pv('made_stone'), req: ['a5'], unlock: ['mason'] },
-      { id: 'a7', text: '石レンガのレシピを買う（🪙100）', n: 1, prog: () => (S.recipes.includes('brick') ? 1 : 0), req: ['a6'], hint: '石工所を建ててパネルから買えます' },
+      { id: 'a7', text: '石工所を建てて石レンガのレシピを買う（🪙100）', n: 1, prog: () => (S.recipes.includes('brick') ? 1 : 0), req: ['a6'], hint: '石工所を建ててパネルから買えます' },
       { id: 'a8', text: '石工所で石レンガを10個作る', n: 10, prog: () => pv('made_brick'), req: ['a7'] },
       { id: 'a9', text: '住民を8人にする', n: 8, prog: () => S.pop, req: ['a5'] },
     ] },
@@ -169,8 +171,8 @@ const STAGES = [
     goals: [
       { id: 'b1', text: '採集所で小麦を10個採る', n: 10, prog: () => pv('made_wheat') },
       { id: 'b1o', text: '採集所でオレンジを10個採る', n: 10, prog: () => pv('made_orange') },
-      { id: 'b2', text: '製粉所で小麦粉を10個作る', n: 10, prog: () => pv('made_flour'), hint: '小麦粉のレシピ（🪙100）が必要です' },
-      { id: 'b3', text: '食品工房でオレンジジュースを10個作る', n: 10, prog: () => pv('made_juice'), hint: 'ジュースのレシピ（🪙100）が必要です' },
+      { id: 'b2', text: '製粉所で小麦粉を10個作る', n: 10, prog: () => pv('made_flour'), hint: '小麦粉のレシピ（🪙200）が必要です' },
+      { id: 'b3', text: '食品工房でオレンジジュースを10個作る', n: 10, prog: () => pv('made_juice'), hint: 'ジュースのレシピ（🪙200）が必要です' },
       { id: 'b4', text: '市場をアップグレードする（石レンガ10）', n: 1, prog: () => (S.buildings.some(b => b.type === 'market' && (b.lv || 1) >= 2) ? 1 : 0) },
       { id: 'b5', text: '住民を16人にする', n: 16, prog: () => S.pop },
     ] },
@@ -178,25 +180,25 @@ const STAGES = [
     intro: '島レベル3：衣のカテゴリが始まりました（綿・糸、分母4）。採集所で綿を採り、配りましょう',
     goals: [
       { id: 'c1', text: '採集所で綿を10個採る', n: 10, prog: () => pv('made_cotton'), unlock: ['spinner'], hint: '綿花畑の近くに採集所を建て、「綿」を選びます' },
-      { id: 'c2', text: '紡績所で糸を5個作る', n: 5, prog: () => pv('made_thread'), req: ['c1'], hint: '糸のレシピ（🪙100）が必要です' },
-      { id: 'c3', text: '道具屋で石のオノを3個作る', n: 3, prog: () => pv('made_axe'), hint: 'オノのレシピ（🪙100）が必要です' },
+      { id: 'c2', text: '紡績所で糸を5個作る', n: 5, prog: () => pv('made_thread'), req: ['c1'], hint: '糸のレシピ（🪙300）が必要です' },
+      { id: 'c3', text: '道具屋で石のオノを3個作る', n: 3, prog: () => pv('made_axe'), hint: 'オノのレシピ（🪙300）が必要です' },
       { id: 'c4', text: '石のオノで伐採を速める', n: 1, prog: () => pv('boost_axe'), req: ['c3'], hint: '伐採所のパネルから石のオノを入れます' },
       { id: 'c5', text: '住民を28人にする', n: 28, prog: () => S.pop },
     ] },
   { n: 4, cap: 36, denom: { food: 18, cloth: 4 }, items: ['water', 'wheat', 'orange', 'flour', 'juice', 'bread', 'cotton', 'thread'], unlock: ['hive'],
     intro: '島レベル4：パンが食の満足度に加わりました（食の分母14→18）。巣箱も建てられます',
     goals: [
-      { id: 'd1', text: 'パンのレシピを買ってパンを10個作る', n: 10, prog: () => pv('made_bread'), hint: '食品工房でパンのレシピ（🪙100）を買い、レシピをパンに変えます' },
+      { id: 'd1', text: 'パンのレシピを買ってパンを10個作る', n: 10, prog: () => pv('made_bread'), hint: '食品工房でパンのレシピ（🪙500）を買い、レシピをパンに変えます' },
       { id: 'd2', text: '巣箱を花畑の隣に1個置く', n: 1, prog: () => countType('hive') },
       { id: 'd3', text: '住民を36人にする', n: 36, prog: () => S.pop },
     ] },
   { n: 5, cap: 44, denom: { food: 18, cloth: 8, luxury: 8 }, items: ['water', 'wheat', 'orange', 'flour', 'juice', 'bread', 'cotton', 'thread', 'cloth', 'honey', 'polish', 'jam'], unlock: ['apiary', 'polisher', 'furniture'],
     intro: '島レベル5：贅沢品のカテゴリが始まりました（ハチミツ・磨き石・オレンジジャム、分母8）。衣に布が加わりました（分母8）',
     goals: [
-      { id: 'e1', text: '研磨所を建てて磨き石を10個作る', n: 10, prog: () => pv('made_polish'), hint: '磨き石のレシピ（🪙100）が必要です' },
+      { id: 'e1', text: '研磨所を建てて磨き石を10個作る', n: 10, prog: () => pv('made_polish'), hint: '磨き石のレシピ（🪙800）が必要です' },
       { id: 'e2', text: '養蜂場を建ててハチミツを10個採る', n: 10, prog: () => pv('made_honey'), hint: '巣箱の隣に養蜂場を建てます' },
-      { id: 'e3', text: '紡績所で布を10個作る', n: 10, prog: () => pv('made_cloth'), hint: '布のレシピ（🪙100）を買い、紡績所のレシピを布に変えます' },
-      { id: 'e4', text: '家具屋で木のベッドを4個作る', n: 4, prog: () => pv('made_bed'), hint: 'ベッドのレシピ（🪙100）が必要です' },
+      { id: 'e3', text: '紡績所で布を10個作る', n: 10, prog: () => pv('made_cloth'), hint: '布のレシピ（🪙800）を買い、紡績所のレシピを布に変えます' },
+      { id: 'e4', text: '家具屋で木のベッドを4個作る', n: 4, prog: () => pv('made_bed'), hint: 'ベッドのレシピ（🪙800）が必要です' },
       { id: 'e5', text: '木のベッド4個と1000コインで住居をアップグレードする', n: 1, prog: () => (S.buildings.some(b => b.type === 'house' && (b.lv || 0) >= 1) ? 1 : 0), req: ['e4'], hint: '自宅をタップして「アップグレード」' },
       { id: 'e6', text: '住民を44人にする', n: 44, prog: () => S.pop },
     ] },
@@ -402,7 +404,10 @@ function boostLeftSec(b) { return b.workers ? (b.boost || 0) / b.workers : (b.bo
 
 // ---------- レシピ ----------
 function recipeOwned(r) { return !RECIPES[r].buy || S.recipes.includes(r); }
-function buyRecipe(r) { if (recipeOwned(r) || S.coins < CONFIG.RECIPE_COST) return false; S.coins -= CONFIG.RECIPE_COST; S.recipes.push(r); notify(`📜 レシピ「${ITEMS[RECIPES[r].out].name}」を買いました`); return true; }
+// レシピの価格：そのレシピの品が初めて満足度・材料に使われる島レベルで決まる
+const RECIPE_LV = { brick: 1, flour: 2, juice: 2, thread: 3, axe: 3, pickaxe: 3, scissors: 3, bread: 4, cloth: 5, polish: 5, jam: 5, bed: 5 };
+function recipeCost(r) { return CONFIG.RECIPE_COST_BY_LV[RECIPE_LV[r]] || CONFIG.RECIPE_COST; }
+function buyRecipe(r) { if (recipeOwned(r) || S.coins < recipeCost(r)) return false; S.coins -= recipeCost(r); S.recipes.push(r); notify(`📜 レシピ「${ITEMS[RECIPES[r].out].name}」を買いました`); return true; }
 function workSec(b) {
   const d = BUILD[b.type];
   if (d.kind === 'gather') { if (d.noTile) return CONFIG.GATHER_SEC; const t = gatherTarget(b); return CONFIG.GATHER_SEC + (t ? t.d : 1) * 2 * CONFIG.TILE_SEC; }
@@ -989,6 +994,7 @@ const WORK = ['..ii....', '.yii....', '.oooo...', '.oooo...', '..oo....', '.oo.o
 
 SPR.collect = SPR.farm;   // 採集所は畑の絵
 SPR.toolshop = SPR.workshop;
+SPR.house1 = SPR.house.map(r => r.replace(/r/g, 'l').replace(/R/g, 'L'));   // 住居レベル1：屋根が青
 // 島レベル5の施設（仮の絵：既存の絵を流用）
 SPR.apiary = SPR.drinks.map(r => r.replace(/o/g, 'y').replace(/O/g, 'Y'));
 SPR.polisher = SPR.warehouse.map(r => r.replace(/n/g, 's').replace(/N/g, 'S').replace(/m/g, 'x'));
@@ -1063,7 +1069,7 @@ function rangeBox(b, R, fill, stroke, ox, oy, ts) {
 function drawBuilding(type, x, y, ox, oy, ts, mark, b) {
   const sx = ox + x * ts, sy = oy + y * ts;
   ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(sx + ts / 2, sy + ts * 0.9, ts * 0.45, ts * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.drawImage(sprite(type), sx, sy, ts, ts);
+  ctx.drawImage(sprite(type === 'house' && b && (b.lv || 0) >= 1 ? 'house1' : type), sx, sy, ts, ts);
   if (b && type === 'collect') {  // 採るものの小さな印
     const bs = ts * 0.42, bx = sx + ts - bs - ts * 0.02, by = sy + ts - bs - ts * 0.02;
     ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(bx + bs / 2, by + bs / 2, bs / 2 + 1, 0, Math.PI * 2); ctx.fill();
@@ -1260,7 +1266,7 @@ function openBuildMenu() {
 function showDetail(type) {
   const d = BUILD[type];
   let extra = '';
-  if (d.kind === 'prod') extra = `<div>レシピ：${d.recipes.map(r => `${Object.entries(RECIPES[r].need).map(([k, v]) => ITEMS[k].name + v).join('＋')} → ${ITEMS[RECIPES[r].out].name}${RECIPES[r].buy ? '（🪙' + CONFIG.RECIPE_COST + 'で購入）' : ''}`).join(' / ')}</div>`;
+  if (d.kind === 'prod') extra = `<div>レシピ：${d.recipes.map(r => `${Object.entries(RECIPES[r].need).map(([k, v]) => ITEMS[k].name + v).join('＋')} → ${ITEMS[RECIPES[r].out].name}${RECIPES[r].buy ? '（🪙' + recipeCost(r) + 'で購入）' : ''}`).join(' / ')}</div>`;
   modal(d.name, `<div>${d.desc}</div>${extra}<div style="margin-top:8px"><b>建築の材料</b>${costHtml(d.cost, true)}</div><div class="hint">今 ${countType(type)}棟</div>`);
 }
 function startPlace(type) {
@@ -1316,7 +1322,7 @@ function renderInfo() {
   } else if (d.kind === 'prod') {
     const r = RECIPES[b.recipe], it = ITEMS[r.out];
     h += `<div class="line"><span class="lbl">レシピ</span>${d.recipes.length > 1 ? `<button class="recipe-btn" id="pick-recipe">${Object.entries(r.need).map(([k, v]) => ITEMS[k].name + v + (k === r.fuel ? '(燃料)' : '')).join('＋')} → <b>${it.name}</b>　▼</button>` : `<span class="val">${Object.entries(r.need).map(([k, v]) => ITEMS[k].name + v + (k === r.fuel ? '(燃料)' : '')).join('＋')} → <b>${it.name}</b></span>`}</div>`;
-    if (!recipeOwned(b.recipe)) h += `<div class="line buyable"><span class="lbl">📜 <b>${it.name}のレシピ</b>が必要です<br><small>買うと島のどの${d.name}でも作れます</small></span><button class="btn small primary" id="buy-recipe" ${S.coins >= CONFIG.RECIPE_COST ? '' : 'disabled'}>🪙${CONFIG.RECIPE_COST}で買う</button></div>`;
+    if (!recipeOwned(b.recipe)) h += `<div class="line buyable"><span class="lbl">📜 <b>${it.name}のレシピ</b>が必要です<br><small>買うと島のどの${d.name}でも作れます</small></span><button class="btn small primary" id="buy-recipe" ${S.coins >= recipeCost(b.recipe) ? '' : 'disabled'}>🪙${recipeCost(b.recipe)}で買う</button></div>`;
     h += workersLine();
     let st; const miss = recipeOwned(b.recipe) ? missingMats(b) : [];
     if (!recipeOwned(b.recipe)) st = '📜 レシピを買うと作れます';
@@ -1414,7 +1420,7 @@ function pickRecipe(b) {
   for (const r of d.recipes) {
     const rc = RECIPES[r], it = ITEMS[rc.out], label = `${Object.entries(rc.need).map(([k, v]) => ITEMS[k].name + v + (k === rc.fuel ? '(燃料)' : '')).join('＋')} → <b>${it.name}</b>`;
     if (recipeOwned(r)) h += `<div class="line"><button class="recipe-btn pick" data-r="${r}">${label}${b.recipe === r ? '　✔' : ''}</button></div>`;
-    else h += `<div class="line"><span class="lbl">${label}</span><button class="btn small buyr" data-r="${r}" ${S.coins >= CONFIG.RECIPE_COST ? '' : 'disabled'}>🪙${CONFIG.RECIPE_COST}で買う</button></div>`;
+    else h += `<div class="line"><span class="lbl">${label}</span><button class="btn small buyr" data-r="${r}" ${S.coins >= recipeCost(r) ? '' : 'disabled'}>🪙${recipeCost(r)}で買う</button></div>`;
   }
   h += '<div class="hint" style="text-align:left">1つの施設で作れるのは1つのレシピだけ。別の品も作りたいときは、同じ施設をもう1つ建てます</div>';
   modal('レシピを選ぶ', h);
@@ -1546,7 +1552,7 @@ function showWelcome() {
 function showWelcomeBack(acc) {
   const hrs = Math.floor(acc.elapsed / 3600), mins = Math.floor(acc.elapsed % 3600 / 60);
   const items = Object.keys(acc.items).map(k => `${ITEMS[k].name} +${acc.items[k]}`).join('、') || 'なし';
-  modal('おかえりなさい', `<div>留守の間：約 ${hrs ? hrs + '時間' : ''}${mins}分${acc.elapsed >= CONFIG.OFFLINE_MAX_SEC ? '（上限12時間分）' : ''}</div><div>🪙 収入 +${acc.coins}</div><div>👤 住民 +${acc.pop}</div><div>📦 つくった品：${items}</div>`);
+  modal('おかえりなさい', `<div>留守の間：約 ${hrs ? hrs + '時間' : ''}${mins}分${acc.elapsed >= CONFIG.OFFLINE_MAX_SEC ? `（上限${CONFIG.OFFLINE_MAX_SEC / 3600}時間分）` : ''}</div><div>🪙 収入 +${acc.coins}</div><div>👤 住民 +${acc.pop}</div><div>📦 つくった品：${items}</div>`);
 }
 function start() {
   resize();
