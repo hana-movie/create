@@ -5,12 +5,13 @@
    仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.23.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.24.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数 ----------
 const CONFIG = {
   MAP: 17,              // 17×17。外周1マスは海岸（港など専用・今は何も建てられない）。陸は中の15×15
   COAST: 1,
+  HEX: true,            // マスの形：true＝六角形（ハニカム。奇数行が半マス右にずれる）、false＝四角
   TILE: 32,             // ワールド座標の1マスのピクセル
   START_COINS: 100,
   START_POP: 3,
@@ -60,11 +61,14 @@ const CONFIG = {
   COMB_SEC: 10, COMB_MAX: 100,   // 蜂の巣は10秒に1個（畑と同じ）、上限100
   // ---- 住居・市場の拡張 ----
   HOUSE_UP: [{ bed: 4, coins: 1000 }],       // 住居レベル0→1
-  MARKET_SLOT_UP: { cost: { plank: 20, brick: 20 }, slots: 8, stage: 5 },
+  MARKET_SLOT_UP: { cost: { plank: 20, brick: 20 }, slots: 8, stage: 3 },   // 島レベル3から（作業員は島レベル2から）
   SPEEDS: [1, 2, 4, 8], // 時間加速（テスト用）
   DEBUG_SPEED: true,
   SAVE_KEY: 'nonbiri-island-v20',
 };
+// 範囲の言い方（マスの形で変わる）
+const AROUND = CONFIG.HEX ? '周り6マス' : '周り8マス';
+const rangeText = R => CONFIG.HEX ? `${R}マス以内（${3 * R * (R + 1)}マス）` : `周り${R * 2 + 1}×${R * 2 + 1}マス`;
 
 // ---------- アイテム ----------
 // tier: 0=原材料 1=加工品1 2=加工品2 3=加工品3。cat: 満足度のカテゴリ（food/cloth/luxury）。cat なし＝満足度の対象外（売るだけ・建材）
@@ -112,7 +116,7 @@ const RECIPES = {
   cloth:   { out: 'cloth',   need: { thread: 2 }, buy: true },
   polish:  { out: 'polish',  need: { stone: 1, water: 1 }, buy: true },
   jam:     { out: 'jam',     need: { juice: 1, honey: 1, wood: 1 }, fuel: 'wood', buy: true },
-  bed:     { out: 'bed',     need: { plank: 5, cloth: 2 }, buy: true },
+  bed:     { out: 'bed',     need: { plank: 5 }, buy: true },
   obread:  { out: 'obread',  need: { flour: 1, orange: 1, water: 1, honey: 1, wood: 1 }, fuel: 'wood', buy: true },
   clothes: { out: 'clothes', need: { thread: 1, cloth: 1 }, buy: true },
   shine:   { out: 'shine',   need: { polish: 2, water: 2 }, buy: true },
@@ -145,12 +149,12 @@ const CATS = [
   { id: 'home',   name: '暮らし' },
 ];
 const BUILD = {
-  lumber:  { name: '伐採所', cat: 'gather', kind: 'gather', res: 'wood', cost: { wood: 10 }, tool: 'axe', desc: '周り8マスの木から木材を採ります。' },
+  lumber:  { name: '伐採所', cat: 'gather', kind: 'gather', res: 'wood', cost: { wood: 10 }, tool: 'axe', desc: AROUND + 'の木から木材を採ります。' },
   well:    { name: '井戸',   cat: 'gather', kind: 'gather', res: 'water', noTile: true, cost: { wood: 5 }, desc: '水を汲みます。資源マスは不要で、枯れません。' },
-  quarry:  { name: '採石所', cat: 'gather', kind: 'gather', res: 'stone', cost: { plank: 10 }, tool: 'pickaxe', desc: '周り8マスの石から石材を採ります。' },
+  quarry:  { name: '採石所', cat: 'gather', kind: 'gather', res: 'stone', cost: { plank: 10 }, tool: 'pickaxe', desc: AROUND + 'の石から石材を採ります。' },
   collect: { name: '採集所', cat: 'gather', kind: 'gather', choose: ['wheat', 'orange', 'cotton', 'herb'], cost: { plank: 10 }, tool: 'scissors', desc: '小麦畑・オレンジの木・綿花畑・ハーブから採ります。何を採るかはパネルで選べます。' },
   hive:    { name: '巣箱',   cat: 'gather', kind: 'hive', cost: { plank: 5 }, desc: '花畑の隣に置くと、蜂の巣がたまります（10秒に1個、100個まで）。島レベル5から、養蜂場で周りの巣箱からハチミツを採れます。' },
-  apiary:  { name: '養蜂場', cat: 'gather', kind: 'gather', res: 'honey', cost: { plank: 10, brick: 10 }, desc: '周り8マスの巣箱から、蜂の巣を採ってハチミツにします。' },
+  apiary:  { name: '養蜂場', cat: 'gather', kind: 'gather', res: 'honey', cost: { plank: 10, brick: 10 }, desc: AROUND + 'の巣箱から、蜂の巣を採ってハチミツにします。' },
   sawmill: { name: '製材所', cat: 'prod', kind: 'prod', recipes: ['plank'], cost: { wood: 10 }, desc: '木材2 → 板材' },
   mason:   { name: '石工所', cat: 'prod', kind: 'prod', recipes: ['brick'], cost: { plank: 10, stone: 10 }, desc: '石材2 → 石レンガ（レシピ購入）' },
   mill:    { name: '製粉所', cat: 'prod', kind: 'prod', recipes: ['flour'], cost: { plank: 10, brick: 5 }, desc: '小麦2 → 小麦粉（レシピ購入）' },
@@ -159,7 +163,7 @@ const BUILD = {
   polisher:{ name: '研磨所', cat: 'prod', kind: 'prod', recipes: ['polish', 'shine'], cost: { plank: 10, brick: 10 }, desc: '石材＋水 → 磨き石、磨き石2＋水2 → 輝き石（レシピ購入。1施設で1レシピ）' },
   pharmacy:{ name: '薬局', cat: 'prod', kind: 'prod', recipes: ['oint', 'tea', 'comp'], cost: { plank: 10, brick: 10 }, desc: 'ハーブ＋水 → 軟膏、ハーブ＋水＋ハチミツ＋木材（燃料） → ハーブ茶、軟膏＋布 → 湿布（レシピ購入。1施設で1レシピ）' },
   tailor:  { name: '仕立て屋', cat: 'prod', kind: 'prod', recipes: ['clothes'], cost: { plank: 10, brick: 10 }, desc: '糸＋布 → 服（レシピ購入）' },
-  furniture:{ name: '家具屋', cat: 'prod', kind: 'prod', recipes: ['bed'], cost: { plank: 10, brick: 10 }, desc: '板材5＋布2 → 木のベッド（レシピ購入）。ベッドは住居のアップグレードに使います' },
+  furniture:{ name: '家具屋', cat: 'prod', kind: 'prod', recipes: ['bed'], cost: { plank: 10, brick: 10 }, desc: '板材5 → 木のベッド（レシピ購入）。ベッドは住居のアップグレードに使います' },
   toolshop:{ name: '道具屋', cat: 'prod', kind: 'prod', recipes: ['axe', 'pickaxe', 'scissors'], cost: { plank: 10, brick: 5 }, desc: '木材＋石材 → 石のオノ・石のピッケル・石のハサミ（レシピ購入。1施設で1レシピ）。道具は施設に入れると作業が速くなります' },
   house:   { name: '自宅',   cat: 'home', kind: 'house', cost: { plank: 10 }, desc: '4人まで住めます。全員が住居に入れないと人口は増えません。' },
   market:  { name: '市場',   cat: 'home', kind: 'market', cost: { plank: 10 }, desc: '作業員が周りの家に品物を配達してコインを得ます。いくつでも建てられます。' },
@@ -291,6 +295,36 @@ const idx = (x, y) => y * N + x;
 const inMap = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
 // 海岸：外周1マス
 const isCoast = (x, y) => x < CONFIG.COAST || y < CONFIG.COAST || x >= N - CONFIG.COAST || y >= N - CONFIG.COAST;
+// ---------- マスの形（六角形／四角） ----------
+// 六角形は「とがった頭」で横に並べ、奇数行を半マス右にずらす（odd-r）。マスの横幅＝T、行の間隔＝T×0.866
+const HEXMAP = CONFIG.HEX, ROW_H = HEXMAP ? Math.sqrt(3) / 2 : 1;
+const HEX_DIRS = [[[1, 0], [-1, 0], [-1, -1], [0, -1], [-1, 1], [0, 1]], [[1, 0], [-1, 0], [0, -1], [1, -1], [0, 1], [1, 1]]];
+// 隣のマス（六角形は6つ、四角は8つ）
+function neighbors(x, y) {
+  const out = [];
+  if (HEXMAP) { for (const [dx, dy] of HEX_DIRS[y & 1]) if (inMap(x + dx, y + dy)) out.push([x + dx, y + dy]); }
+  else for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && inMap(x + dx, y + dy)) out.push([x + dx, y + dy]);
+  return out;
+}
+function toCube(x, y) { const q = x - (y - (y & 1)) / 2; return [q, y, -q - y]; }
+// マスの距離：六角形は歩数、四角は縦横の和（往復の時間に使う）
+function tileDist(ax, ay, bx, by) { if (HEXMAP) { const a = toCube(ax, ay), b = toCube(bx, by); return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2])); } return Math.abs(ax - bx) + Math.abs(ay - by); }
+// 範囲の判定：六角形は歩数、四角は縦横それぞれ（周り8マス＝1）
+function tileRange(ax, ay, bx, by) { return HEXMAP ? tileDist(ax, ay, bx, by) : Math.max(Math.abs(ax - bx), Math.abs(ay - by)); }
+// (x,y) から範囲 R 以内のマス（自分を除く）
+function tilesWithin(x, y, R) { const out = []; for (let ny = Math.max(0, y - R); ny <= Math.min(N - 1, y + R); ny++) for (let nx = Math.max(0, x - R - 1); nx <= Math.min(N - 1, x + R + 1); nx++) if ((nx !== x || ny !== y) && tileRange(x, y, nx, ny) <= R) out.push([nx, ny]); return out; }
+// マスの中心（ワールド座標をマス幅で割った値）。dx,dy はマスの中でのずれ
+function cpos(x, y, dx = 0, dy = 0) { return [x + 0.5 + (HEXMAP && (y & 1) ? 0.5 : 0) + dx, (y + 0.5) * ROW_H + dy * ROW_H]; }
+// ワールド座標（ピクセル）→ マス。六角形は近い中心を探す
+function worldToTile(wx, wy) {
+  const fx = wx / CONFIG.TILE, fy = wy / CONFIG.TILE;
+  if (!HEXMAP) return [Math.floor(fx), Math.floor(fy)];
+  const y0 = Math.round(fy / ROW_H - 0.5); let best = null, bd = 1e9;
+  for (let y = y0 - 1; y <= y0 + 1; y++) for (let x = Math.floor(fx) - 1; x <= Math.floor(fx) + 1; x++) { const [cx, cy] = cpos(x, y); const d = (cx - fx) ** 2 + (cy - fy) ** 2; if (d < bd) { bd = d; best = [x, y]; } }
+  return best;
+}
+// ワールドの大きさ（マス幅単位）
+function worldSize() { return [N + (HEXMAP ? 0.5 : 0), (N - 1) * ROW_H + (HEXMAP ? 2 / Math.sqrt(3) : 1)]; }
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
 // 資源の配置（各資源をだいたい同じ数に）。ブロック(bx,by)は陸の5×5区画
@@ -317,8 +351,8 @@ function makeClusterFn(tiles, r) {
       const cells = [[sx, sy]], set = new Set([idx(sx, sy)]); let guard = 80;
       while (cells.length < n && guard--) {
         const [cx, cy] = cells[Math.floor(r() * cells.length)];
-        const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(r() * 4)];
-        const nx = cx + dx, ny = cy + dy;
+        const nb = neighbors(cx, cy); if (!nb.length) continue;
+        const [nx, ny] = nb[Math.floor(r() * nb.length)];
         if (nx < x0 || ny < y0 || nx >= x0 + B || ny >= y0 + B || set.has(idx(nx, ny)) || tiles[idx(nx, ny)].res || (avoid && avoid(nx, ny))) continue;
         cells.push([nx, ny]); set.add(idx(nx, ny));
       }
@@ -333,7 +367,7 @@ function newGame() {
   for (let i = 0; i < N * N; i++) tiles.push({ res: null });
   const c = Math.floor(N / 2), B = 5, O = CONFIG.COAST;
   const cluster = makeClusterFn(tiles, r);
-  const nearHome = (x, y) => Math.abs(x - c) <= 1 && Math.abs(y - c) <= 1;
+  const nearHome = (x, y) => tileRange(x, y, c, c) <= 1;
   placeResources(cluster, nearHome);
   S = {
     v: 20, coins: CONFIG.START_COINS, pop: CONFIG.START_POP, residents: [], stage: 1, diff: 'normal',
@@ -439,7 +473,7 @@ function setWorkers(b, n) {
 }
 function canPlace(type, x, y, ignoreId) { if (!inMap(x, y) || isCoast(x, y)) return false; const o = occ[idx(x, y)]; if (o && o !== ignoreId) return false; if (BUILD[type].kind === 'hive' && !hiveSpotOk(x, y)) return false; return true; }
 // 巣箱：花畑のマスそのものではなく、花畑の隣（周り8マス）に置く
-function nearFlower(x, y) { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const nx = x + dx, ny = y + dy; if (inMap(nx, ny) && S.tiles[idx(nx, ny)].res && S.tiles[idx(nx, ny)].res.t === 'flower') return true; } return false; }
+function nearFlower(x, y) { return neighbors(x, y).some(([nx, ny]) => S.tiles[idx(nx, ny)].res && S.tiles[idx(nx, ny)].res.t === 'flower'); }
 function hiveSpotOk(x, y) { const t = S.tiles[idx(x, y)]; return !(t.res && t.res.t === 'flower') && nearFlower(x, y); }
 function build(type, x, y) {
   const cost = buildCost(type);
@@ -494,17 +528,16 @@ function gatherTarget(b) {
   const res = b.res, R = CONFIG.GATHER_RANGE; let best = null, bd = 1e9, bp = 99;
   if (res === 'honey') {  // 養蜂場：周りの巣箱の蜂の巣
     for (const h of S.buildings) {
-      if (h.type !== 'hive' || h.combs <= 0 || Math.abs(h.x - b.x) > R || Math.abs(h.y - b.y) > R) continue;
-      const d = Math.abs(h.x - b.x) + Math.abs(h.y - b.y);
+      if (h.type !== 'hive' || h.combs <= 0 || tileRange(h.x, h.y, b.x, b.y) > R) continue;
+      const d = tileDist(h.x, h.y, b.x, b.y);
       if (d < bd || (d === bd && best && h.combs > best.h.combs)) { best = { tile: { get amt() { return h.combs; }, set amt(v) { h.combs = v; } }, x: h.x, y: h.y, d, h }; bd = d; }
     }
     return best;
   }
-  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
-    const x = b.x + dx, y = b.y + dy; if (!inMap(x, y) || (!dx && !dy)) continue;
-    const i = idx(x, y), t = S.tiles[i]; if (!t.res || t.res.t !== res || t.res.amt <= 0 || occ[i]) continue;
-    const d = Math.abs(dx) + Math.abs(dy), p = (dy < 0 && !dx) ? 0 : (dx > 0 && !dy) ? 1 : (dy > 0 && !dx) ? 2 : (dx < 0 && !dy) ? 3 : 4;
-    if (d < bd || (d === bd && p < bp)) { best = { tile: t.res, x, y, d }; bd = d; bp = p; }
+  for (const [x, y] of tilesWithin(b.x, b.y, R)) {
+    const i = idx(x, y), tl = S.tiles[i]; if (!tl.res || tl.res.t !== res || tl.res.amt <= 0 || occ[i]) continue;
+    const d = tileDist(b.x, b.y, x, y), dx = x - b.x, dy = y - b.y, p = (dy < 0 && !dx) ? 0 : (dx > 0 && !dy) ? 1 : (dy > 0 && !dx) ? 2 : (dx < 0 && !dy) ? 3 : 4;
+    if (d < bd || (d === bd && p < bp)) { best = { tile: tl.res, x, y, d }; bd = d; bp = p; }
   }
   return best;
 }
@@ -513,8 +546,8 @@ function missingMats(b) { const r = RECIPES[b.recipe]; return Object.keys(r.need
 
 // ---------- 市場 ----------
 function marketRange(m) { return CONFIG.MARKET.range; }
-function inMarketRange(m, h) { const R = marketRange(m); return Math.abs(m.x - h.x) <= R && Math.abs(m.y - h.y) <= R; }
-function mDist(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
+function inMarketRange(m, h) { return tileRange(m.x, m.y, h.x, h.y) <= marketRange(m); }
+function mDist(a, b) { return tileDist(a.x, a.y, b.x, b.y); }
 function marketUpCost(m) { const i = (m.lv || 1) - 1; return CONFIG.MARKET.upCost[i] || null; }
 function marketUpStage(m) { return CONFIG.MARKET.upStage[(m.lv || 1) - 1] || 99; }
 function marketUp(m) { const c = marketUpCost(m); if (!c || S.stage < marketUpStage(m) || !canAfford(c)) return false; payCost(c); m.lv = (m.lv || 1) + 1; notify(`⬆ ${bname(m)}が Lv${m.lv} に（作業員${maxWorkers(m)}人まで）`); return true; }
@@ -1097,6 +1130,24 @@ SPR.herb = [
   '................',
   '................',
 ];
+SPR.pharmacy = [
+  '................',
+  '..tttttttttttt..',
+  '.tTTTTTTTTTTTTt.',
+  '.tttttttttttttt.',
+  '.BBBBBBBBBBBBBB.',
+  '.BccccccccccccB.',
+  '.Bccccc..cccccB.',
+  '.Bccccc..cccccB.',
+  '.Bcc........ccB.',
+  '.Bcc........ccB.',
+  '.Bccccc..cccccB.',
+  '.Bccccc..cccccB.',
+  '.BcCkkCcccccccB.',
+  '.BcCkkCcccccccB.',
+  '.BBBBBBBBBBBBBB.',
+  '................',
+].map((r, y) => (y >= 6 && y <= 11) ? r.replace(/\./g, (m, i) => (i >= 3 && i <= 12) ? 'g' : m) : r);
 SPR.house1 = SPR.house.map(r => r.replace(/r/g, 'l').replace(/R/g, 'L'));   // 住居レベル1：屋根が青
 // 島レベル5の施設（仮の絵：既存の絵を流用）
 SPR.apiary = SPR.drinks.map(r => r.replace(/o/g, 'y').replace(/O/g, 'Y'));
@@ -1112,7 +1163,8 @@ let W = 0, H = 0, DPR = 1;
 const spriteCache = {};
 function sprite(name) {
   if (spriteCache[name]) return spriteCache[name];
-  const rows = name === 'villager' ? VILL : name === 'worker' ? WORK : SPR[name], n = rows.length;
+  // 絵が見つからないときは仮の箱を描く（絵の書き忘れで画面が止まらないように）
+  const rows = name === 'villager' ? VILL : name === 'worker' ? WORK : (SPR[name] || SPR.warehouse), n = rows.length;
   const c = document.createElement('canvas'); c.width = n; c.height = n; const g = c.getContext('2d');
   rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') { g.fillStyle = PAL[ch]; g.fillRect(x, y, 1, 1); } }));
   return spriteCache[name] = c;
@@ -1129,23 +1181,40 @@ const toScreen = (wx, wy) => [(wx - cam.x) * cam.s + W / 2, (wy - cam.y) * cam.s
 const toWorld = (sx, sy) => [(sx - W / 2) / cam.s + cam.x, (sy - H / 2) / cam.s + cam.y];
 const UI = { mode: 'normal', placeType: null, px: 0, py: 0, moveB: null, sel: null };
 
+// マスの左上（スプライトを描く四角の左上。六角形のときは六角形の中心に合わせる）
+function tileBox(x, y, ox, oy, ts) { const [cx, cy] = cpos(x, y); return [ox + (cx - 0.5) * ts, oy + (cy - 0.5) * ts]; }
+// マスの形の線をなぞる
+function tilePath(x, y, ox, oy, ts, shrink = 0) {
+  const [cx, cy] = cpos(x, y), px = ox + cx * ts, py = oy + cy * ts;
+  if (!HEXMAP) { const h = ts / 2 - shrink; ctx.rect(px - h, py - h, h * 2, h * 2); return; }
+  const r = ts / Math.sqrt(3) - shrink;
+  for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k - Math.PI / 2; const vx = px + r * Math.cos(a), vy = py + r * Math.sin(a); if (k) ctx.lineTo(vx, vy); else ctx.moveTo(vx, vy); }
+  ctx.closePath();
+}
 function draw() {
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#2a7fb8'; ctx.fillRect(0, 0, W, H); // 海
-  const ts = T * cam.s, [ox, oy] = toScreen(0, 0);
-  ctx.fillStyle = '#e8d9a0'; ctx.fillRect(ox - ts * 0.4, oy - ts * 0.4, ts * N + ts * 0.8, ts * N + ts * 0.8); // 砂浜
+  const ts = T * cam.s, [ox, oy] = toScreen(0, 0), [ww, wh] = worldSize();
+  ctx.fillStyle = '#e8d9a0'; ctx.fillRect(ox - ts * 0.4, oy - ts * 0.4, ts * ww + ts * 0.8, ts * wh + ts * 0.8); // 砂浜
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const sx = ox + x * ts, sy = oy + y * ts; if (sx + ts < 0 || sy + ts < 0 || sx > W || sy > H) continue;
+    const [sx, sy] = tileBox(x, y, ox, oy, ts); if (sx + ts < 0 || sy + ts * 1.2 < 0 || sx > W || sy - ts * 0.2 > H) continue;
     const t = S.tiles[idx(x, y)];
-    if (isCoast(x, y)) { ctx.fillStyle = ((x + y) & 1) ? '#ead9a0' : '#e2d096'; ctx.fillRect(sx, sy, ts + 0.5, ts + 0.5); continue; }  // 海岸（砂浜）
-    ctx.fillStyle = ((x + y) & 1) ? '#6db85a' : '#64ad52'; ctx.fillRect(sx, sy, ts + 0.5, ts + 0.5);
+    // マスの色。六角形は3色で塗り分けると隣どうしが同じ色にならない
+    const alt = HEXMAP ? ((x + (y & 1 ? 2 : 0) + y * 2) % 3) : ((x + y) & 1);
+    ctx.beginPath(); tilePath(x, y, ox, oy, ts, -0.4);
+    if (isCoast(x, y)) { ctx.fillStyle = ['#e2d096', '#ead9a0', '#e6d49b'][alt]; ctx.fill(); continue; }  // 海岸（砂浜）
+    ctx.fillStyle = ['#64ad52', '#6db85a', '#68b256'][alt]; ctx.fill();
     if (t.res && !occ[idx(x, y)]) {
       const nm = RES_SPR[t.res.t];
       if (t.res.amt > 0) ctx.drawImage(sprite(nm), sx, sy, ts, ts);
       else { ctx.globalAlpha = 0.3; ctx.drawImage(sprite(nm), sx + ts * 0.15, sy + ts * 0.15, ts * 0.7, ts * 0.7); ctx.globalAlpha = 1; }
     }
   }
-  // 範囲の表示：採集所は周り8マス（黄）、市場は配達範囲（青）
+  // マスの線
+  ctx.strokeStyle = 'rgba(0,0,0,.10)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) tilePath(x, y, ox, oy, ts);
+  ctx.stroke();
+  // 範囲の表示：採集所は周りのマス（黄）、市場は配達範囲（青）
   const sel = UI.mode === 'normal' ? UI.sel : null;
   if (sel) {
     const d = BUILD[sel.type];
@@ -1153,11 +1222,8 @@ function draw() {
     if (d.kind === 'market') rangeBox(sel, marketRange(sel), 'rgba(120,190,255,.22)', 'rgba(60,140,255,.9)', ox, oy, ts);
   }
   if (UI.mode === 'place' && BUILD[UI.placeType].kind === 'market') rangeBox({ x: UI.px, y: UI.py }, CONFIG.MARKET.range, 'rgba(120,190,255,.18)', 'rgba(60,140,255,.7)', ox, oy, ts);
-  for (const b of S.buildings) { if (UI.mode === 'move' && UI.moveB === b) continue; drawBuilding(b.type, b.x, b.y, ox, oy, ts, UI.sel === b ? 'sel' : null, b); }
-  ctx.strokeStyle = 'rgba(0,0,0,.10)'; ctx.lineWidth = 1; ctx.beginPath();
-  for (let i = 0; i <= N; i++) { ctx.moveTo(ox + i * ts, oy); ctx.lineTo(ox + i * ts, oy + N * ts); ctx.moveTo(ox, oy + i * ts); ctx.lineTo(ox + N * ts, oy + i * ts); }
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2; ctx.strokeRect(ox, oy, N * ts, N * ts);
+  for (const b of S.buildings.slice().sort((a, b) => a.y - b.y)) { if (UI.mode === 'move' && UI.moveB === b) continue; drawBuilding(b.type, b.x, b.y, ox, oy, ts, UI.sel === b ? 'sel' : null, b); }
+  if (!HEXMAP) { ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2; ctx.strokeRect(ox, oy, N * ts, N * ts); }
   if (UI.mode === 'place' || UI.mode === 'move') {
     const type = UI.mode === 'place' ? UI.placeType : UI.moveB.type;
     const ok = canPlace(type, UI.px, UI.py, UI.mode === 'move' ? UI.moveB.id : null) && (UI.mode === 'move' || canAfford(buildCost(type)));
@@ -1165,13 +1231,25 @@ function draw() {
   }
   drawVillagers(ox, oy, ts);
 }
+// 範囲のマスを塗って、外側の縁を太線で囲む
 function rangeBox(b, R, fill, stroke, ox, oy, ts) {
-  const x0 = Math.max(0, b.x - R), y0 = Math.max(0, b.y - R), x1 = Math.min(N - 1, b.x + R), y1 = Math.min(N - 1, b.y + R);
-  const sx = ox + x0 * ts, sy = oy + y0 * ts, w = (x1 - x0 + 1) * ts, h = (y1 - y0 + 1) * ts;
-  ctx.fillStyle = fill; ctx.fillRect(sx, sy, w, h); ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.strokeRect(sx, sy, w, h);
+  const cells = tilesWithin(b.x, b.y, R); cells.push([b.x, b.y]);
+  ctx.fillStyle = fill; ctx.beginPath(); for (const [x, y] of cells) tilePath(x, y, ox, oy, ts); ctx.fill();
+  ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.beginPath();
+  if (!HEXMAP) { const x0 = Math.max(0, b.x - R), y0 = Math.max(0, b.y - R), x1 = Math.min(N - 1, b.x + R), y1 = Math.min(N - 1, b.y + R); ctx.rect(ox + x0 * ts, oy + y0 * ts, (x1 - x0 + 1) * ts, (y1 - y0 + 1) * ts); }
+  else for (const [x, y] of cells) {  // 外側の辺だけ線を引く（辺の向こうのマスが範囲外・地図外なら外側）
+    const [cx, cy] = cpos(x, y), r = ts / Math.sqrt(3);
+    for (let k = 0; k < 6; k++) {
+      const am = Math.PI / 3 * k - Math.PI / 3, [nx, ny] = worldToTile((cx + Math.cos(am)) * T, (cy + Math.sin(am)) * T);
+      if (inMap(nx, ny) && tileRange(b.x, b.y, nx, ny) <= R) continue;
+      const a0 = Math.PI / 3 * k - Math.PI / 2, a1 = a0 + Math.PI / 3, px = ox + cx * ts, py = oy + cy * ts;
+      ctx.moveTo(px + r * Math.cos(a0), py + r * Math.sin(a0)); ctx.lineTo(px + r * Math.cos(a1), py + r * Math.sin(a1));
+    }
+  }
+  ctx.stroke();
 }
 function drawBuilding(type, x, y, ox, oy, ts, mark, b) {
-  const sx = ox + x * ts, sy = oy + y * ts;
+  const [sx, sy] = tileBox(x, y, ox, oy, ts);
   ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(sx + ts / 2, sy + ts * 0.9, ts * 0.45, ts * 0.12, 0, 0, Math.PI * 2); ctx.fill();
   ctx.drawImage(sprite(type === 'house' && b && (b.lv || 0) >= 1 ? 'house1' : type), sx, sy, ts, ts);
   if (b && type === 'collect') {  // 採るものの小さな印
@@ -1187,18 +1265,19 @@ function drawBuilding(type, x, y, ox, oy, ts, mark, b) {
     ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.arc(sx + ts * 0.16, sy + ts * 0.16, ts * 0.13, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(8, ts * 0.18)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('0', sx + ts * 0.16, sy + ts * 0.17);
   }
-  if (mark === 'sel') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect(sx + 1, sy + 1, ts - 2, ts - 2); }
-  if (mark === 'ok') { ctx.strokeStyle = '#3ad24a'; ctx.lineWidth = 3; ctx.strokeRect(sx + 1, sy + 1, ts - 2, ts - 2); }
-  if (mark === 'ng') { ctx.fillStyle = 'rgba(255,0,0,.45)'; ctx.fillRect(sx, sy, ts, ts); }
+  if (mark === 'sel') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); tilePath(x, y, ox, oy, ts, 1.5); ctx.stroke(); }
+  if (mark === 'ok') { ctx.strokeStyle = '#3ad24a'; ctx.lineWidth = 3; ctx.beginPath(); tilePath(x, y, ox, oy, ts, 1.5); ctx.stroke(); }
+  if (mark === 'ng') { ctx.fillStyle = 'rgba(255,0,0,.45)'; ctx.beginPath(); tilePath(x, y, ox, oy, ts); ctx.fill(); }
 }
 // 住民：作業員は施設⇄採集先／市場⇄配達先を往復、それ以外は散歩
 const villagers = [];
 function drawVillagers(ox, oy, ts) {
   const c = Math.floor(N / 2);
-  while (villagers.length < S.pop) villagers.push({ x: c + 0.5, y: c + 0.5, tx: c + 0.5, ty: c + 0.5, wait: 0, job: null, phase: 0 });
+  const [c0x, c0y] = cpos(c, c);
+  while (villagers.length < S.pop) villagers.push({ x: c0x, y: c0y, tx: c0x, ty: c0y, wait: 0, job: null, phase: 0 });
   villagers.length = Math.min(villagers.length, S.pop);
   const jobs = []; for (const b of S.buildings.slice().sort((a, b) => a.order - b.order)) for (let k = 0; k < (b.workers || 0); k++) jobs.push([b, k]);
-  villagers.forEach((v, i) => { const j = jobs[i] || null; const key = j ? j[0].id + ':' + j[1] : null; if (v.key !== key) { v.key = key; v.job = j; v.phase = 0; v.wait = 0; if (j) { v.tx = j[0].x + 0.5; v.ty = j[0].y + 0.9; } } });
+  villagers.forEach((v, i) => { const j = jobs[i] || null; const key = j ? j[0].id + ':' + j[1] : null; if (v.key !== key) { v.key = key; v.job = j; v.phase = 0; v.wait = 0; if (j) [v.tx, v.ty] = cpos(j[0].x, j[0].y, 0, 0.4); } });
   for (const v of villagers) {
     const dx = v.tx - v.x, dy = v.ty - v.y, d = Math.hypot(dx, dy);
     if (v.wait > 0) v.wait -= 1 / 60;
@@ -1206,16 +1285,16 @@ function drawVillagers(ox, oy, ts) {
     else if (v.job) {
       const [b, k] = v.job, kind = BUILD[b.type].kind;
       if (kind === 'gather' && !BUILD[b.type].noTile) {
-        if (v.phase === 0) { const t = gatherTarget(b); if (t) { v.tx = t.x + 0.5; v.ty = t.y + 0.5; v.phase = 1; } v.wait = 1; }
-        else { v.tx = b.x + 0.5; v.ty = b.y + 0.9; v.phase = 0; v.wait = 1.5; }
+        if (v.phase === 0) { const t = gatherTarget(b); if (t) { [v.tx, v.ty] = cpos(t.x, t.y); v.phase = 1; } v.wait = 1; }
+        else { [v.tx, v.ty] = cpos(b.x, b.y, 0, 0.4); v.phase = 0; v.wait = 1.5; }
       } else if (kind === 'market') {
         const jb = b.jobs[k]; const h = jb ? getB(jb.hid) : null;
-        if (v.phase === 0 && h) { v.tx = h.x + 0.5; v.ty = h.y + 0.9; v.phase = 1; v.wait = 0.5; }
-        else { v.tx = b.x + 0.5; v.ty = b.y + 0.9; v.phase = 0; v.wait = 1; }
-      } else { v.tx = b.x + 0.3 + (k % 3) * 0.2; v.ty = b.y + 0.95; v.wait = 3; }
+        if (v.phase === 0 && h) { [v.tx, v.ty] = cpos(h.x, h.y, 0, 0.4); v.phase = 1; v.wait = 0.5; }
+        else { [v.tx, v.ty] = cpos(b.x, b.y, 0, 0.4); v.phase = 0; v.wait = 1; }
+      } else { [v.tx, v.ty] = cpos(b.x, b.y, -0.2 + (k % 3) * 0.2, 0.45); v.wait = 3; }
     } else {
       v.wait = 1 + Math.random() * 3; let tries = 12;
-      while (tries--) { const nx = Math.floor(v.x) + Math.floor(Math.random() * 7) - 3, ny = Math.floor(v.y) + Math.floor(Math.random() * 7) - 3; if (inMap(nx, ny) && !isCoast(nx, ny) && !occ[idx(nx, ny)] && !S.tiles[idx(nx, ny)].res) { v.tx = nx + 0.5; v.ty = ny + 0.5; break; } }
+      const [vx, vy] = worldToTile(v.x * T, v.y * T); while (tries--) { const nx = vx + Math.floor(Math.random() * 7) - 3, ny = vy + Math.floor(Math.random() * 7) - 3; if (inMap(nx, ny) && !isCoast(nx, ny) && !occ[idx(nx, ny)] && !S.tiles[idx(nx, ny)].res) { [v.tx, v.ty] = cpos(nx, ny); break; } }
     }
     const sx = ox + v.x * ts, sy = oy + v.y * ts, vs = ts * 0.5;
     ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(sx, sy + vs * 0.4, vs * 0.25, vs * 0.1, 0, 0, Math.PI * 2); ctx.fill();
@@ -1271,10 +1350,11 @@ if (window.PointerEvent) {
   window.addEventListener('mouseup', e => { if (mdown) { mdown = false; onUp(1, e.clientX, e.clientY); } });
 }
 cv.addEventListener('wheel', e => { cam.s = Math.max(0.6, Math.min(5, cam.s * (e.deltaY < 0 ? 1.1 : 0.9))); clampCam(); }, { passive: true });
-function clampCam() { const m = T * N; cam.x = Math.max(0, Math.min(m, cam.x)); cam.y = Math.max(0, Math.min(m, cam.y)); }
+function centerCam() { const c = Math.floor(N / 2); [cam.x, cam.y] = cpos(c, c).map(v => v * T); }
+function clampCam() { const [ww, wh] = worldSize(); cam.x = Math.max(0, Math.min(T * ww, cam.x)); cam.y = Math.max(0, Math.min(T * wh, cam.y)); }
 
 function onTap(sx, sy) {
-  const [wx, wy] = toWorld(sx, sy); const x = Math.floor(wx / T), y = Math.floor(wy / T);
+  const [wx, wy] = toWorld(sx, sy); const [x, y] = worldToTile(wx, wy);
   if (UI.mode === 'place' || UI.mode === 'move') {
     UI.px = Math.max(0, Math.min(N - 1, x)); UI.py = Math.max(0, Math.min(N - 1, y));
     UI.mode === 'place' ? showPlacePanel() : showMovePanel();
@@ -1375,14 +1455,14 @@ function showDetail(type) {
 }
 function startPlace(type) {
   UI.mode = 'place'; UI.placeType = type; UI.sel = null;
-  UI.px = Math.max(0, Math.min(N - 1, Math.round(cam.x / T - 0.5))); UI.py = Math.max(0, Math.min(N - 1, Math.round(cam.y / T - 0.5)));
+  { const [px, py] = worldToTile(cam.x, cam.y); UI.px = Math.max(0, Math.min(N - 1, px)); UI.py = Math.max(0, Math.min(N - 1, py)); }
   if (shownNew.length) { S.newTypes = S.newTypes.filter(t => !shownNew.includes(t)); shownNew = []; }
   $('buildmenu').classList.add('hidden'); showPlacePanel();
 }
 function showPlacePanel() {
   const d = BUILD[UI.placeType];
   $('place-title').textContent = `${d.name} を配置（タップで位置変更）`;
-  $('place-cost').innerHTML = costHtml(buildCost(UI.placeType), true) + (UI.placeType === 'house' && S.stage >= CONFIG.HOUSE_LV1_FROM ? '<div class="hint">島レベル6からは、最初から住居レベル1の自宅を建てます</div>' : '') + (d.kind === 'market' ? `<div class="hint">青い枠が配達できる範囲（周り${CONFIG.MARKET.range * 2 + 1}×${CONFIG.MARKET.range * 2 + 1}マス）</div>` : d.kind === 'gather' && !d.noTile ? '<div class="hint">周り8マスの資源から採ります</div>' : '');
+  $('place-cost').innerHTML = costHtml(buildCost(UI.placeType), true) + (UI.placeType === 'house' && S.stage >= CONFIG.HOUSE_LV1_FROM ? '<div class="hint">島レベル6からは、最初から住居レベル1の自宅を建てます</div>' : '') + (d.kind === 'market' ? `<div class="hint">青い枠が配達できる範囲（${rangeText(CONFIG.MARKET.range)}）</div>` : d.kind === 'gather' && !d.noTile ? `<div class="hint">${AROUND}の資源から採ります</div>` : '');
   $('place-ok').disabled = !(canPlace(UI.placeType, UI.px, UI.py) && canAfford(buildCost(UI.placeType))); $('place-ok').textContent = '建築する';
   $('place-cancel').onclick = () => { UI.mode = 'normal'; $('placepanel').classList.add('hidden'); openBuildMenu(); };
   $('place-ok').onclick = () => { const b = build(UI.placeType, UI.px, UI.py); if (b) { UI.mode = 'normal'; $('placepanel').classList.add('hidden'); toast(`${d.name}を建てました`); save(); UI.sel = b; openInfo(); } };
@@ -1420,8 +1500,8 @@ function renderInfo() {
     else st = '⛏ 採集中';
     h += status(st);
     h += `<div class="line"><span class="lbl">採集速度</span><span class="val">${b.workers ? (workSec(b) / b.workers / (boostTool(b) && b.boost > 0 ? 2 : 1)).toFixed(0) + '秒/個' + (boostTool(b) && b.boost > 0 ? ' <small>(道具で2倍)</small>' : '') : '停止'}</span></div>`;
-    if (b.res === 'honey') { const hs = S.buildings.filter(h => h.type === 'hive' && Math.abs(h.x - b.x) <= 1 && Math.abs(h.y - b.y) <= 1); h += `<div class="line"><span class="lbl">周りの巣箱</span><span class="val">${hs.length}個・蜂の巣 ${hs.reduce((a, x) => a + x.combs, 0)}</span></div>`; }
-    else if (!d.noTile) { let a = 0, m = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x = b.x + dx, y = b.y + dy; if (!inMap(x, y)) continue; const t = S.tiles[idx(x, y)]; if (t.res && t.res.t === b.res && !occ[idx(x, y)]) { a += t.res.amt; m += t.res.max; } } h += `<div class="line"><span class="lbl">周りの${resName(b.res)}</span><span class="val">${a}/${m}</span></div>`; }
+    if (b.res === 'honey') { const hs = S.buildings.filter(h => h.type === 'hive' && tileRange(h.x, h.y, b.x, b.y) <= CONFIG.GATHER_RANGE); h += `<div class="line"><span class="lbl">周りの巣箱</span><span class="val">${hs.length}個・蜂の巣 ${hs.reduce((a, x) => a + x.combs, 0)}</span></div>`; }
+    else if (!d.noTile) { let a = 0, m = 0; for (const [x, y] of tilesWithin(b.x, b.y, CONFIG.GATHER_RANGE)) { const t = S.tiles[idx(x, y)]; if (t.res && t.res.t === b.res && !occ[idx(x, y)]) { a += t.res.amt; m += t.res.max; } } h += `<div class="line"><span class="lbl">周りの${resName(b.res)}</span><span class="val">${a}/${m}</span></div>`; }
     h += `<div class="line"><span class="lbl">インベントリ</span><span class="val">${ITEMS[b.res].name} ${invCount(b.res)}/${invCap(b.res)}</span></div>`;
   } else if (d.kind === 'prod') {
     const r = RECIPES[b.recipe], it = ITEMS[r.out];
@@ -1447,7 +1527,7 @@ function renderInfo() {
     const hs = S.buildings.filter(x => x.type === 'house' && inMarketRange(b, x)), rn = hs.reduce((a, x) => a + residentsOf(x).length, 0);
     h += status(b.workers === 0 ? '⏸ 停止中（作業員を置いてください）' : b.jobs.length ? `🚶 配達中 ${b.jobs.length}人` : '👀 配達を待っています（範囲内で30%を切った品なし、または在庫なし）');
     if (b.slots.length < CONFIG.MARKET_SLOT_UP.slots) h += `<div class="line"><span class="lbl">販売スロット ${b.slots.length}個</span>` + (marketSlotUpOk(b) ? `<button class="btn small" id="mk-slot" ${canAfford(CONFIG.MARKET_SLOT_UP.cost) ? '' : 'disabled'}>⬆ ${CONFIG.MARKET_SLOT_UP.slots}個に ${costText(CONFIG.MARKET_SLOT_UP.cost)}</button>` : `<span class="val"><small>島レベル${CONFIG.MARKET_SLOT_UP.stage}から${CONFIG.MARKET_SLOT_UP.slots}個に</small></span>`) + `</div>`;
-    h += `<div class="line"><span class="lbl">配達範囲</span><span class="val">周り${CONFIG.MARKET.range * 2 + 1}×${CONFIG.MARKET.range * 2 + 1}マス <small>家${hs.length}軒・${rn}人</small></span></div>`;
+    h += `<div class="line"><span class="lbl">配達範囲</span><span class="val">${rangeText(marketRange(b))} <small>家${hs.length}軒・${rn}人</small></span></div>`;
     h += `<div class="hint" style="text-align:left">販売品（タップで変更）。満足度ゲージが${CONFIG.DELIVER_BELOW}%を切った住民に、近い家から配ります。自動補充は確保を除いた在庫から</div>`;
     b.slots.forEach((s, i) => {
       h += `<div class="mkslot"><button class="recipe-btn mk-item" data-i="${i}">${s.item ? ITEMS[s.item].name : '（なし）'}</button>` +
@@ -1574,7 +1654,7 @@ function renderPeople() {
   $('people-body').innerHTML = h;
   document.querySelectorAll('.pw-minus').forEach(el => el.onclick = () => { const b = getB(+el.dataset.id); setWorkers(b, b.workers - 1); renderPeople(); });
   document.querySelectorAll('.pw-plus').forEach(el => el.onclick = () => { const b = getB(+el.dataset.id); setWorkers(b, b.workers + 1); renderPeople(); });
-  document.querySelectorAll('.jump').forEach(el => el.onclick = () => { const b = getB(+el.dataset.id); cam.x = (b.x + 0.5) * T; cam.y = (b.y + 0.5) * T; UI.sel = b; closeAll(false); openInfo(); });
+  document.querySelectorAll('.jump').forEach(el => el.onclick = () => { const b = getB(+el.dataset.id); [cam.x, cam.y] = cpos(b.x, b.y).map(v => v * T); UI.sel = b; closeAll(false); openInfo(); });
 }
 
 // --- 目標・島レベル ---
@@ -1607,7 +1687,7 @@ function openSettings() {
   $('do-reset').onclick = () => modal('最初からやり直す', '<div>今の島のデータを消して、新しい島を始めます。元には戻せません。</div>', () => {
     try { localStorage.removeItem(CONFIG.SAVE_KEY); } catch (e) { }
     newGame(); villagers.length = 0; UI.mode = 'normal'; UI.sel = null; closeAll();
-    cam.x = T * N / 2; cam.y = T * N / 2; save(); showWelcome();
+    centerCam(); save(); showWelcome();
   }, true);
 }
 
@@ -1671,7 +1751,7 @@ function start() {
   $('ver').textContent = 'v' + VERSION;
   const loaded = load();
   if (!loaded) newGame();
-  cam.x = T * N / 2; cam.y = T * N / 2;
+  centerCam();
   cam.s = Math.max(1, Math.min(4, (W - 16) / (T * 7)));
   if (!loaded) showWelcome(); else { const acc = offlineProgress(); if (acc) showWelcomeBack(acc); }
   $('btn-speed').onclick = () => { const i = CONFIG.SPEEDS.indexOf(S.speed || 1); S.speed = CONFIG.SPEEDS[(i + 1) % CONFIG.SPEEDS.length]; $('btn-speed').textContent = '⏩×' + S.speed; save(); };
