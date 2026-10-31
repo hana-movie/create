@@ -18,11 +18,13 @@
   <div class="stat" id="st-pop">👤 <span>0</span></div>
   <div class="stat" id="st-free" title="未割り当て">🙋 <span>0</span></div>
   <div class="stat" id="st-happy">😊 <span>0</span></div>
-  <div class="spacer"></div>
-  <button class="icon-btn" id="btn-goal" title="目標">🎯</button>
-  <button class="icon-btn" id="btn-store" title="インベントリ">📦</button>
-  <button class="icon-btn wide" id="btn-speed" title="時間加速">⏩×1</button>
-  <button class="icon-btn" id="btn-reset" title="設定">⚙️</button>
+  <!-- ボタンはまとめて右寄せ。幅が足りないときは2段目に回る（⚙️が画面の外に出ないように） -->
+  <div class="topbtns">
+    <button class="icon-btn" id="btn-goal" title="目標">🎯</button>
+    <button class="icon-btn" id="btn-store" title="インベントリ">📦</button>
+    <button class="icon-btn wide" id="btn-speed" title="時間加速">⏩×1</button>
+    <button class="icon-btn" id="btn-reset" title="設定">⚙️</button>
+  </div>
 </div>
 
 <!-- 目標（常時表示） -->
