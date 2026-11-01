@@ -5,7 +5,7 @@
    仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.28.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.30.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数 ----------
 const CONFIG = {
@@ -52,7 +52,7 @@ const CONFIG = {
   },
   RECIPE_COST: 100,
   // レシピの価格：そのレシピが使えるようになる島レベルごと（石レンガ100、小麦粉以降200、次300、次500、次800（仮））
-  RECIPE_COST_BY_LV: { 1: 100, 2: 200, 3: 300, 4: 500, 5: 800, 6: 1000, 7: 1000, 8: 1000, 9: 1000 },
+  RECIPE_COST_BY_LV: { 1: 100, 2: 200, 3: 300, 4: 500, 5: 800, 6: 1000, 7: 1000, 8: 1000, 9: 1000, 10: 1000 },
   HOUSE_LV1_FROM: 99,   // この島レベルから、新しい住居は最初からレベル1（v0.27でやめた：島レベル6以降も新しい住居はレベル0。住の満足度を満たせば人口は増える）
   HOUSE_LV1_COST: { plank: 10, bed: 4, coins: 1000 },
   // ---- 道具のブースト ----
@@ -66,11 +66,10 @@ const CONFIG = {
   // ---- 2島・港 ----
   ISLAND2: { cost: 10000, stage: 10 },   // 島レベル10で2島を買える（1島の左隣に出る）
   PORT: {
-    cost: { plank: 30, brick: 20 },      // 2つ1組の値段（仮）。材料は1島の倉庫から
-    workers: 3,                          // 作業員の上限（強化なし）
-    slots: 5, stock: 100,                // 輸出スロット5つ、各100個まで
-    load: 5,                             // 船に1回で積む数（1スロット5個まで → 最大25個）
-    oneWaySec: 180,                      // 片道：作業員1人で3分（3人で1分）。往復で2倍
+    cost: { plank: 15, brick: 10 },      // 港1つの値段（仮）。材料は1島の倉庫から
+    workers: 3,                          // 作業員の上限＝船の数（作業員1人で船1隻）
+    capacity: 10,                        // 船1隻に1回で積める数（品の組み合わせは自由）
+    oneWaySec: 180,                      // 片道：船1隻（作業員1人）で3分
   },
   // ---- 島レベル10（やり込み）：コインで強化 ----
   EXTRA: {
@@ -118,6 +117,16 @@ const ITEMS = {
   oint:   { name: '軟膏',   color: '#6aa08a', tier: 1, cat: 'hygiene' },
   tea:    { name: 'ハーブ茶', color: '#6a8a3a', tier: 2, cat: 'hygiene' },
   comp:   { name: '湿布',   color: '#7a9aa0', tier: 3, cat: 'hygiene' },
+  // ---- 2島の品（isl2：初めて手に入れたとき、ポイントの半分がそのカテゴリの分母に加わり、満足度に数えられる） ----
+  lemon:   { name: 'レモン',         color: '#c8b818', tier: 0, time: 10, cat: 'food', isl2: true },
+  milk:    { name: 'ミルク',         color: '#9aa8b8', tier: 0, time: 10, cat: 'food', isl2: true },     // 搾乳機→農場（ハチミツと同じ仕組み）
+  bean:    { name: 'コーヒー豆',     color: '#7a4a2a', tier: 0, time: 10, cat: 'luxury', isl2: true },
+  wool:    { name: 'ウール',         color: '#a8a090', tier: 0, time: 10, cat: 'cloth', isl2: true },    // 羊毛機→農場
+  lemonade:{ name: 'レモネード',     color: '#b8a820', tier: 1, cat: 'food', isl2: true },
+  lbread:  { name: 'レモンパン',     color: '#c8a030', tier: 3, cat: 'food', isl2: true },
+  roast:   { name: '焙煎コーヒー豆', color: '#5a3418', tier: 1, cat: 'luxury', isl2: true },
+  hotcof:  { name: 'ホットコーヒー', color: '#6a3a1a', tier: 2, cat: 'luxury', isl2: true },
+  milkcof: { name: 'ミルクコーヒー', color: '#8a5a3a', tier: 3, cat: 'luxury', isl2: true },
 };
 const CATS_SAT = { food: '食', cloth: '衣', luxury: '贅沢品', hygiene: '衛生' };
 // buy: true はコインで購入が必要（CONFIG.RECIPE_COST）。fuel は燃料（表示用。作業時間には加える）
@@ -141,9 +150,16 @@ const RECIPES = {
   oint:    { out: 'oint',    need: { herb: 1, water: 1 }, buy: true },
   tea:     { out: 'tea',     need: { herb: 1, water: 1, honey: 1, wood: 1 }, fuel: 'wood', buy: true },
   comp:    { out: 'comp',    need: { oint: 1, cloth: 1 }, buy: true },
+  // ---- 2島 ----
+  lemonade:{ out: 'lemonade', need: { lemon: 1, honey: 1, water: 1 }, buy: true },
+  lbread:  { out: 'lbread',   need: { lemon: 1, flour: 1, water: 1, honey: 1, wood: 1 }, fuel: 'wood', buy: true },
+  roast:   { out: 'roast',    need: { bean: 1, wood: 1 }, fuel: 'wood', buy: true },
+  hotcof:  { out: 'hotcof',   need: { roast: 1, water: 1, wood: 1 }, fuel: 'wood', buy: true },
+  milkcof: { out: 'milkcof',  need: { hotcof: 1, milk: 1 }, buy: true },
+  thread_w:{ out: 'thread',   need: { wool: 2 }, buy: true },    // ウールの糸（綿の糸と同じ品）
 };
 (function initItems() {
-  const byOut = {}; for (const id in RECIPES) byOut[RECIPES[id].out] = RECIPES[id];
+  const byOut = {}; for (const id in RECIPES) byOut[RECIPES[id].out] = byOut[RECIPES[id].out] || RECIPES[id];   // 同じ品のレシピが2つ（糸）なら最初のもので時間を計算
   const calc = k => {
     const it = ITEMS[k];
     if (it.time === undefined) { const r = byOut[k]; let t = 0; for (const m in r.need) t += calc(m).time * r.need[m]; it.time = t; }
@@ -155,8 +171,8 @@ const RECIPES = {
   for (const k in ITEMS) calc(k);
 })();
 // 資源マス（t はそこから採れるアイテム。花畑は巣箱を隣に置く）
-const RES_NAMES = { honey: '巣箱の蜂の巣', wood: '木', stone: '石', wheat: '小麦畑', orange: 'オレンジの木', cotton: '綿花畑', flower: '花畑', herb: 'ハーブ' };
-const RES_SPR = { wood: 'tree', stone: 'rock', wheat: 'wheat', orange: 'orangetree', cotton: 'cotton', flower: 'flower', herb: 'herb' };
+const RES_NAMES = { lemon: 'レモンの木', bean: 'コーヒー豆の木', cow: '牛', sheep: '羊', milk: '搾乳機のミルク', wool: '羊毛機のウール', honey: '巣箱の蜂の巣', wood: '木', stone: '石', wheat: '小麦畑', orange: 'オレンジの木', cotton: '綿花畑', flower: '花畑', herb: 'ハーブ' };
+const RES_SPR = { lemon: 'lemontree', bean: 'beantree', cow: 'cow', sheep: 'sheep', milk: 'milker', wool: 'shearer', honey: 'hive', wood: 'tree', stone: 'rock', wheat: 'wheat', orange: 'orangetree', cotton: 'cotton', flower: 'flower', herb: 'herb' };
 function resName(t) { return RES_NAMES[t] || (ITEMS[t] && ITEMS[t].name) || t; }
 
 // ---------- 施設 ----------
@@ -170,24 +186,28 @@ const BUILD = {
   lumber:  { name: '伐採所', cat: 'gather', kind: 'gather', res: 'wood', cost: { wood: 10 }, tool: 'axe', desc: AROUND + 'の木から木材を採ります。' },
   well:    { name: '井戸',   cat: 'gather', kind: 'gather', res: 'water', noTile: true, cost: { wood: 5 }, desc: '水を汲みます。資源マスは不要で、枯れません。' },
   quarry:  { name: '採石所', cat: 'gather', kind: 'gather', res: 'stone', cost: { plank: 10 }, tool: 'pickaxe', desc: AROUND + 'の石から石材を採ります。' },
-  collect: { name: '採集所', cat: 'gather', kind: 'gather', choose: ['wheat', 'orange', 'cotton', 'herb'], cost: { plank: 10 }, tool: 'scissors', desc: '小麦畑・オレンジの木・綿花畑・ハーブから採ります。何を採るかはパネルで選べます。' },
-  hive:    { name: '巣箱',   cat: 'gather', kind: 'hive', cost: { plank: 5 }, desc: '花畑の隣に置くと、蜂の巣がたまります（10秒に1個、100個まで）。島レベル5から、養蜂場で周りの巣箱からハチミツを採れます。' },
+  collect: { name: '採集所', cat: 'gather', kind: 'gather', choose: ['wheat', 'orange', 'cotton', 'herb', 'lemon', 'bean'], cost: { plank: 10 }, tool: 'scissors', desc: '小麦畑・オレンジの木・綿花畑・ハーブから採ります。何を採るかはパネルで選べます。' },
+  hive:    { name: '巣箱',   cat: 'gather', kind: 'hive', near: 'flower', out: 'honey', label: '蜂の巣', cost: { plank: 5 }, desc: '花畑の隣に置くと、蜂の巣がたまります（10秒に1個、100個まで）。島レベル5から、養蜂場で周りの巣箱からハチミツを採れます。' },
   apiary:  { name: '養蜂場', cat: 'gather', kind: 'gather', res: 'honey', cost: { plank: 10, brick: 10 }, desc: AROUND + 'の巣箱から、蜂の巣を採ってハチミツにします。' },
+  milker:  { name: '搾乳機', cat: 'gather', kind: 'hive', near: 'cow', out: 'milk', label: 'ミルク', cost: { plank: 5 }, desc: '牛の隣に置くと、ミルクがたまります（10秒に1個、100個まで）。農場が周りの搾乳機から集めます。' },
+  shearer: { name: '羊毛機', cat: 'gather', kind: 'hive', near: 'sheep', out: 'wool', label: 'ウール', cost: { plank: 5 }, desc: '羊の隣に置くと、ウールがたまります（10秒に1個、100個まで）。農場が周りの羊毛機から集めます。' },
+  ranch:   { name: '農場',   cat: 'gather', kind: 'gather', choose: ['milk', 'wool'], cost: { plank: 10, brick: 10 }, desc: AROUND + 'の搾乳機からミルク、羊毛機からウールを集めます（どちらを集めるかはパネルで選びます）。' },
+  coffee:  { name: 'コーヒースタンド', cat: 'prod', kind: 'prod', recipes: ['roast', 'hotcof', 'milkcof'], cost: { plank: 10, brick: 10 }, desc: 'コーヒー豆＋木材（燃料） → 焙煎コーヒー豆、焙煎コーヒー豆＋水＋木材（燃料） → ホットコーヒー、ホットコーヒー＋ミルク → ミルクコーヒー（レシピ購入）' },
   sawmill: { name: '製材所', cat: 'prod', kind: 'prod', recipes: ['plank'], cost: { wood: 10 }, desc: '木材2 → 板材' },
   mason:   { name: '石工所', cat: 'prod', kind: 'prod', recipes: ['brick'], cost: { plank: 10, stone: 10 }, desc: '石材2 → 石レンガ（レシピ購入）' },
   mill:    { name: '製粉所', cat: 'prod', kind: 'prod', recipes: ['flour'], cost: { plank: 10, brick: 5 }, desc: '小麦2 → 小麦粉（レシピ購入）' },
-  food:    { name: '食品工房', cat: 'prod', kind: 'prod', recipes: ['juice', 'bread', 'jam', 'obread'], cost: { plank: 10, brick: 5 }, desc: 'オレンジ＋水 → オレンジジュース、小麦粉＋水＋木材（燃料） → パン（レシピ購入。1施設で1レシピ）' },
-  spinner: { name: '紡績所', cat: 'prod', kind: 'prod', recipes: ['thread', 'cloth'], cost: { plank: 10, brick: 5 }, desc: '綿2 → 糸、糸2 → 布（レシピ購入。1施設で1レシピ）' },
+  food:    { name: '食品工房', cat: 'prod', kind: 'prod', recipes: ['juice', 'bread', 'jam', 'obread', 'lemonade', 'lbread'], cost: { plank: 10, brick: 5 }, desc: 'オレンジ＋水 → オレンジジュース、小麦粉＋水＋木材（燃料） → パン（レシピ購入。1施設で1レシピ）' },
+  spinner: { name: '紡績所', cat: 'prod', kind: 'prod', recipes: ['thread', 'cloth', 'thread_w'], cost: { plank: 10, brick: 5 }, desc: '綿2 → 糸、糸2 → 布（レシピ購入。1施設で1レシピ）' },
   polisher:{ name: '研磨所', cat: 'prod', kind: 'prod', recipes: ['polish', 'shine'], cost: { plank: 10, brick: 10 }, desc: '石材＋水 → 磨き石、磨き石2＋水2 → 輝き石（レシピ購入。1施設で1レシピ）' },
   pharmacy:{ name: '薬局', cat: 'prod', kind: 'prod', recipes: ['oint', 'tea', 'comp'], cost: { plank: 10, brick: 10 }, desc: 'ハーブ＋水 → 軟膏、ハーブ＋水＋ハチミツ＋木材（燃料） → ハーブ茶、軟膏＋布 → 湿布（レシピ購入。1施設で1レシピ）' },
   tailor:  { name: '仕立て屋', cat: 'prod', kind: 'prod', recipes: ['clothes'], cost: { plank: 10, brick: 10 }, desc: '糸＋布 → 服（レシピ購入）' },
   furniture:{ name: '家具屋', cat: 'prod', kind: 'prod', recipes: ['bed'], cost: { plank: 10, brick: 10 }, desc: '板材5 → 木のベッド（レシピ購入）。ベッドは住居のアップグレードに使います' },
   toolshop:{ name: '道具屋', cat: 'prod', kind: 'prod', recipes: ['axe', 'pickaxe', 'scissors'], cost: { plank: 10, brick: 5 }, desc: '木材＋石材 → 石のオノ・石のピッケル・石のハサミ（レシピ購入。1施設で1レシピ）。道具は施設に入れると作業が速くなります' },
   house:   { name: '自宅',   cat: 'home', kind: 'house', cost: { plank: 10 }, desc: '4人まで住めます。全員が住居に入れないと人口は増えません。' },
-  port:    { name: '港', cat: 'home', kind: 'port', cost: { plank: 30, brick: 20 }, desc: '砂浜に建てます。2つで1組（1島と2島に1つずつ）。輸出スロットに入れた品を、作業員が船で相手の島へ運び、相手の島の倉庫に自動で入れます。材料は1島の倉庫から。' },
+  port:    { name: '港', cat: 'home', kind: 'port', cost: { plank: 15, brick: 10 }, desc: '砂浜に建てます。作業員1人で船1隻（3隻まで）。船ごとに行き先の港と荷物（10個まで）を決めると、自動で運び続けます。帰りの荷物も積めます。材料は1島の倉庫から。' },
   market:  { name: '市場',   cat: 'home', kind: 'market', cost: { plank: 10 }, desc: '作業員が周りの家に品物を配達してコインを得ます。いくつでも建てられます。' },
 };
-BUILD.collect.res = 'wheat';
+BUILD.collect.res = 'wheat'; BUILD.ranch.res = 'milk';
 for (const t in BUILD) BUILD[t].size = 1;
 
 // ---------- 島レベルと目標 ----------
@@ -280,7 +300,7 @@ const STAGES = [
     intro: '島レベル10：自由モード。満足度を保てば、住居を置けるかぎり住民が増えます。コインで島を強化できます（📦倉庫の拡張、施設の作業員の上限アップ・2つのレシピ、市場の配達範囲の拡大）',
     goals: [
       { id: 'j1', text: '2島を買う（🪙10,000）', n: 1, prog: () => (S.isl2 ? 1 : 0), hint: '目標の画面（🎯）の「2島を買う」ボタンで買えます' },
-      { id: 'j2', text: '港を建てて1島と2島をつなぐ', n: 1, prog: () => (countType('port') >= 2 ? 1 : 0), req: ['j1'], hint: '港は砂浜に建てます。1島の港を置いたら、続けて2島の港の場所を選びます' },
+      { id: 'j2', text: '港を建てて1島と2島をつなぐ', n: 1, prog: () => (S.buildings.some(b => b.type === 'port' && (b.ships || []).some(s => { const d = getB(s.dest); return d && islandOf(d.x) !== islandOf(b.x); })) ? 1 : 0), req: ['j1'], hint: '1島と2島の砂浜に港を建て、船の行き先を相手の島の港にします' },
       { id: 'j3', text: '2島に自宅を建てる', n: 1, prog: () => (S.buildings.some(b => b.type === 'house' && islandOf(b.x) === 2) ? 1 : 0), req: ['j2'], hint: '1島の港の輸出スロットに板材を入れ、作業員を置くと、船で2島の倉庫に届きます' },
     ] },
 ];
@@ -473,9 +493,17 @@ function invAvail(k) { return Math.max(0, invCount(k) - reserveOf(k)); }
 function invAdd(k, n) {
   const a = Math.min(n, invRoom(k)); if (a <= 0) return 0;
   const st = ST(); st.inv[k] = invCount(k) + a; if (!st.invOrder.includes(k)) { st.invOrder.push(k); }
+  if (ITEMS[k].isl2 && !(S.got || []).includes(k)) gotItem(k);
   return a;
 }
 // useReserve: 確保分も使う（建築・アップグレード・市場の手動補充・売却）
+// 2島の品を初めて手に入れた：満足度に数えるようになり、分母にポイントの半分が加わる
+function gotItem(k) {
+  const it = ITEMS[k]; S.got = S.got || []; S.extraDenom = S.extraDenom || {};
+  S.got.push(k); if (!it.cat) return;
+  S.extraDenom[it.cat] = (S.extraDenom[it.cat] || 0) + it.pts / 2;
+  notify(`🆕 ${it.name}が${CATS_SAT[it.cat]}の満足度に加わりました（${CATS_SAT[it.cat]}の分母＋${it.pts / 2}）`);
+}
 function invTake(k, n, useReserve) { const a = Math.min(n, useReserve ? invCount(k) : invAvail(k)); if (a > 0) ST().inv[k] = invCount(k) - a; return a; }
 function canAfford(cost) { for (const k in cost) { if (k === 'coins' ? S.coins < cost[k] : invCount(k) < cost[k]) return false; } return true; }
 function payCost(cost) { for (const k in cost) { if (k === 'coins') S.coins -= cost[k]; else invTake(k, cost[k], true); } }
@@ -491,7 +519,8 @@ function rehouse() { for (const r of S.residents) if (!r.house || !getB(r.house)
 function housedAll() { return S.residents.every(r => r.house && getB(r.house)); }
 function houseCapacity() { return countType('house') * CONFIG.HOUSE_CAP; }
 function needPct() { return CONFIG.DIFFICULTY[S.diff || 'normal'].need; }
-function denoms() { return stageDef().denom; }
+// 分母：島レベルの分母＋2島の品を初めて手に入れたときに加わる分（ポイントの半分）
+function denoms() { const d = { ...stageDef().denom }; for (const c in S.extraDenom || {}) if (d[c]) d[c] += S.extraDenom[c]; return d; }
 function activeCats() { return Object.keys(denoms()); }
 // 住民1人のカテゴリ満足度（%）：ポイント × ゲージ ÷ 分母
 function resSat(r, cat) { const d = denoms()[cat]; if (!d) return 100; let p = 0; for (const k in r.demand) if (ITEMS[k].cat === cat && itemCounts(k)) p += ITEMS[k].pts * r.demand[k] / 100; return Math.min(100, p / d * 100); }
@@ -500,7 +529,7 @@ function minSat() { const cs = activeCats(); return cs.length ? Math.min(...cs.m
 // 品物がそのカテゴリで今の島レベルに含まれるか（分母に入っている品）
 // 今の島レベルで満足度に数える品（分母に入っている品）。それ以外の品は届けても満足度にならない
 function stageItems() { return stageDef().items; }
-function itemCounts(k) { return stageItems().includes(k); }
+function itemCounts(k) { return stageItems().includes(k) || (!!ITEMS[k].isl2 && (S.got || []).includes(k)); }
 function stageCap() { return stageDef().cap; }
 // 住の満足度：人が住んでいる住居のうち、住居レベル1以上の割合（%）。島レベルごとに必要な割合 house がある
 function housePct() { const hs = S.buildings.filter(b => b.type === 'house' && residentsOf(b).length); return hs.length ? hs.filter(b => (b.lv || 0) >= 1).length / hs.length * 100 : 0; }
@@ -530,7 +559,7 @@ function makeBuilding(type, x, y) {
   if (d.kind === 'hive') { b.combs = 0; b.ct = 0; }
   if (d.kind === 'house') b.lv = 0;
   if (d.kind === 'prod') { b.recipe = d.recipes[0]; b.prog = 0; b.active = false; }
-  if (d.kind === 'port') { b.pair = null; b.exp = []; for (let i = 0; i < CONFIG.PORT.slots; i++) b.exp.push({ item: null, stock: 0, auto: true }); b.ship = { st: 0, p: 0, cargo: {} }; }
+  if (d.kind === 'port') b.ships = [0, 1, 2].map(newShip);
   if (d.kind === 'market') { b.lv = 1; b.slots = []; for (let i = 0; i < CONFIG.MARKET.slots; i++) b.slots.push({ item: null, stock: 0, auto: true }); b.jobs = []; }
   return b;
 }
@@ -552,15 +581,18 @@ function islandPop(i) { if (!S.isl2) return S.pop; let n = 0; for (const r of S.
 function freeWorkers(i = ISL) { return islandPop(i) - assigned(i); }
 function setWorkers(b, n) {
   n = Math.max(0, Math.min(maxWorkers(b), n));
+  if (b.ships && n < b.workers && b.ships.slice(n, b.workers).some(shipBusy)) return;   // 運送中の船の作業員は外せない
   if (n > b.workers && freeWorkers(islandOf(b.x)) < n - b.workers) return;
   b.workers = n;
   if (b.jobs) while (b.jobs.length > n) { const j = b.jobs.pop(); const sl = b.slots.find(s => s.item === j.item); if (sl) sl.stock++; else withIsl(islandOf(b.x), () => invAdd(j.item, 1)); }
 }
 // 港は砂浜だけ、ほかの施設は陸だけ
-function canPlace(type, x, y, ignoreId) { if (!inMap(x, y)) return false; if (BUILD[type].kind === 'port' ? KIND[idx(x, y)] !== 1 : isCoast(x, y)) return false; const o = occ[idx(x, y)]; if (o && o !== ignoreId) return false; if (BUILD[type].kind === 'hive' && !hiveSpotOk(x, y)) return false; return true; }
+function canPlace(type, x, y, ignoreId) { if (!inMap(x, y)) return false; if (BUILD[type].kind === 'port' ? KIND[idx(x, y)] !== 1 : isCoast(x, y)) return false; const o = occ[idx(x, y)]; if (o && o !== ignoreId) return false; if (BUILD[type].kind === 'hive' && !hiveSpotOk(x, y, type)) return false; return true; }
 // 巣箱：花畑のマスそのものではなく、花畑の隣（周り8マス）に置く
-function nearFlower(x, y) { return neighbors(x, y).some(([nx, ny]) => S.tiles[idx(nx, ny)].res && S.tiles[idx(nx, ny)].res.t === 'flower'); }
-function hiveSpotOk(x, y) { const t = S.tiles[idx(x, y)]; return !(t.res && t.res.t === 'flower') && nearFlower(x, y); }
+// 巣箱・搾乳機・羊毛機：資源マス（花畑・牛・羊）の隣に置く。そのマスそのものには置けない
+function nearRes(x, y, r) { return neighbors(x, y).some(([nx, ny]) => S.tiles[idx(nx, ny)].res && S.tiles[idx(nx, ny)].res.t === r); }
+function nearFlower(x, y) { return nearRes(x, y, 'flower'); }
+function hiveSpotOk(x, y, type = 'hive') { const t = S.tiles[idx(x, y)], r = BUILD[type].near; return !(t.res && t.res.t === r) && nearRes(x, y, r); }
 // 材料は建てる島の倉庫から（港は1島の倉庫から）
 function build(type, x, y) { return withIsl(BUILD[type].kind === 'port' ? 1 : islandOf(x), () => build0(type, x, y)); }
 function build0(type, x, y) {
@@ -576,8 +608,8 @@ function moveBuilding(b, x, y) { if (islandOf(x) !== islandOf(b.x) || !canPlace(
 // 取り壊し：材料の半分を返す（端数切り捨て）。市場の在庫はインベントリへ
 function demolishRefund(b) { const o = {}; const c = b.type === 'house' && (b.lv || 0) >= 1 && S.stage >= CONFIG.HOUSE_LV1_FROM ? CONFIG.HOUSE_LV1_COST : BUILD[b.type].cost; for (const k in c) o[k] = Math.floor(c[k] / 2); return o; }
 function demolish(b) {
-  // 港は2つ1組で取り壊す。輸出スロットの在庫と船の荷物は、それぞれの島の倉庫へ戻す
-  if (b.type === 'port') { const pb = getB(b.pair); for (const p of [b, pb]) if (p) withIsl(islandOf(p.x), () => { setWorkers(p, 0); for (const s of p.exp) if (s.item && s.stock) invAdd(s.item, s.stock); for (const k in p.ship.cargo) invAdd(k, p.ship.cargo[k]); }); withIsl(1, () => { for (const k in CONFIG.PORT.cost) invAdd(k, Math.floor(CONFIG.PORT.cost[k] / 2)); }); S.buildings = S.buildings.filter(x => x !== b && x !== pb); rebuildOcc(); return; }
+  // 港：船の荷物はこの港の島の倉庫へ戻す。ほかの港からこの港へ向かう船は引き返す
+  if (b.type === 'port') { withIsl(islandOf(b.x), () => { for (const s of b.ships) for (const k in s.cargo) invAdd(k, s.cargo[k]); }); b.workers = 0; for (const o of S.buildings) if (o.ships) for (const s of o.ships) if (s.dest === b.id) { if (s.st === 1) { s.st = 2; s.p = 1 - s.p; } s.dest = null; if (s.next && s.next !== 'stop') s.next.dest = null; } }
   withIsl(islandOf(b.x), () => demolish0(b));
 }
 function demolish0(b) {
@@ -588,6 +620,15 @@ function demolish0(b) {
   if (b.type === 'house') { for (const r of S.residents) if (r.house === b.id) r.house = null; rehouse(); }
 }
 // ---------- 2島と港 ----------
+// 2島の牛・羊・レモンの木・コーヒー豆の木と、2島の施設（v0.30）。前のセーブで2島がある場合も、読み込み時にここで足す
+function isl2Content() {
+  if (!S.isl2) return;
+  if (!S.tiles.some((t, i) => t.res && t.res.t === 'lemon')) {
+    const cl = makeClusterFn(S.tiles, rng((Date.now() ^ 0x3c3c) & 0xffff), 2), freeT = (x, y) => !!occ[idx(x, y)];
+    for (const [bx, by, tp, n] of [[0, 0, 'lemon', 7], [2, 1, 'lemon', 4], [2, 0, 'bean', 6], [2, 2, 'bean', 4], [0, 1, 'cow', 6], [2, 2, 'sheep', 6], [1, 2, 'cow', 3], [1, 0, 'sheep', 3]]) cl(bx, by, tp, n, freeT);
+  }
+  for (const t of ['port', 'milker', 'shearer', 'ranch', 'coffee']) unlockType(t);
+}
 function canBuyIsland() { return S.stage >= CONFIG.ISLAND2.stage && !S.isl2 && S.coins >= CONFIG.ISLAND2.cost; }
 function buyIsland() {
   if (!canBuyIsland()) return false;
@@ -596,49 +637,64 @@ function buyIsland() {
   // 2島の資源（今回は木・石・ハーブ。牛・羊・レモン・コーヒー豆は次の更新で空いている区画に置く）
   const cl = makeClusterFn(S.tiles, rng((Date.now() ^ 0x5a5a) & 0xffff), 2);
   for (const [bx, by, tp, n] of [[1, 1, 'wood', 6], [1, 0, 'stone', 6], [1, 2, 'stone', 5], [0, 1, 'wood', 5], [2, 1, 'wood', 4], [2, 0, 'herb', 5], [0, 2, 'herb', 5]]) cl(bx, by, tp, n);
-  unlockType('port'); S.stats.isl2 = 1;
+  isl2Content(); S.stats.isl2 = 1;
   notify('🏝 2島を買いました！ 1島の左にあります。港を建ててつなぎましょう');
   return true;
 }
-// 港を2つ1組で建てる（(x1,y1) と (x2,y2) は別の島の砂浜）。材料は1島の倉庫から
-function canPlacePortPair(x1, y1, x2, y2) { return S.isl2 && islandOf(x1) !== islandOf(x2) && canPlace('port', x1, y1) && canPlace('port', x2, y2); }
-function buildPortPair(x1, y1, x2, y2) {
-  if (!S.unlocked.includes('port') || !canPlacePortPair(x1, y1, x2, y2)) return null;
-  return withIsl(1, () => {
-    if (!canAfford(CONFIG.PORT.cost)) return null;
-    payCost(CONFIG.PORT.cost);
-    const a = addBuilding('port', x1, y1), b = addBuilding('port', x2, y2);
-    a.pair = b.id; b.pair = a.id; S.stats.built_port = (S.stats.built_port || 0); return [a, b];
+// ---------- 港と船 ----------
+// 船：dest（行き先の港）・go（行きの荷物 {品:個数}）・back（帰りの荷物）・next（予約。'stop'＝やめる）
+// st：0 港で待つ／1 行き／2 帰り。p は片道の進み具合（0〜1）
+function newShip() { return { dest: null, go: {}, back: {}, next: null, st: 0, p: 0, cargo: {} }; }
+const loadSum = o => Object.values(o || {}).reduce((a, n) => a + n, 0);
+function shipActive(b, i) { return i < b.workers; }
+function shipBusy(s) { return s.st !== 0 || loadSum(s.cargo) > 0; }
+// 行き先にできる港：ほかの島の港
+function portDests(b) { return S.buildings.filter(o => o.type === 'port' && o.id !== b.id && islandOf(o.x) !== islandOf(b.x)); }
+// 船の設定。待っている船はすぐ変わる。運送中の船は予約になり、港に戻ったら変わる（plan=null で運送をやめる）
+function setShipPlan(b, i, plan) {
+  const s = b.ships[i];
+  if (plan && (loadSum(plan.go) > CONFIG.PORT.capacity || loadSum(plan.back) > CONFIG.PORT.capacity)) return false;
+  if (shipBusy(s)) { s.next = plan ? { dest: plan.dest, go: { ...plan.go }, back: { ...plan.back } } : 'stop'; return 'reserved'; }
+  applyPlan(s, plan); return 'now';
+}
+function applyPlan(s, plan) { if (plan) { s.dest = plan.dest; s.go = { ...plan.go }; s.back = { ...plan.back }; } else { s.dest = null; s.go = {}; s.back = {}; } s.next = null; }
+// 在庫から荷物を積む（確保は使わない）。足りなければ、あるものだけ
+function loadCargo(order) { const c = {}; for (const k in order) { const a = invTake(k, order[k], false); if (a > 0) c[k] = a; } return c; }
+function unloadCargo(s) { for (const k in s.cargo) { const a = invAdd(k, s.cargo[k]); s.cargo[k] -= a; S.stats['ship_' + k] = (S.stats['ship_' + k] || 0) + a; if (!s.cargo[k]) delete s.cargo[k]; } return !loadSum(s.cargo); }
+function shipLeft(s) { return (1 - s.p) * CONFIG.PORT.oneWaySec; }
+// 港の処理（ISL＝この港の島）。作業員1人で船1隻
+function stepPort(b, dt, acc) {
+  b.ships.forEach((s, i) => {
+    if (s.st === 0) {
+      if (loadSum(s.cargo) && !unloadCargo(s)) return;       // 帰りの荷物を降ろす（入りきらなければ待つ）
+      if (s.next) { applyPlan(s, s.next === 'stop' ? null : s.next); }
+      const d = getB(s.dest);
+      if (!shipActive(b, i) || !d || !loadSum(s.go) && !loadSum(s.back)) return;
+      s.cargo = loadCargo(s.go);
+      if (!loadSum(s.cargo) && !loadSum(s.back)) return;      // 積むものが何もなければ待つ
+      s.st = 1; s.p = 0; return;
+    }
+    s.p = Math.min(1, s.p + dt / CONFIG.PORT.oneWaySec + 1e-9); if (s.p < 1) return;
+    if (s.st === 1) {
+      const d = getB(s.dest);
+      if (!d) { s.st = 2; s.p = 0; return; }
+      // 着いたら相手の島の倉庫へ入れる。入りきらなければ待つ。降ろしたら帰りの荷物を積んで戻る
+      const done = withIsl(islandOf(d.x), () => { if (!unloadCargo(s)) return false; s.cargo = loadCargo(s.back); return true; });
+      if (done) { s.st = 2; s.p = 0; }
+    } else { s.st = 0; s.p = 0; }   // 戻った。荷物は次の処理で降ろす
   });
 }
-function portCap() { return CONFIG.PORT.stock; }
-function setPortItem(b, i, item) { const s = b.exp[i]; withIsl(islandOf(b.x), () => { if (s.item && s.stock) invAdd(s.item, s.stock); }); s.item = item || null; s.stock = 0; }
-function portFillManual(b, i) { const s = b.exp[i]; if (!s.item) return 0; return withIsl(islandOf(b.x), () => { const a = invTake(s.item, portCap() - s.stock, true); s.stock += a; return a; }); }
-// 片道の残り秒数（作業員の人数で割る）
-function shipLeft(b) { return b.workers ? (1 - b.ship.p) * CONFIG.PORT.oneWaySec / b.workers : Infinity; }
-// 港の処理（ISL＝この港の島）：輸出スロットを補充 → 船に積む → 片道 → 相手の島の倉庫へ → 戻る
-function stepPort(b, dt, acc) {
-  const C = CONFIG.PORT, sh = b.ship, pb = getB(b.pair);
-  for (const s of b.exp) if (s.item && s.auto && s.stock < C.stock) s.stock += invTake(s.item, C.stock - s.stock, false);
-  if (!pb || !b.workers) return;
-  if (sh.st === 0) {
-    // 1スロットにつき5個まで積める。同じ品のスロットが複数あれば、その品の在庫をまとめて使う（5×スロット数まで）
-    let n = 0; const cargo = {}, room = {};
-    for (const s of b.exp) if (s.item) room[s.item] = (room[s.item] || 0) + C.load;
-    for (const s of b.exp) { if (!s.item) continue; const a = Math.min(room[s.item], s.stock); if (a > 0) { cargo[s.item] = (cargo[s.item] || 0) + a; s.stock -= a; room[s.item] -= a; n += a; } }
-    if (n) { sh.st = 1; sh.p = 0; sh.cargo = cargo; }
-    return;
+// 前のセーブ（v0.28：2つ1組の港）→ 船の形に。輸出スロットの在庫と船の荷物は倉庫に戻し、1隻目の行き先を相手の港にする
+function migratePorts() {
+  for (const b of S.buildings) {
+    if (b.type !== 'port' || b.ships) continue;
+    withIsl(islandOf(b.x), () => { for (const s of b.exp || []) if (s.item && s.stock) invAdd(s.item, s.stock); for (const k in (b.ship && b.ship.cargo) || {}) invAdd(k, b.ship.cargo[k]); });
+    b.ships = [0, 1, 2].map(newShip); if (b.pair && getB(b.pair)) b.ships[0].dest = b.pair;
+    delete b.exp; delete b.ship; delete b.pair;
   }
-  if (sh.p < 1) { sh.p = Math.min(1, sh.p + dt * b.workers / C.oneWaySec); if (sh.p < 1) return; }
-  if (sh.st === 1) {
-    // 着いたら相手の島の倉庫に入れる。入りきらない分は船で待つ
-    withIsl(islandOf(pb.x), () => { for (const k in sh.cargo) { const a = invAdd(k, sh.cargo[k]); sh.cargo[k] -= a; S.stats['ship_' + k] = (S.stats['ship_' + k] || 0) + a; if (!sh.cargo[k]) delete sh.cargo[k]; } });
-    if (Object.keys(sh.cargo).length) return;
-    sh.st = 2; sh.p = 0;
-  } else { sh.st = 0; sh.p = 0; }
 }
 // 採集所の「採るもの」
-function resAvailable(r) { return r === 'cotton' ? S.stage >= 3 : r === 'herb' ? S.stage >= 6 : true; }
+function resAvailable(r) { return r === 'cotton' ? S.stage >= 3 : r === 'herb' ? S.stage >= 6 : (r === 'lemon' || r === 'bean') ? !!S.isl2 : true; }
 function setRes(b, r) { if (BUILD[b.type].choose && BUILD[b.type].choose.includes(r) && resAvailable(r)) { b.res = r; b.prog = 0; } }
 // 生産施設のレシピを変える（1施設で1レシピ）。作りかけの材料はインベントリへ戻す
 // slot：1＝1つ目のレシピ、2＝2つ目（島レベル10の「2つのレシピ」）。作っている途中のレシピを変えたら材料を戻す
@@ -664,7 +720,7 @@ function boostLeftSec(b) { return b.workers ? (b.boost || 0) / b.workers : (b.bo
 // ---------- レシピ ----------
 function recipeOwned(r) { return !RECIPES[r].buy || S.recipes.includes(r); }
 // レシピの価格：そのレシピの品が初めて満足度・材料に使われる島レベルで決まる
-const RECIPE_LV = { brick: 1, flour: 2, juice: 2, thread: 3, axe: 3, pickaxe: 3, scissors: 3, bread: 4, cloth: 5, polish: 5, jam: 5, bed: 5, obread: 6, clothes: 6, oint: 6, shine: 7, tea: 8, comp: 9 };
+const RECIPE_LV = { lemonade: 10, lbread: 10, roast: 10, hotcof: 10, milkcof: 10, thread_w: 10, brick: 1, flour: 2, juice: 2, thread: 3, axe: 3, pickaxe: 3, scissors: 3, bread: 4, cloth: 5, polish: 5, jam: 5, bed: 5, obread: 6, clothes: 6, oint: 6, shine: 7, tea: 8, comp: 9 };
 function recipeCost(r) { return CONFIG.RECIPE_COST_BY_LV[RECIPE_LV[r]] || CONFIG.RECIPE_COST; }
 // レシピはその品が使えるようになる島レベルから買える
 function recipeUnlocked(r) { return S.stage >= (RECIPE_LV[r] || 1); }
@@ -675,12 +731,15 @@ function workSec(b) {
   if (d.kind === 'prod') { const r = RECIPES[curRecipe(b)]; let t = 0; for (const m in r.need) t += ITEMS[m].time * r.need[m]; return t; }
   return 10;
 }
+// 集める品 → ためる施設
+const SRC_OF = { honey: 'hive', milk: 'milker', wool: 'shearer' };
 // 採集対象：周り8マスで量が残っている同じ資源。近い順（同距離は上→右→下→左）
 function gatherTarget(b) {
   const res = b.res, R = CONFIG.GATHER_RANGE; let best = null, bd = 1e9, bp = 99;
-  if (res === 'honey') {  // 養蜂場：周りの巣箱の蜂の巣
+  const src = SRC_OF[res];
+  if (src) {  // 養蜂場・農場：周りの巣箱（蜂の巣）・搾乳機（ミルク）・羊毛機（ウール）から集める
     for (const h of S.buildings) {
-      if (h.type !== 'hive' || h.combs <= 0 || tileRange(h.x, h.y, b.x, b.y) > R) continue;
+      if (h.type !== src || h.combs <= 0 || tileRange(h.x, h.y, b.x, b.y) > R) continue;
       const d = tileDist(h.x, h.y, b.x, b.y);
       if (d < bd || (d === bd && best && h.combs > best.h.combs)) { best = { tile: { get amt() { return h.combs; }, set amt(v) { h.combs = v; } }, x: h.x, y: h.y, d, h }; bd = d; }
     }
@@ -770,7 +829,7 @@ function stepBuilding0(b, dt, acc) {
   const d = BUILD[b.type];
   if (d.kind === 'hive') {
     b.ct = (b.ct || 0) + dt;
-    while (b.ct >= CONFIG.COMB_SEC) { b.ct -= CONFIG.COMB_SEC; if (b.combs < CONFIG.COMB_MAX && nearFlower(b.x, b.y)) b.combs++; }
+    while (b.ct >= CONFIG.COMB_SEC) { b.ct -= CONFIG.COMB_SEC; if (b.combs < CONFIG.COMB_MAX && nearRes(b.x, b.y, d.near)) b.combs++; }
     return;
   }
   if (d.kind === 'gather') {
@@ -832,7 +891,7 @@ function migrateMap() {
 }
 function forceLand() { for (let i = 0; i < MW * N; i++) if (S.tiles[i].res || occ[i]) S.land[i] = 1; for (const b of S.buildings) S.land[idx(b.x, b.y)] = 1; }
 function load() {
-  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); migrateMap(); S.notified = S.notified || {}; S.reserve = S.reserve || {}; S.newTypes = S.newTypes || []; for (const b of S.buildings) { const d = BUILD[b.type]; if (d.tool && b.boost === undefined) { b.boost = 0; b.autoBoost = false; } } if (S.inv.sickle) { S.inv.scissors = (S.inv.scissors || 0) + S.inv.sickle; delete S.inv.sickle; } S.invOrder = S.invOrder.map(k => k === 'sickle' ? 'scissors' : k).filter((k, i, a) => ITEMS[k] && a.indexOf(k) === i); S.recipes = S.recipes.map(r => r === 'sickle' ? 'scissors' : r); for (const b of S.buildings) if (b.recipe === 'sickle') b.recipe = 'scissors'; if (S.reserve.sickle) { S.reserve.scissors = S.reserve.sickle; delete S.reserve.sickle; } rebuildOcc(); return true; } catch (e) { return false; }
+  try { const j = localStorage.getItem(CONFIG.SAVE_KEY); if (!j) return false; S = JSON.parse(j); migrateMap(); migratePorts(); isl2Content(); S.notified = S.notified || {}; S.reserve = S.reserve || {}; S.newTypes = S.newTypes || []; for (const b of S.buildings) { const d = BUILD[b.type]; if (d.tool && b.boost === undefined) { b.boost = 0; b.autoBoost = false; } } if (S.inv.sickle) { S.inv.scissors = (S.inv.scissors || 0) + S.inv.sickle; delete S.inv.sickle; } S.invOrder = S.invOrder.map(k => k === 'sickle' ? 'scissors' : k).filter((k, i, a) => ITEMS[k] && a.indexOf(k) === i); S.recipes = S.recipes.map(r => r === 'sickle' ? 'scissors' : r); for (const b of S.buildings) if (b.recipe === 'sickle') b.recipe = 'scissors'; if (S.reserve.sickle) { S.reserve.scissors = S.reserve.sickle; delete S.reserve.sickle; } rebuildOcc(); return true; } catch (e) { return false; }
 }
 function offlineProgress() {
   const elapsed = Math.min(CONFIG.OFFLINE_MAX_SEC, Math.floor((Date.now() - S.lastSave) / 1000));
@@ -1344,6 +1403,83 @@ SPR.port = [
   'lLlBlLllBlLllBlL',
   'LLLLLLLLLLLLLLLL',
 ];
+// ---- 2島の資源・施設 ----
+SPR.lemontree = SPR.orangetree.map(r => r.replace(/o/g, 'y'));
+SPR.beantree = SPR.orangetree.map(r => r.replace(/o/g, 'R').replace(/T/g, 't'));
+SPR.cow = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '...........k.k..',
+  '..pppppppppppkp.',
+  '.ppkkppppkppppii',
+  '.pkkkppppkkpppik',
+  '.ppkppppppppppp.',
+  '..ppppppppppppp.',
+  '..pppPPPPPPppp..',
+  '..pp.pp....pp.pp',
+  '..kk.kk....kk.kk',
+  '................',
+  '................',
+  '................',
+];
+SPR.sheep = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '....ppp.pp......',
+  '..pppppppppp....',
+  '.ppppppppppppkk.',
+  '.pppppppppppkkkk',
+  '.ppppppppppppkxk',
+  '..pppppppppp.kk.',
+  '...pppppppp.....',
+  '...k.k...k.k....',
+  '...k.k...k.k....',
+  '................',
+  '................',
+  '................',
+];
+SPR.milker = [
+  '................',
+  '.......RR.......',
+  '.....RRRRRR.....',
+  '...RRRRRRRRRR...',
+  '..RRRRRRRRRRRR..',
+  '...cccccccccc...',
+  '...cCCCCCCCCc...',
+  '...cC.ssss.Cc...',
+  '...cC.spps.Cc...',
+  '...cC.ssss.Cc...',
+  '...cC.sSSs.Cc...',
+  '...cC.sSSs.Cc...',
+  '...cccccccccc...',
+  '...B........B...',
+  '..BBB......BBB..',
+  '................',
+];
+SPR.shearer = SPR.milker.map(r => r.replace(/R/g, 'L').replace(/s/g, 'p').replace(/S/g, 'P'));
+SPR.ranch = [
+  '................',
+  '.......RR.......',
+  '.....RRRRRR.....',
+  '...RRRRRRRRRR...',
+  '..RRRRRRRRRRRR..',
+  '.RRRRRRRRRRRRRR.',
+  '..rrrrrrrrrrrr..',
+  '..rRRrrrrrrRRr..',
+  '..rRRrppppRRRr..',
+  '..rrrrpkkprrrr..',
+  '..rrrrpkkprrrr..',
+  '..rrrrpkkprrrr..',
+  '..rrrrpkkprrrr..',
+  'nNnNnNnNnNnNnNnN',
+  'n..n..n..n..n..n',
+  '................',
+];
+SPR.coffee = SPR.drinks.map(r => r.replace(/o/g, 'N').replace(/O/g, 'B').replace(/y/g, 'h').replace(/Y/g, 'H'));
 SPR.house1 = SPR.house.map(r => r.replace(/r/g, 'l').replace(/R/g, 'L'));   // 住居レベル1：屋根が青
 // 島レベル5の施設（仮の絵：既存の絵を流用）
 SPR.apiary = SPR.drinks.map(r => r.replace(/o/g, 'y').replace(/O/g, 'Y'));
@@ -1427,8 +1563,7 @@ function draw() {
   for (const b of S.buildings.slice().sort((a, b) => a.y - b.y)) { if (UI.mode === 'move' && UI.moveB === b) continue; drawBuilding(b.type, b.x, b.y, ox, oy, ts, UI.sel === b ? 'sel' : null, b); }
   if (UI.mode === 'place' || UI.mode === 'move') {
     const type = UI.mode === 'place' ? UI.placeType : UI.moveB.type;
-    if (UI.mode === 'place' && UI.portA) { ctx.globalAlpha = 0.75; drawBuilding('port', UI.portA[0], UI.portA[1], ox, oy, ts, 'ok'); ctx.globalAlpha = 1; }
-    const ok = UI.mode === 'place' && UI.portA ? canPlacePortPair(UI.portA[0], UI.portA[1], UI.px, UI.py) : canPlace(type, UI.px, UI.py, UI.mode === 'move' ? UI.moveB.id : null) && (UI.mode === 'move' || canAfford(buildCost(type)));
+    const ok = canPlace(type, UI.px, UI.py, UI.mode === 'move' ? UI.moveB.id : null) && (UI.mode === 'move' || canAfford(buildCost(type)));
     ctx.globalAlpha = 0.75; drawBuilding(type, UI.px, UI.py, ox, oy, ts, ok ? 'ok' : 'ng'); ctx.globalAlpha = 1;
   }
   drawShips(ox, oy, ts);
@@ -1441,13 +1576,16 @@ function draw() {
 // 船：港から相手の港へ、片道の進み具合で動く。選んだ港の航路は点線で出す
 function drawShips(ox, oy, ts) {
   for (const b of S.buildings) {
-    if (b.type !== 'port') continue; const pb = getB(b.pair); if (!pb) continue;
-    const [ax, ay] = cpos(b.x, b.y), [bx, by] = cpos(pb.x, pb.y);
-    if (UI.sel === b || UI.sel === pb) { ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.moveTo(ox + ax * ts, oy + ay * ts); ctx.lineTo(ox + bx * ts, oy + by * ts); ctx.stroke(); ctx.setLineDash([]); }
-    const sh = b.ship; if (!sh || sh.st === 0) continue;
-    const f = sh.st === 1 ? sh.p : 1 - sh.p, x = ax + (bx - ax) * f, y = ay + (by - ay) * f + 0.6;
-    ctx.font = `${Math.max(14, ts * 0.7)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.save(); ctx.translate(ox + x * ts, oy + y * ts); if (bx < ax === (sh.st === 1)) ctx.scale(-1, 1); ctx.fillText('⛵', 0, 0); ctx.restore();
+    if (b.type !== 'port') continue;
+    b.ships.forEach((s, i) => {
+      const d = getB(s.dest); if (!d) return;
+      const [ax, ay] = cpos(b.x, b.y), [bx, by] = cpos(d.x, d.y), oy2 = 0.45 + i * 0.35;
+      if (UI.sel === b) { ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.moveTo(ox + ax * ts, oy + (ay + oy2) * ts); ctx.lineTo(ox + bx * ts, oy + (by + oy2) * ts); ctx.stroke(); ctx.setLineDash([]); }
+      if (s.st === 0) return;
+      const f = s.st === 1 ? s.p : 1 - s.p, x = ax + (bx - ax) * f, y = ay + (by - ay) * f + oy2;
+      ctx.font = `${Math.max(14, ts * 0.7)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.save(); ctx.translate(ox + x * ts, oy + y * ts); if (bx < ax === (s.st === 1)) ctx.scale(-1, 1); ctx.fillText('⛵', 0, 0); ctx.restore();
+    });
   }
 }
 // 範囲のマスを塗って、外側の縁を太線で囲む
@@ -1476,7 +1614,7 @@ function drawBuilding(type, x, y, ox, oy, ts, mark, b) {
     ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(bx + bs / 2, by + bs / 2, bs / 2 + 1, 0, Math.PI * 2); ctx.fill();
     ctx.drawImage(sprite(RES_SPR[b.res]), bx + 1, by + 1, bs - 2, bs - 2);
   }
-  if (b && type === 'hive') { // 蜂の巣の数
+  if (b && BUILD[type].kind === 'hive') { // たまった数（蜂の巣・ミルク・ウール）
     ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(sx + ts * 0.05, sy + ts * 0.72, ts * 0.9, ts * 0.24);
     ctx.fillStyle = '#ffd34a'; ctx.font = `bold ${Math.max(8, ts * 0.2)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(b.combs, sx + ts / 2, sy + ts * 0.85);
   }
@@ -1587,7 +1725,7 @@ function onTap(sx, sy) {
   if (id) { UI.sel = getB(id); closeAll(false); openInfo(); return; }
   closeAll();
   const t = S.tiles[idx(x, y)];
-  if (t.res) toast(t.res.t === 'flower' ? '花畑（島レベル4以降で使います）' : t.res.t === 'cotton' ? `綿花畑 ${t.res.amt}/${t.res.max}（島レベル3以降で使います）` : `${resName(t.res.t)} ${t.res.amt}/${t.res.max}`);
+  if (t.res) toast(t.res.t === 'flower' ? '花畑（島レベル4以降で使います）' : t.res.t === 'cow' ? '牛（隣に搾乳機を置くとミルクがたまります）' : t.res.t === 'sheep' ? '羊（隣に羊毛機を置くとウールがたまります）' : t.res.t === 'cotton' ? `綿花畑 ${t.res.amt}/${t.res.max}（島レベル3以降で使います）` : `${resName(t.res.t)} ${t.res.amt}/${t.res.max}`);
 }
 
 // ============================================================
@@ -1677,7 +1815,7 @@ function showDetail(type) {
   modal(d.name, `<div>${d.desc}</div>${extra}<div style="margin-top:8px"><b>建築の材料</b>${costHtml(buildCost(type), true)}</div><div class="hint">今 ${countType(type)}棟</div>`);
 }
 function startPlace(type) {
-  UI.mode = 'place'; UI.placeType = type; UI.sel = null; UI.portA = null;
+  UI.mode = 'place'; UI.placeType = type; UI.sel = null;
   { const [px, py] = worldToTile(cam.x, cam.y); UI.px = Math.max(0, Math.min(MW - 1, px)); UI.py = Math.max(0, Math.min(N - 1, py)); }
   if (shownNew.length) { S.newTypes = S.newTypes.filter(t => !shownNew.includes(t)); shownNew = []; }
   $('buildmenu').classList.add('hidden'); showPlacePanel();
@@ -1685,34 +1823,12 @@ function startPlace(type) {
 function showPlacePanel() {
   const d = BUILD[UI.placeType];
   ISL = d.kind === 'port' ? 1 : islandOf(UI.px);   // 材料はその島の倉庫から（港は1島から）
+  if (d.kind === 'port') $('place-title').textContent = '港を配置（砂浜をタップ。材料は1島の倉庫から）';
   $('place-title').textContent = `${d.name} を配置（タップで位置変更）`;
   $('place-cost').innerHTML = costHtml(buildCost(UI.placeType), true) + (UI.placeType === 'house' && S.stage >= CONFIG.HOUSE_LV1_FROM ? '<div class="hint">島レベル6からは、最初から住居レベル1の自宅を建てます</div>' : '') + (d.kind === 'market' ? `<div class="hint">青い枠が配達できる範囲（${rangeText(CONFIG.MARKET.range)}）</div>` : d.kind === 'gather' && !d.noTile ? `<div class="hint">${AROUND}の資源から採ります</div>` : '');
-  if (d.kind === 'port') return showPortPlace();
   $('place-ok').disabled = !(canPlace(UI.placeType, UI.px, UI.py) && canAfford(buildCost(UI.placeType))); $('place-ok').textContent = '建築する';
   $('place-cancel').onclick = () => { UI.mode = 'normal'; $('placepanel').classList.add('hidden'); openBuildMenu(); };
   $('place-ok').onclick = () => { const b = build(UI.placeType, UI.px, UI.py); if (b) { UI.mode = 'normal'; $('placepanel').classList.add('hidden'); toast(`${d.name}を建てました`); save(); UI.sel = b; openInfo(); } };
-  $('placepanel').classList.remove('hidden');
-}
-// 港は2段階：1つ目の砂浜を選ぶ → もう片方の島の砂浜を選ぶ（材料は1島の倉庫から、1組ぶん）
-function showPortPlace() {
-  const A = UI.portA;
-  $('place-title').textContent = A ? `港（2つ目）：${islandOf(A[0]) === 1 ? 2 : 1}島の砂浜をタップ` : '港（1つ目）：どちらかの島の砂浜をタップ';
-  $('place-cost').innerHTML = costHtml(CONFIG.PORT.cost, true) + `<div class="hint">${A ? '2つ目の港は、1つ目と別の島の砂浜に置きます' : '港は砂浜（陸のまわりの黄色いマス）にだけ建てられます。1組で上の材料です'}</div>`;
-  const ok = A ? canPlacePortPair(A[0], A[1], UI.px, UI.py) && canAfford(CONFIG.PORT.cost) : canPlace('port', UI.px, UI.py) && canAfford(CONFIG.PORT.cost);
-  $('place-ok').disabled = !ok; $('place-ok').textContent = A ? '港を建てる' : '次へ';
-  $('place-cancel').onclick = () => { if (A) { UI.portA = null; [UI.px, UI.py] = A; showPortPlace(); return; } UI.mode = 'normal'; $('placepanel').classList.add('hidden'); openBuildMenu(); };
-  $('place-ok').onclick = () => {
-    if (!A) {
-      UI.portA = [UI.px, UI.py];
-      // もう片方の島へカメラを動かし、その島の砂浜の1マスを仮に選ぶ
-      const o = islOX(islandOf(UI.px) === 1 ? 2 : 1), c = Math.floor(N / 2); [cam.x, cam.y] = cpos(o + c, c).map(v => v * T); clampCam();
-      let best = null, bd = 1e9; for (let y = 0; y < N; y++) for (let x = o; x < o + N; x++) if (canPlace('port', x, y)) { const d = Math.abs(y - UI.py) * 3 + (o === 0 ? x : o + N - x);  /* 相手の島に近い側（2島は右側、1島は左側） */ if (d < bd) { bd = d; best = [x, y]; } }
-      if (best) { [UI.px, UI.py] = best; [cam.x, cam.y] = cpos(best[0], best[1]).map(v => v * T); clampCam(); }
-      showPortPlace(); return;
-    }
-    const r = buildPortPair(A[0], A[1], UI.px, UI.py);
-    if (r) { UI.mode = 'normal'; UI.portA = null; $('placepanel').classList.add('hidden'); toast('港を建てました'); save(); UI.sel = r[0]; openInfo(); }
-  };
   $('placepanel').classList.remove('hidden');
 }
 function showMovePanel() {
@@ -1748,7 +1864,7 @@ function renderInfo() {
     else st = '⛏ 採集中';
     h += status(st);
     h += `<div class="line"><span class="lbl">採集速度</span><span class="val">${b.workers ? (workSec(b) / b.workers / (boostTool(b) && b.boost > 0 ? 2 : 1)).toFixed(0) + '秒/個' + (boostTool(b) && b.boost > 0 ? ' <small>(道具で2倍)</small>' : '') : '停止'}</span></div>`;
-    if (b.res === 'honey') { const hs = S.buildings.filter(h => h.type === 'hive' && tileRange(h.x, h.y, b.x, b.y) <= CONFIG.GATHER_RANGE); h += `<div class="line"><span class="lbl">周りの巣箱</span><span class="val">${hs.length}個・蜂の巣 ${hs.reduce((a, x) => a + x.combs, 0)}</span></div>`; }
+    if (SRC_OF[b.res]) { const src = SRC_OF[b.res], hs = S.buildings.filter(h => h.type === src && tileRange(h.x, h.y, b.x, b.y) <= CONFIG.GATHER_RANGE); h += `<div class="line"><span class="lbl">周りの${BUILD[src].name}</span><span class="val">${hs.length}個・${BUILD[src].label} ${hs.reduce((a, x) => a + x.combs, 0)}</span></div>`; }
     else if (!d.noTile) { let a = 0, m = 0; for (const [x, y] of tilesWithin(b.x, b.y, CONFIG.GATHER_RANGE)) { const t = S.tiles[idx(x, y)]; if (t.res && t.res.t === b.res && !occ[idx(x, y)]) { a += t.res.amt; m += t.res.max; } } h += `<div class="line"><span class="lbl">周りの${resName(b.res)}</span><span class="val">${a}/${m}</span></div>`; }
     h += `<div class="line"><span class="lbl">インベントリ</span><span class="val">${ITEMS[b.res].name} ${invCount(b.res)}/${invCap(b.res)}</span></div>`;
   } else if (d.kind === 'prod') {
@@ -1786,32 +1902,29 @@ function renderInfo() {
         (s.item ? `<span class="mkst">${s.stock}/${marketStock()}</span><button class="btn small mk-auto ${s.auto ? 'on' : ''}" data-i="${i}">${s.auto ? '自動' : '手動'}</button><button class="btn small mk-fill" data-i="${i}" ${s.stock >= marketStock() || !invCount(s.item) ? 'disabled' : ''}>補充</button>` : '') + `</div>`;
     });
   } else if (d.kind === 'port') {
-    const pb = getB(b.pair), sh = b.ship, oi = pb ? islandOf(pb.x) : 0, C = CONFIG.PORT;
-    h += `<div class="line"><span class="lbl">つながっている港</span><span class="val">${pb ? `<a class="jump-port">${bname(pb)}</a>` : 'なし'}</span></div>`;
+    const C = CONFIG.PORT, fmt = s => s >= 60 ? `${Math.floor(s / 60)}分${String(Math.floor(s % 60)).padStart(2, '0')}秒` : `${Math.ceil(s)}秒`;
+    const list = o => Object.entries(o || {}).map(([k, v]) => ITEMS[k].name + v).join('・') || 'なし';
     h += workersLine();
-    const cg = Object.entries(sh.cargo || {}).map(([k, v]) => ITEMS[k].name + v).join('・');
-    const fmt = s => s === Infinity ? '—' : s >= 60 ? `${Math.floor(s / 60)}分${String(Math.floor(s % 60)).padStart(2, '0')}秒` : `${Math.ceil(s)}秒`;
-    let st;
-    if (sh.st === 1 && sh.p >= 1) st = `📦 ${oi}島の倉庫がいっぱいで、荷物を降ろせません（${cg}）`;
-    else if (!b.workers) st = sh.st ? '⏸ 作業員がいないので、船が止まっています' : '⏸ 停止中（作業員を置くと船が出ます）';
-    else if (sh.st === 1) st = `⛵ ${oi}島へ運んでいます（あと${fmt(shipLeft(b))}）：${cg}`;
-    else if (sh.st === 2) st = `⛵ 戻っています（あと${fmt(shipLeft(b))}）`;
-    else st = '⚓ 荷物を待っています（輸出スロットに品を入れましょう）';
-    h += status(st);
-    h += `<div class="line"><span class="lbl">船</span><span class="val">片道 ${b.workers ? fmt(C.oneWaySec / b.workers) : '—'}・1回に各スロット${C.load}個まで</span></div>`;
-    h += `<div class="sub">輸出 <small>（${oi || '相手の'}島の倉庫に自動で入ります）</small></div>`;
-    b.exp.forEach((s, i) => {
-      h += `<div class="mkslot"><button class="recipe-btn pt-item" data-i="${i}">${s.item ? ITEMS[s.item].name : '（なし）'}</button>` +
-        (s.item ? `<span class="mkst">${s.stock}/${C.stock}</span><button class="btn small pt-auto ${s.auto ? 'on' : ''}" data-i="${i}">${s.auto ? '自動' : '手動'}</button><button class="btn small pt-fill" data-i="${i}" ${s.stock >= C.stock || !invCount(s.item) ? 'disabled' : ''}>補充</button>` : '') + `</div>`;
+    h += `<div class="hint" style="text-align:left">作業員1人で船1隻（${C.workers}隻まで）。片道${fmt(C.oneWaySec)}・1回に${C.capacity}個まで。運送中の船の作業員は外せません</div>`;
+    b.ships.forEach((s, i) => {
+      const d = getB(s.dest), on = shipActive(b, i);
+      let st;
+      if (s.st === 1) st = s.p >= 1 ? `📦 ${d ? bname(d) : '行き先'}の倉庫がいっぱいで降ろせません` : `⛵ ${d ? bname(d) : '行き先'}へ（あと${fmt(shipLeft(s))}）：${list(s.cargo)}`;
+      else if (s.st === 2) st = `⛵ 戻っています（あと${fmt(shipLeft(s))}）：${list(s.cargo)}`;
+      else if (loadSum(s.cargo)) st = '📦 倉庫がいっぱいで、帰りの荷物を降ろせません';
+      else if (!on) st = '⏸ 作業員がいません';
+      else if (!d) st = '⚓ 行き先と荷物を決めてください';
+      else st = '⚓ 積む品が倉庫にありません（届くのを待っています）';
+      h += `<div class="shipbox ${on ? '' : 'off'}"><div class="line"><span class="lbl"><b>船${i + 1}</b> <small>${st}</small></span><button class="btn small ship-set" data-i="${i}" ${on || shipBusy(s) ? '' : 'disabled'}>設定</button></div>` +
+        `<div class="line"><span class="lbl"><small>行き先：${d ? bname(d) : 'なし'}<br>行き：${list(s.go)}　帰り：${list(s.back)}</small></span></div>` +
+        (s.next ? `<div class="line"><span class="lbl"><small>🕒 予約：${s.next === 'stop' ? 'この運送で終わり' : `${getB(s.next.dest) ? bname(getB(s.next.dest)) : 'なし'}へ 行き ${list(s.next.go)}・帰り ${list(s.next.back)}`}</small></span></div>` : '') + `</div>`;
     });
-    h += `<div class="hint" style="text-align:left">自動補充は、この島の倉庫から確保を除いた在庫を入れます</div>`;
-    const imp = pb ? pb.exp.filter(s => s.item) : [];
-    h += `<div class="sub">輸入 <small>（${oi}島の港から届く品）</small></div>`;
-    h += imp.length ? imp.map(s => `<div class="line"><span class="lbl">${ITEMS[s.item].name}</span><span class="val">${oi}島の港に ${s.stock}個</span></div>`).join('') : `<div class="hint">${oi}島の港の輸出スロットに品を入れると、この島に届きます</div>`;
+    if (!portDests(b).length) h += `<div class="hint red" style="text-align:left">⚠ ほかの島に港がありません。行き先にする港をほかの島の砂浜に建てましょう</div>`;
   } else if (d.kind === 'hive') {
-    h += gaugeLine('蜂の巣', b.combs, CONFIG.COMB_MAX);
-    h += status(nearFlower(b.x, b.y) ? (b.combs >= CONFIG.COMB_MAX ? '🐝 満杯です' : `🐝 ${CONFIG.COMB_SEC}秒に1個たまります`) : '🌼 隣に花畑がありません（移動してください）');
-    h += `<div class="hint" style="text-align:left">作業員はいりません。島レベル5で養蜂場ができると、ここからハチミツを採れます。</div>`;
+    const near = nearRes(b.x, b.y, d.near), ic = { hive: '🐝', milker: '🐄', shearer: '🐑' }[b.type];
+    h += gaugeLine(d.label, b.combs, CONFIG.COMB_MAX);
+    h += status(near ? (b.combs >= CONFIG.COMB_MAX ? `${ic} 満杯です` : `${ic} ${CONFIG.COMB_SEC}秒に1個たまります`) : `⚠ 隣に${resName(d.near === 'flower' ? 'flower' : d.near)}がありません（移動してください）`);
+    h += `<div class="hint" style="text-align:left">作業員はいりません。${b.type === 'hive' ? '島レベル5で養蜂場ができると、ここからハチミツを採れます。' : '農場が周りの' + d.name + 'から' + ITEMS[d.out].name + 'を集めます。'}</div>`;
   } else if (d.kind === 'house') {
     const rs = residentsOf(b);
     const hc = houseUpCost(b);
@@ -1839,10 +1952,8 @@ function renderInfo() {
   const msu = $('mk-slot'); if (msu) msu.onclick = () => { if (marketSlotUp(b)) save(); renderInfo(); };
   const hu = $('house-up'); if (hu) hu.onclick = () => { if (houseUp(b)) save(); renderInfo(); };
   document.querySelectorAll('.mk-item').forEach(el => el.onclick = () => pickMarketItem(b, +el.dataset.i));
-  document.querySelectorAll('.pt-item').forEach(el => el.onclick = () => pickPortItem(b, +el.dataset.i));
-  document.querySelectorAll('.pt-auto').forEach(el => el.onclick = () => { const s = b.exp[+el.dataset.i]; s.auto = !s.auto; save(); renderInfo(); });
-  document.querySelectorAll('.pt-fill').forEach(el => el.onclick = () => { const n = portFillManual(b, +el.dataset.i); toast(n ? `${n}個 入れました` : '入れられる在庫がありません'); save(); renderInfo(); });
-  document.querySelectorAll('.jump-port').forEach(el => el.onclick = () => { const pb = getB(b.pair); if (!pb) return; [cam.x, cam.y] = cpos(pb.x, pb.y).map(v => v * T); clampCam(); UI.sel = pb; renderInfo(); });
+  document.querySelectorAll('.ship-set').forEach(el => el.onclick = () => editShip(b, +el.dataset.i));
+  if (b.ships && wm) wm.onclick = () => { const n = b.workers; setWorkers(b, n - 1); if (b.workers === n && n > 0) toast('運送中の船の作業員は外せません'); renderInfo(); };
   document.querySelectorAll('.mk-auto').forEach(el => el.onclick = () => { const s = b.slots[+el.dataset.i]; s.auto = !s.auto; save(); renderInfo(); });
   document.querySelectorAll('.mk-fill').forEach(el => el.onclick = () => { const n = marketRefillManual(b, +el.dataset.i); toast(n ? `${n}個 補充しました` : '補充できる在庫がありません'); save(); renderInfo(); });
   $('a-move').onclick = () => { UI.mode = 'move'; UI.moveB = b; UI.px = b.x; UI.py = b.y; $('infopanel').classList.add('hidden'); showMovePanel(); };
@@ -1855,15 +1966,29 @@ function renderInfo() {
     modal('取り壊しの確認', note, () => { demolish(b); UI.sel = null; $('infopanel').classList.add('hidden'); toast(`${BUILD[b.type].name}を取り壊しました`); save(); }, true);
   };
 }
-// 港の輸出スロットに入れる品（この島の倉庫にある品なら何でも）
-function pickPortItem(b, i) {
-  ISL = islandOf(b.x);
-  const cand = ST().invOrder.slice();   // 同じ品を複数のスロットに入れてもよい（1回に多く運べる）
-  let h = `<div class="line"><button class="recipe-btn pick" data-it="">（なし）</button></div>`;
-  for (const k of cand) h += `<div class="mkrow2"><button class="recipe-btn pick" data-it="${k}">${ITEMS[k].name}</button><div class="mkinfo"><div class="mksub">在庫 ${invAvail(k)}${reserveOf(k) ? `（＋確保${Math.min(reserveOf(k), invCount(k))}）` : ''}</div></div></div>`;
-  if (!cand.length) h += '<div class="hint">この島の倉庫に品がありません</div>';
-  modal('輸出する品を選ぶ', h);
-  document.querySelectorAll('.pick').forEach(el => el.onclick = () => { setPortItem(b, i, el.dataset.it || null); $('modal').classList.add('hidden'); renderInfo(); save(); });
+// 船の設定：行き先の港と、行きの荷物・帰りの荷物（それぞれ10個まで、組み合わせ自由）
+function editShip(b, i) {
+  const s = b.ships[i], C = CONFIG.PORT, base = s.next && s.next !== 'stop' ? s.next : s;
+  const dests = portDests(b);
+  const E = UI.shipEdit && UI.shipEdit.b === b.id && UI.shipEdit.i === i ? UI.shipEdit : (UI.shipEdit = { b: b.id, i, dest: base.dest && getB(base.dest) ? base.dest : (dests[0] ? dests[0].id : null), go: { ...base.go }, back: { ...base.back } });
+  const d = getB(E.dest);
+  const rows = (key, isl) => {
+    const o = E[key], keys = [...new Set([...Object.keys(o), ...ST(isl).invOrder])];
+    return keys.map(k => `<div class="line"><span class="lbl">${ITEMS[k].name} <small>（${isl}島の在庫 ${withIsl(isl, () => invAvail(k))}）</small></span><button class="btn small se-n" data-key="${key}" data-k="${k}" data-d="-1" ${o[k] ? '' : 'disabled'}>－</button><b style="min-width:2em;text-align:center;display:inline-block">${o[k] || 0}</b><button class="btn small se-n" data-key="${key}" data-k="${k}" data-d="1" ${loadSum(o) < C.capacity ? '' : 'disabled'}>＋</button></div>`).join('') || '<div class="hint">倉庫に品がありません</div>';
+  };
+  let h = `<div class="sub">行き先</div><div class="resbtns">${dests.map(o => `<button class="btn small se-dest ${E.dest === o.id ? 'on' : ''}" data-id="${o.id}">${bname(o)}</button>`).join('') || '<span class="red">ほかの島に港がありません</span>'}</div>`;
+  if (d) {
+    h += `<div class="sub">行きの荷物 <small>${loadSum(E.go)}/${C.capacity}個（${islandOf(b.x)}島の倉庫から）</small></div>` + rows('go', islandOf(b.x));
+    h += `<div class="sub">帰りの荷物 <small>${loadSum(E.back)}/${C.capacity}個（${islandOf(d.x)}島の倉庫から）</small></div>` + rows('back', islandOf(d.x));
+  }
+  h += `<div class="hint" style="text-align:left">${shipBusy(s) ? '運送中なので、決定すると予約になり、港に戻ってから変わります。' : '決定すると、すぐに運送を始めます。'}在庫が足りないときは、あるものだけ積んで出ます。設定は運送をやめるまで続きます</div>`;
+  h += `<div class="row"><button class="btn danger" id="se-stop">${shipBusy(s) ? 'この運送で終わりにする' : '運送をやめる'}</button><button class="btn primary" id="se-ok" ${d && (loadSum(E.go) || loadSum(E.back)) ? '' : 'disabled'}>決定</button></div>`;
+  modal(`${bname(b)}・船${i + 1}`, h);
+  $('modal-ok').textContent = '閉じる'; $('modal-ok').onclick = () => { UI.shipEdit = null; $('modal').classList.add('hidden'); };
+  document.querySelectorAll('.se-dest').forEach(el => el.onclick = () => { if (E.dest !== +el.dataset.id) { E.dest = +el.dataset.id; E.back = {}; } editShip(b, i); });
+  document.querySelectorAll('.se-n').forEach(el => el.onclick = () => { const o = E[el.dataset.key], k = el.dataset.k; o[k] = Math.max(0, (o[k] || 0) + +el.dataset.d); if (!o[k]) delete o[k]; editShip(b, i); });
+  $('se-ok').onclick = () => { const r = setShipPlan(b, i, { dest: E.dest, go: E.go, back: E.back }); toast(r === 'reserved' ? '予約しました（港に戻ったら変わります）' : '運送を始めます'); UI.shipEdit = null; $('modal').classList.add('hidden'); save(); renderInfo(); };
+  $('se-stop').onclick = () => { const r = setShipPlan(b, i, null); toast(r === 'reserved' ? 'この運送で終わりにします' : '運送をやめました'); UI.shipEdit = null; $('modal').classList.add('hidden'); save(); renderInfo(); };
 }
 function pickMarketItem(m, i) {
   const cand = ST().invOrder.filter(k => ITEMS[k].cat && itemCounts(k));
