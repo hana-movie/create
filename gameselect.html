@@ -67,6 +67,7 @@
   .g6 { --c: #ffd36b; --d: #d9a21f; --bg: #fdf2f8; }
   .g7 { --c: #7fd3a8; --d: #3fa673; --bg: #fff4d6; }
   .g8 { --c: #f0b25a; --d: #c47f1f; --bg: #fff6df; }
+  .g9 { --c: #6cc8e8; --d: #2b93bd; --bg: #fffdf7; }
 </style>
 </head>
 <body>
@@ -136,6 +137,14 @@
         <div class="name">マージ・ベーカリー</div>
         <div class="desc">おなじ ものを かさねて ちゅうもんを かなえよう！</div>
         <div class="stars">★★☆</div>
+      </div>
+    </a>
+    <a class="game g9" href="rakugaki_move/index.html">
+      <canvas class="thumb" id="th9"></canvas>
+      <div class="body">
+        <div class="name">うごく おえかき</div>
+        <div class="desc">かいた えに めだまが ついて うごきだす！</div>
+        <div class="stars">★☆☆</div>
       </div>
     </a>
   </div>
@@ -480,6 +489,64 @@
     }
     c.strokeStyle = '#f08a24'; c.lineWidth = 5; c.setLineDash([8, 7]);
     c.beginPath(); c.moveTo(70, 110); c.quadraticCurveTo(100, 64, 128, 100); c.stroke(); c.setLineDash([]);
+  }
+
+  // 9. うごく おえかき
+  {
+    const c = setup('th9');
+    c.fillStyle = '#fffdf7'; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(180,160,200,.22)';
+    for (let y = 14; y < H; y += 26) for (let x = 14; x < W; x += 26) { c.beginPath(); c.arc(x, y, 1.6, 0, Math.PI * 2); c.fill(); }
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    const eyes = (x, y, r, lx, ly) => {
+      for (const s of [-1, 1]) {
+        c.fillStyle = '#fff'; c.strokeStyle = '#3a3340'; c.lineWidth = r * .18;
+        c.beginPath(); c.arc(x + s * r * 1.25, y, r, 0, Math.PI * 2); c.fill(); c.stroke();
+        c.fillStyle = '#2b2430'; c.beginPath(); c.arc(x + s * r * 1.25 + lx * r * .38, y + ly * r * .38, r * .52, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(x + s * r * 1.25 + lx * r * .38 - r * .18, y + ly * r * .38 - r * .2, r * .17, 0, Math.PI * 2); c.fill();
+      }
+    };
+    const star = (x, y, r, col) => {
+      c.fillStyle = col; c.beginPath(); c.moveTo(x, y - r);
+      for (let i = 1; i <= 4; i++) { const a = i * Math.PI / 2 - Math.PI / 2; c.quadraticCurveTo(x, y, x + Math.cos(a) * r, y + Math.sin(a) * r); }
+      c.fill();
+    };
+    // かきかけの え（てんせん と タイマー）
+    c.strokeStyle = '#ff9f1c'; c.lineWidth = 9;
+    c.beginPath(); c.moveTo(42, 212); c.quadraticCurveTo(70, 180, 98, 212); c.quadraticCurveTo(122, 240, 146, 208); c.stroke();
+    c.setLineDash([9, 7]); c.lineWidth = 3; c.strokeStyle = 'rgba(255,120,170,.85)';
+    c.strokeRect(28, 176, 132, 62); c.setLineDash([]);
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(160, 176, 17, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#ff7fb0'; c.lineWidth = 5;
+    c.beginPath(); c.arc(160, 176, 12, -Math.PI / 2, Math.PI * .9); c.stroke();
+    star(160, 176, 7, '#ffcf2e');
+    // うごきだした あかい まる
+    c.save(); c.translate(118, 112); c.rotate(-0.15); c.scale(0.95, 0.8);
+    c.strokeStyle = '#ff4b4b'; c.lineWidth = 10;
+    c.beginPath(); c.ellipse(0, 0, 52, 46, 0, 0, Math.PI * 2); c.stroke();
+    eyes(0, -6, 13, 1, 0.2);
+    c.restore();
+    c.strokeStyle = 'rgba(255,75,75,.35)'; c.lineWidth = 5;
+    for (const [y, l] of [[96, 30], [114, 40], [132, 26]]) { c.beginPath(); c.moveTo(66 - l * .3, y); c.lineTo(66 - l, y); c.stroke(); }
+    // ぴょんぴょん みどり
+    c.fillStyle = 'rgba(40,60,40,.12)'; c.beginPath(); c.ellipse(300, 244, 40, 6, 0, 0, Math.PI * 2); c.fill();
+    c.save(); c.translate(300, 140); c.scale(0.85, 0.85);
+    c.fillStyle = '#3fc25a'; c.strokeStyle = '#2f9e47'; c.lineWidth = 6;
+    c.beginPath(); c.moveTo(-44, 30); c.quadraticCurveTo(-50, -34, 0, -40); c.quadraticCurveTo(50, -34, 44, 30); c.quadraticCurveTo(0, 46, -44, 30); c.fill(); c.stroke();
+    c.lineWidth = 8; c.strokeStyle = '#3fc25a';
+    c.beginPath(); c.moveTo(-20, 38); c.lineTo(-26, 66); c.moveTo(20, 38); c.lineTo(26, 66); c.stroke();
+    eyes(0, -12, 12, 0, -0.6);
+    c.restore();
+    c.strokeStyle = 'rgba(63,194,90,.55)'; c.lineWidth = 4; c.setLineDash([6, 8]);
+    c.beginPath(); c.moveTo(236, 238); c.quadraticCurveTo(240, 150, 262, 120); c.stroke(); c.setLineDash([]);
+    // ハート と きらきら
+    c.fillStyle = '#ff6fa8';
+    c.save(); c.translate(356, 84); c.beginPath(); c.moveTo(0, 6);
+    c.bezierCurveTo(-20, -7, -8, -20, 0, -8); c.bezierCurveTo(8, -20, 20, -7, 0, 6); c.fill(); c.restore();
+    star(206, 78, 10, '#ffd425'); star(226, 160, 7, '#8fd3ff'); star(370, 168, 8, '#b98cff'); star(196, 214, 7, '#ff9ac0');
+    c.font = '40px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.save(); c.translate(350, 222); c.rotate(-0.2); c.fillText('🐟', 0, 0); c.restore();
   }
 })();
 </script>
