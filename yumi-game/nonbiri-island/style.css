@@ -9,7 +9,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e4d2b;
   background: rgba(20,40,25,.8); color: #fff; font-size: 13px; z-index: 5; }
 .stat { background: rgba(255,255,255,.12); padding: 5px 7px; border-radius: 10px; white-space: nowrap; flex: 0 0 auto; }
 #st-free { flex: 0 0 auto; }
-#topbar .topbtns { display: flex; gap: 4px; margin-left: auto !important; flex: 0 0 auto; }
+/* 上のバーは常に2段：1段目が数字、2段目がボタン（右寄せ） */
+#topbar .topbtns { display: flex; gap: 4px; margin-left: auto !important; flex: 1 0 100%; justify-content: flex-end; }
 .icon-btn { background: rgba(255,255,255,.15); border: 0; color: #fff; font-size: 16px;
   width: 32px; height: 32px; border-radius: 9px; flex: 0 0 auto; padding: 0; }
 
