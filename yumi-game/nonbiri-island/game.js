@@ -5,7 +5,7 @@
    仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.33.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.34.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数 ----------
 const CONFIG = {
@@ -79,7 +79,7 @@ const CONFIG = {
   EXTRA: {
     stage: 10,
     inv:     { name: '倉庫の拡張', cost: [5000, 10000, 20000, 40000, 80000], cap: 100, stock: 10 },  // 島全体。1回ごとにインベントリ上限+100、市場の在庫上限+10
-    range:   { name: '配達範囲の拡大', cost: [5000, 15000] },                // 市場ごと。1回ごとに配達範囲+1
+    range:   { name: '配達範囲の拡大', cost: [5000, 15000], stage: 8 },   // v0.34：島レベル8から                // 市場ごと。1回ごとに配達範囲+1
     dual:    { name: '2つのレシピ', cost: [3000] },                           // 生産施設ごと。2つのレシピを交互に作る
     workers: { name: '作業員の上限アップ', cost: [3000, 6000, 12000] },       // 施設ごと。1回ごとに作業員の上限+1
   },
@@ -111,7 +111,6 @@ const ITEMS = {
   bread:  { name: 'パン',   color: '#c07a2a', tier: 2, cat: 'food' },
   honey:  { name: 'ハチミツ', color: '#d89a10', tier: 0, time: 10, cat: 'food' },   // 養蜂場で巣箱から採る
   polish: { name: '磨き石', color: '#7a8a9a', tier: 1, cat: 'luxury' },
-  jam:    { name: 'オレンジジャム', color: '#d8601a', tier: 2, cat: 'food' },
   cloth:  { name: '布',     color: '#9a7aaa', tier: 2, cat: 'cloth' },
   bed:    { name: '木のベッド', color: '#8a5a3a', tier: 3 },   // 住居のアップグレードの材料
   obread: { name: 'オレンジパン', color: '#d07a20', tier: 3, cat: 'food' },
@@ -156,7 +155,6 @@ const RECIPES = {
   bread:   { out: 'bread',   need: { flour: 1, water: 1, wood: 1 }, fuel: 'wood', buy: true },
   cloth:   { out: 'cloth',   need: { thread: 2 }, buy: true },
   polish:  { out: 'polish',  need: { stone: 1, water: 1 }, buy: true },
-  jam:     { out: 'jam',     need: { juice: 1, honey: 1, wood: 1 }, fuel: 'wood', buy: true },
   bed:     { out: 'bed',     need: { plank: 5 }, buy: true },
   obread:  { out: 'obread',  need: { flour: 1, orange: 1, water: 1, honey: 1, wood: 1 }, fuel: 'wood', buy: true },
   clothes: { out: 'clothes', need: { thread: 1, cloth: 1 }, buy: true },
@@ -176,7 +174,7 @@ const RECIPES = {
   gfish:   { out: 'gfish',   need: { fish: 1, wood: 1 }, fuel: 'wood', buy: true },
   sfish:   { out: 'sfish',   need: { fish: 1, herb: 1, water: 1, wood: 1 }, fuel: 'wood', buy: true },
   fpie:    { out: 'fpie',    need: { fish: 1, flour: 1, orange: 1, honey: 1, herb: 1, water: 1, wood: 1 }, fuel: 'wood', buy: true },
-  otea:    { out: 'otea',    need: { jam: 1, tea: 1 }, buy: true },
+  otea:    { out: 'otea',    need: { juice: 1, tea: 1 }, buy: true },   // オレンジジャム廃止（v0.34）でオレンジジュース＋ハーブ茶に
   kitchen: { out: 'kitchen', need: { polish: 2 }, buy: true },
 };
 (function initItems() {
@@ -216,11 +214,11 @@ const BUILD = {
   coffee:  { name: 'コーヒースタンド', cat: 'prod', kind: 'prod', recipes: ['roast', 'hotcof'], cost: { plank: 10, brick: 10 }, desc: 'コーヒー豆＋木材（燃料） → 焙煎コーヒー豆、焙煎コーヒー豆＋水＋木材（燃料） → ホットコーヒー（レシピ購入）' },
   soapworks:{ name: '石鹸工房', cat: 'prod', kind: 'prod', recipes: ['soapliq', 'soap'], cost: { plank: 10, brick: 10 }, desc: 'シャボンの実2＋水＋木材（燃料） → 石鹸液、石鹸液＋蜜蝋2＋木材（燃料） → 石鹸（レシピ購入）' },
   smithy:  { name: '鍛冶屋', cat: 'prod', kind: 'prod', recipes: ['ingot', 'plate', 'spoon'], cost: { plank: 10, brick: 10 }, desc: '銅鉱石＋木材（燃料） → 銅インゴット、銅インゴット2＋木材 → 銅板、銅板＋木材＋水 → 銅のスプーン（レシピ購入）' },
-  drinks:  { name: '飲料工房', cat: 'prod', kind: 'prod', recipes: ['juice', 'tea', 'otea'], cost: { plank: 10, brick: 5 }, desc: 'オレンジ＋水 → オレンジジュース、ハーブ＋水＋ハチミツ＋木材（燃料） → ハーブ茶、オレンジジャム＋ハーブ茶 → ホットオレンジティー（レシピ購入。1施設で1レシピ）' },
+  drinks:  { name: '飲料工房', cat: 'prod', kind: 'prod', recipes: ['juice', 'tea', 'otea'], cost: { plank: 10, brick: 5 }, desc: 'オレンジ＋水 → オレンジジュース、ハーブ＋水＋ハチミツ＋木材（燃料） → ハーブ茶、オレンジジュース＋ハーブ茶 → ホットオレンジティー（レシピ購入。1施設で1レシピ）' },
   sawmill: { name: '製材所', cat: 'prod', kind: 'prod', recipes: ['plank'], cost: { wood: 10 }, desc: '木材2 → 板材' },
   mason:   { name: '石工所', cat: 'prod', kind: 'prod', recipes: ['brick'], cost: { plank: 10, stone: 10 }, desc: '石材2 → 石レンガ（レシピ購入）' },
   mill:    { name: '製粉所', cat: 'prod', kind: 'prod', recipes: ['flour'], cost: { plank: 10, brick: 5 }, desc: '小麦2 → 小麦粉（レシピ購入）' },
-  food:    { name: '食品工房', cat: 'prod', kind: 'prod', recipes: ['bread', 'jam', 'obread', 'gfish', 'sfish', 'fpie'], cost: { plank: 10, brick: 5 }, desc: '小麦粉＋水＋木材（燃料） → パン など（レシピ購入。1施設で1レシピ）。2島の魚の料理も作れます' },
+  food:    { name: '食品工房', cat: 'prod', kind: 'prod', recipes: ['bread', 'obread', 'gfish', 'sfish', 'fpie'], cost: { plank: 10, brick: 5 }, desc: '小麦粉＋水＋木材（燃料） → パン など（レシピ購入。1施設で1レシピ）。2島の魚の料理も作れます' },
   spinner: { name: '紡績所', cat: 'prod', kind: 'prod', recipes: ['thread', 'cloth', 'thread_w'], cost: { plank: 10, brick: 5 }, desc: '綿2 → 糸、糸2 → 布（レシピ購入。1施設で1レシピ）' },
   polisher:{ name: '研磨所', cat: 'prod', kind: 'prod', recipes: ['polish', 'shine'], cost: { plank: 10, brick: 10 }, desc: '石材＋水 → 磨き石、磨き石2＋水2 → 輝き石（レシピ購入。1施設で1レシピ）' },
   pharmacy:{ name: '薬局', cat: 'prod', kind: 'prod', recipes: ['oint', 'comp'], cost: { plank: 10, brick: 10 }, desc: 'ハーブ＋水 → 軟膏、軟膏＋布 → 湿布（レシピ購入。1施設で1レシピ）' },
@@ -237,7 +235,7 @@ for (const t in BUILD) BUILD[t].size = 1;
 // ---------- 島レベルと目標 ----------
 // goal: prog() が n 以上で達成。req のゴールが済むと表示。unlock は達成で解放される施設
 const pv = k => (S.stats[k] || 0);
-const L5ITEMS = ['water', 'wheat', 'orange', 'flour', 'juice', 'bread', 'cotton', 'thread', 'cloth', 'honey', 'polish', 'jam'];
+const L5ITEMS = ['water', 'wheat', 'orange', 'flour', 'juice', 'bread', 'cotton', 'thread', 'cloth', 'honey', 'polish'];
 const STAGES = [
   { n: 1, cap: 8, denom: { food: 2 }, items: ['water'], unlock: ['lumber'],
     intro: '島レベル1：水を配って住民を8人にしましょう',
@@ -278,7 +276,7 @@ const STAGES = [
       { id: 'd2', text: '巣箱を花畑の隣に1個置く', n: 1, prog: () => countType('hive') },
       { id: 'd3', text: '住民を36人にする', n: 36, prog: () => S.pop },
     ] },
-  { n: 5, cap: 44, denom: { food: 18, cloth: 8, luxury: 8 }, items: ['water', 'wheat', 'orange', 'flour', 'juice', 'bread', 'cotton', 'thread', 'cloth', 'honey', 'polish', 'jam'], unlock: ['apiary', 'polisher', 'furniture'],
+  { n: 5, cap: 44, denom: { food: 18, cloth: 8, luxury: 8 }, items: ['water', 'wheat', 'orange', 'flour', 'juice', 'bread', 'cotton', 'thread', 'cloth', 'honey', 'polish'], unlock: ['apiary', 'polisher', 'furniture'],
     intro: '島レベル5：贅沢品のカテゴリが始まりました（ハチミツ・磨き石・オレンジジャム、分母8）。衣に布が加わりました（分母8）',
     goals: [
       { id: 'e1', text: '研磨所を建てて磨き石を10個作る', n: 10, prog: () => pv('made_polish'), hint: '磨き石のレシピ（🪙800）が必要です' },
@@ -299,28 +297,28 @@ const STAGES = [
       { id: 'f5', text: '住居レベル1の割合を50%以上にする', n: 50, prog: () => Math.floor(housePct()), hint: '自宅をアップグレード（ベッド4＋1000コイン）' },
       { id: 'f6', text: '住民を56人にする', n: 56, prog: () => S.pop },
     ] },
-  { n: 7, cap: 68, house: 75, denom: { food: 26, cloth: 20, luxury: 20, hygiene: 4 }, items: [...L5ITEMS, 'obread', 'clothes', 'herb', 'oint', 'shine'], unlock: [],
+  { n: 7, cap: 68, house: 56, denom: { food: 26, cloth: 20, luxury: 20, hygiene: 4 }, items: [...L5ITEMS, 'obread', 'clothes', 'herb', 'oint', 'shine'], unlock: [],
     intro: '島レベル7：贅沢品に輝き石が加わりました（分母20）。住居レベル1の割合は75%が必要です',
     goals: [
       { id: 'g1', text: '研磨所で輝き石を10個作る', n: 10, prog: () => pv('made_shine'), hint: '輝き石のレシピ（🪙1000）を買い、研磨所のレシピを変えます' },
-      { id: 'g2', text: '住居レベル1の割合を75%以上にする', n: 75, prog: () => Math.floor(housePct()) },
+      { id: 'g2', text: '住居レベル1の割合を56%以上にする', n: 56, prog: () => Math.floor(housePct()) },
       { id: 'g3', text: '住民を68人にする', n: 68, prog: () => S.pop },
     ] },
-  { n: 8, cap: 80, house: 90, denom: { food: 26, cloth: 20, luxury: 20, hygiene: 10 }, items: [...L5ITEMS, 'obread', 'clothes', 'herb', 'oint', 'shine', 'tea'], unlock: [],
+  { n: 8, cap: 80, house: 63, denom: { food: 26, cloth: 20, luxury: 20, hygiene: 10 }, items: [...L5ITEMS, 'obread', 'clothes', 'herb', 'oint', 'shine', 'tea'], unlock: [],
     intro: '島レベル8：衛生にハーブ茶が加わりました（分母10）。住居レベル1の割合は90%が必要です',
     goals: [
       { id: 'h1', text: '飲料工房でハーブ茶を10個作る', n: 10, prog: () => pv('made_tea'), hint: 'ハーブ茶のレシピ（🪙1000）が必要です' },
-      { id: 'h2', text: '住居レベル1の割合を90%以上にする', n: 90, prog: () => Math.floor(housePct()) },
+      { id: 'h2', text: '住居レベル1の割合を63%以上にする', n: 63, prog: () => Math.floor(housePct()) },
       { id: 'h3', text: '住民を80人にする', n: 80, prog: () => S.pop },
     ] },
-  { n: 9, cap: 100, house: 100, denom: { food: 26, cloth: 20, luxury: 20, hygiene: 20 }, items: [...L5ITEMS, 'obread', 'clothes', 'herb', 'oint', 'shine', 'tea', 'comp'], unlock: [],
+  { n: 9, cap: 100, house: 69, denom: { food: 26, cloth: 20, luxury: 20, hygiene: 20 }, items: [...L5ITEMS, 'obread', 'clothes', 'herb', 'oint', 'shine', 'tea', 'comp'], unlock: [],
     intro: '島レベル9：衛生に湿布が加わりました（分母20）。すべての住居を住居レベル1にしましょう',
     goals: [
       { id: 'i1', text: '薬局で湿布を10個作る', n: 10, prog: () => pv('made_comp'), hint: '湿布のレシピ（🪙1000）が必要です' },
-      { id: 'i2', text: 'すべての住居を住居レベル1にする', n: 100, prog: () => Math.floor(housePct()) },
+      { id: 'i2', text: '住居レベル1の割合を69%以上にする', n: 69, prog: () => Math.floor(housePct()) },
       { id: 'i3', text: '住民を100人にする', n: 100, prog: () => S.pop },
     ] },
-  { n: 10, cap: Infinity, house: 100, denom: { food: 26, cloth: 20, luxury: 20, hygiene: 20 }, items: [...L5ITEMS, 'obread', 'clothes', 'herb', 'oint', 'shine', 'tea', 'comp'], unlock: [],
+  { n: 10, cap: Infinity, house: 75, denom: { food: 26, cloth: 20, luxury: 20, hygiene: 20 }, items: [...L5ITEMS, 'obread', 'clothes', 'herb', 'oint', 'shine', 'tea', 'comp'], unlock: [],
     intro: '島レベル10：自由モード。満足度を保てば、住居を置けるかぎり住民が増えます。コインで島を強化できます（📦倉庫の拡張、施設の作業員の上限アップ・2つのレシピ、市場の配達範囲の拡大）',
     goals: [
       { id: 'j1', text: '2島を買う（🪙10,000）', n: 1, prog: () => (S.isl2 ? 1 : 0), hint: '目標の画面（🎯）の「2島を買う」ボタンで買えます' },
@@ -493,7 +491,8 @@ function marketStock() { return CONFIG.MARKET.stock + (ST().invUp || 0) * CONFIG
 // ---------- 島レベル10の強化（コイン） ----------
 // key: inv（島全体）／range（市場）／dual（生産施設）／workers（施設）。b は施設（inv のときは null）
 function extraLv(key, b) { return key === 'inv' ? (ST().invUp || 0) : key === 'range' ? (b.rangeUp || 0) : key === 'dual' ? (b.dual ? 1 : 0) : (b.wUp || 0); }
-function extraCost(key, b) { return S.stage >= CONFIG.EXTRA.stage ? (CONFIG.EXTRA[key].cost[extraLv(key, b)] || null) : null; }
+function extraStage(key) { return CONFIG.EXTRA[key].stage || CONFIG.EXTRA.stage; }
+function extraCost(key, b) { return S.stage >= extraStage(key) ? (CONFIG.EXTRA[key].cost[extraLv(key, b)] || null) : null; }
 function extraOk(key, b) {
   if (key === 'inv') return true;
   const k = BUILD[b.type].kind;
@@ -553,7 +552,7 @@ function activeCats() { return Object.keys(denoms()); }
 // 住民1人のカテゴリ満足度（%）：ポイント × ゲージ ÷ 分母
 function resSat(r, cat) { const d = denoms()[cat]; if (!d) return 100; let p = 0; for (const k in r.demand) if (ITEMS[k].cat === cat && itemCounts(k)) p += ITEMS[k].pts * r.demand[k] / 100; return Math.min(100, p / d * 100); }
 function catSat(cat) { return S.residents.length ? S.residents.reduce((a, r) => a + resSat(r, cat), 0) / S.residents.length : 0; }
-function minSat() { const cs = activeCats(); return cs.length ? Math.min(...cs.map(catSat)) : 100; }
+function minSat() { const cs = activeCats(); return cs.length ? Math.min(...cs.map(catSat)) : 0; }   // 配れる品がまだ無いときは0%
 // 品物がそのカテゴリで今の島レベルに含まれるか（分母に入っている品）
 // 今の島レベルで満足度に数える品（分母に入っている品）。それ以外の品は届けても満足度にならない
 function stageItems() { return availItems(); }
@@ -685,7 +684,8 @@ function placeFish(r) {
 }
 // 前の版のセーブ：なくなった品・施設・レシピを片づける（返却なし）。ジュース・ハーブ茶は飲料工房へ
 function migrateV32() {
-  const GONE = ['lemon', 'milk', 'lemonade', 'lbread', 'milkcof'];
+  const GONE = ['lemon', 'milk', 'lemonade', 'lbread', 'milkcof', 'jam'];
+  for (const tl of S.tiles) if (tl.res && tl.res.t !== 'flower') tl.res.amt = tl.res.max;   // 資源マスは無くならない（v0.34）
   for (const st of [S, S.st2].filter(Boolean)) { for (const k of GONE) { delete st.inv[k]; delete st.reserve[k]; } st.invOrder = st.invOrder.filter(k => ITEMS[k]); }
   S.recipes = S.recipes.filter(r => RECIPES[r]);
   S.buildings = S.buildings.filter(b => BUILD[b.type]);
@@ -795,7 +795,7 @@ function boostLeftSec(b) { return b.workers ? (b.boost || 0) / b.workers : (b.bo
 // ---------- レシピ ----------
 function recipeOwned(r) { return !RECIPES[r].buy || S.recipes.includes(r); }
 // レシピの価格：そのレシピの品が初めて満足度・材料に使われる島レベルで決まる
-const RECIPE_LV = { roast: 10, hotcof: 10, thread_w: 10, soapliq: 10, soap: 10, ingot: 10, plate: 10, spoon: 10, gfish: 10, sfish: 10, fpie: 10, otea: 10, kitchen: 10, brick: 1, flour: 2, juice: 2, thread: 3, axe: 3, pickaxe: 3, scissors: 3, bread: 4, cloth: 5, polish: 5, jam: 5, bed: 5, obread: 6, clothes: 6, oint: 6, shine: 7, tea: 8, comp: 9 };
+const RECIPE_LV = { roast: 10, hotcof: 10, thread_w: 10, soapliq: 10, soap: 10, ingot: 10, plate: 10, spoon: 10, gfish: 10, sfish: 10, fpie: 10, otea: 10, kitchen: 10, brick: 1, flour: 2, juice: 2, thread: 3, axe: 3, pickaxe: 3, scissors: 3, bread: 4, cloth: 5, polish: 5, bed: 5, obread: 6, clothes: 6, oint: 6, shine: 7, tea: 8, comp: 9 };
 function recipeCost(r) { return CONFIG.RECIPE_COST_BY_LV[RECIPE_LV[r]] || CONFIG.RECIPE_COST; }
 // レシピはその品が使えるようになる島レベルから買える
 function recipeUnlocked(r) { if (r === 'kitchen') return (S.stats.popMax || S.pop) >= CONFIG.HOUSE_LV2.pop; return S.stage >= (RECIPE_LV[r] || 1); }
@@ -915,7 +915,8 @@ function stepBuilding0(b, dt, acc) {
     let mult = 1;
     if (boostTool(b) && b.boost > 0) { mult = 2; b.boost = Math.max(0, b.boost - dt * b.workers); }
     b.prog += dt * b.workers * mult / workSec(b);
-    while (b.prog >= 1) { b.prog -= 1; if (tg) tg.tile.amt--; invAdd(b.res, 1); made(b.res, acc); if (invRoom(b.res) <= 0 || (tg && tg.tile.amt <= 0)) { b.prog = 0; break; } }
+    // 資源マスは無くならない（v0.34）。巣箱・羊毛機にたまった分だけは減る
+    while (b.prog >= 1) { b.prog -= 1; if (tg && SRC_OF[b.res]) tg.tile.amt--; invAdd(b.res, 1); made(b.res, acc); if (invRoom(b.res) <= 0 || (tg && tg.tile.amt <= 0)) { b.prog = 0; break; } }
   } else if (d.kind === 'prod') {
     if (b.workers === 0 || !b.recipe) return;
     if (!b.active) {
@@ -937,7 +938,13 @@ function stepBuilding0(b, dt, acc) {
 }
 
 // ---------- セーブ ----------
-function save() { S.lastSave = Date.now(); try { localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(S)); } catch (e) { } }
+let NO_SAVE = false;   // 手動セーブを読み込んで再読み込みする間は、自動セーブしない
+function save() { if (NO_SAVE) return; S.lastSave = Date.now(); try { localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(S)); } catch (e) { } }
+// 手動セーブ：自動セーブとは別の場所に保存する。読み込むと、その時点に戻る
+const MANUAL_KEY = () => CONFIG.SAVE_KEY + '-manual';
+function manualSave() { save(); try { localStorage.setItem(MANUAL_KEY(), JSON.stringify(S)); return true; } catch (e) { return false; } }
+function manualInfo() { try { const j = localStorage.getItem(MANUAL_KEY()); if (!j) return null; const o = JSON.parse(j); return { time: o.lastSave, pop: o.pop, stage: o.stage, coins: o.coins }; } catch (e) { return null; } }
+function manualLoad() { try { const j = localStorage.getItem(MANUAL_KEY()); if (!j) return false; localStorage.setItem(CONFIG.SAVE_KEY, j); NO_SAVE = true; return true; } catch (e) { return false; } }
 // 旧セーブ（15×15・17×17の四角い島）を今の地図に移す：全体を真ん中にずらし、丸い島にする
 // 島の外になったマスに資源や施設があれば、そのマスは陸のまま残す。ハーブが無ければ左下・右下に足す
 function migrateMap() {
@@ -1823,7 +1830,7 @@ function onTap(sx, sy) {
   if (id) { UI.sel = getB(id); closeAll(false); openInfo(); return; }
   closeAll();
   const t = S.tiles[idx(x, y)];
-  if (t.res) toast(t.res.t === 'flower' ? '花畑（島レベル4以降で使います）' : t.res.t === 'fish' ? `魚影 ${t.res.amt}/${t.res.max}（砂浜の漁場から獲ります）` : t.res.t === 'copore' ? `銅鉱床 ${t.res.amt}/${t.res.max}（採掘所で銅鉱石を選びます）` : t.res.t === 'sheep' ? '羊（隣に羊毛機を置くとウールがたまります）' : t.res.t === 'cotton' ? `綿花畑 ${t.res.amt}/${t.res.max}（島レベル3以降で使います）` : `${resName(t.res.t)} ${t.res.amt}/${t.res.max}`);
+  if (t.res) toast(t.res.t === 'flower' ? '花畑（島レベル4以降で使います）' : t.res.t === 'fish' ? '魚影（砂浜の漁場から獲ります）' : t.res.t === 'copore' ? '銅鉱床（採掘所で銅鉱石を選びます）' : t.res.t === 'sheep' ? '羊（隣に羊毛機を置くとウールがたまります）' : t.res.t === 'cotton' ? '綿花畑（島レベル3以降で使います）' : `${resName(t.res.t)}（採っても無くなりません）`);
 }
 
 // ============================================================
@@ -2092,7 +2099,7 @@ function editShip(b, i) {
   $('se-stop').onclick = () => { const r = setShipPlan(b, i, null); toast(r === 'reserved' ? 'この運送で終わりにします' : '運送をやめました'); UI.shipEdit = null; $('modal').classList.add('hidden'); save(); renderInfo(); };
 }
 function pickMarketItem(m, i) {
-  const cand = ST().invOrder.filter(k => ITEMS[k].cat && itemCounts(k));
+  const ord = ST().invOrder, cand = ord.filter(k => ITEMS[k].cat && itemCounts(k)).sort((a, b) => CAT_ORDER.indexOf(ITEMS[a].cat) - CAT_ORDER.indexOf(ITEMS[b].cat) || ord.indexOf(a) - ord.indexOf(b));   // カテゴリ順
   let h = `<div class="line"><button class="recipe-btn pick" data-it="">（なし）</button></div>`;
   for (const k of cand) {
     if (m.slots.some((s, j) => j !== i && s.item === k)) continue;
@@ -2118,7 +2125,7 @@ function boostHtml(b) {
 }
 // 島レベル10の強化ボタン
 function extraLine(key, b) {
-  if (S.stage < CONFIG.EXTRA.stage || (b && !extraOk(key, b))) return '';
+  if (S.stage < extraStage(key) || (b && !extraOk(key, b))) return '';
   const c = extraCost(key, b), lv = extraLv(key, b), E = CONFIG.EXTRA[key];
   const desc = key === 'inv' ? `インベントリ上限 ${invCap()}${c ? '→' + (invCap() + E.cap) : ''}・市場の在庫 ${marketStock()}${c ? '→' + (marketStock() + E.stock) : ''}`
     : key === 'range' ? `${marketRange(b)}${c ? '→' + (marketRange(b) + 1) : ''}マス以内`
@@ -2235,11 +2242,15 @@ $('btn-reset').addEventListener('click', () => { if (UI.mode !== 'normal') retur
 function openSettings() {
   let h = `<div class="sub">難易度 <small>（人口が増えるのに必要な満足度。いつでも変えられます）</small></div><div class="row">` +
     Object.entries(CONFIG.DIFFICULTY).map(([k, v]) => `<button class="btn diff ${S.diff === k ? 'primary' : ''}" data-k="${k}">${v.name}<br><small>${v.need}%</small></button>`).join('') + `</div>`;
-  h += `<div class="sub" style="margin-top:12px">セーブ <small>（自動セーブもしています）</small></div><div class="row"><button class="btn primary" id="do-save">💾 今すぐセーブ</button></div><div class="hint">最後のセーブ：${S.lastSave ? new Date(S.lastSave).toLocaleString('ja-JP') : 'まだ'}</div>`;
+  const mi = manualInfo(), ft = ms => ms ? new Date(ms).toLocaleString('ja-JP') : 'まだ';
+  h += `<div class="sub" style="margin-top:12px">セーブ <small>（自動セーブは別に、いつもしています）</small></div>`;
+  h += `<div class="row"><button class="btn primary" id="do-save">💾 手動セーブ</button><button class="btn" id="do-load" ${mi ? '' : 'disabled'}>📂 手動セーブを読み込む</button></div>`;
+  h += `<div class="hint" style="text-align:left">手動セーブ：${mi ? `${ft(mi.time)}（島レベル${mi.stage}・人口${mi.pop}人・🪙${coinText(mi.coins)}）` : 'まだありません'}<br>自動セーブ：${ft(S.lastSave)}<br>読み込むと、手動セーブした時点に戻ります（今の進み具合は消えます）</div>`;
   h += `<div class="row" style="margin-top:14px"><button class="btn danger" id="do-reset">最初からやり直す</button></div><div class="hint">バージョン ${VERSION}　保存キー ${CONFIG.SAVE_KEY}</div>`;
   modal('設定', h);
   document.querySelectorAll('.diff').forEach(el => el.onclick = () => { S.diff = el.dataset.k; save(); openSettings(); });
-  $('do-save').onclick = () => { save(); toast('💾 セーブしました'); openSettings(); };
+  $('do-save').onclick = () => { toast(manualSave() ? '💾 手動セーブしました' : 'セーブできませんでした'); openSettings(); };
+  $('do-load').onclick = () => modal('手動セーブを読み込む', `<div>${ft(mi.time)} の手動セーブに戻ります。今の進み具合は消えます。</div>`, () => { if (manualLoad()) location.reload(); }, true);
   $('do-reset').onclick = () => modal('最初からやり直す', '<div>今の島のデータを消して、新しい島を始めます。元には戻せません。</div>', () => {
     try { localStorage.removeItem(CONFIG.SAVE_KEY); } catch (e) { }
     newGame(); villagers.length = 0; UI.mode = 'normal'; UI.sel = null; closeAll();
