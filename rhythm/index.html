@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffd6e7">
+<title>るんるん リズムステージ</title>
+<style>
+  :root{ --ink:#5a4466; --pink:#ff8fb8; --pink-d:#e8689a; --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px); }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  html,body{margin:0;height:100%;overflow:hidden;color:var(--ink);overscroll-behavior:none;
+    background:linear-gradient(180deg,#ffe0ef 0%,#fff2f8 45%,#e7e4ff 100%);
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Rounded Mplus 1c","Yu Gothic",system-ui,sans-serif}
+  .emo{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
+  button{font:inherit;color:var(--ink);border:none;cursor:pointer;touch-action:manipulation;padding:0}
+  .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    padding:calc(14px + var(--st)) 16px calc(14px + var(--sb));overflow:auto}
+  .screen.active{display:flex;animation:fade .3s ease}
+  @keyframes fade{from{opacity:0}}
+  .bg-stars{position:fixed;inset:0;pointer-events:none;z-index:-1;
+    background-image:radial-gradient(circle,#fff 1.5px,transparent 2px),radial-gradient(circle,#ffd1e6 2px,transparent 2.5px);
+    background-size:60px 60px,90px 90px;background-position:0 0,30px 45px;opacity:.8}
+
+  h1{margin:0;font-size:clamp(34px,10vw,60px);color:#ff6fa8;text-align:center;line-height:1.15;letter-spacing:.04em;
+    text-shadow:3px 3px 0 #fff,-3px -3px 0 #fff,3px -3px 0 #fff,-3px 3px 0 #fff,0 7px 0 rgba(255,111,168,.25)}
+  h1 small{display:block;font-size:.45em;color:#a07ad6;letter-spacing:.2em}
+  h2{margin:0;font-size:clamp(24px,6.5vw,36px);color:#ff6fa8;text-shadow:0 3px 0 #fff}
+  .big{display:flex;align-items:center;justify-content:center;gap:.4em;width:min(86vw,420px);min-height:76px;border-radius:999px;
+    font-size:clamp(22px,6vw,30px);font-weight:800;background:var(--pink);color:#fff;box-shadow:0 7px 0 var(--pink-d);text-shadow:0 2px 0 rgba(0,0,0,.12)}
+  .big:active{transform:translateY(5px);box-shadow:0 2px 0 var(--pink-d)}
+  .big.purple{background:#b493ff;box-shadow:0 7px 0 #8d6be0}
+  .big.yellow{background:#ffc94d;box-shadow:0 7px 0 #e0a62a}
+  .big.blue{background:#7cc8ff;box-shadow:0 7px 0 #4fa6e6}
+  .big.small{min-height:60px;font-size:clamp(18px,5vw,24px);width:auto;padding:0 24px}
+  .round{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.9);font-size:26px;box-shadow:0 4px 0 rgba(160,100,170,.25)}
+  .round:active{transform:translateY(3px)}
+  .corner{position:fixed;top:calc(10px + var(--st));z-index:5}
+  .corner.l{left:12px} .corner.r{right:12px}
+
+  .friends{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;background:rgba(255,255,255,.75);padding:10px 14px;border-radius:26px}
+  .friends .lb{width:100%;text-align:center;font-weight:800;font-size:16px}
+  .friend{width:54px;height:54px;border-radius:50%;background:#fff;font-size:32px;box-shadow:0 3px 0 rgba(0,0,0,.08)}
+  .friend.sel{box-shadow:0 0 0 4px #ff8fb8;transform:scale(1.1)}
+
+  .songs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;width:min(94vw,760px)}
+  .song{background:#fff;border-radius:24px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:4px;
+    border:5px solid var(--c);box-shadow:0 6px 0 var(--d)}
+  .song:active{transform:translateY(4px);box-shadow:0 2px 0 var(--d)}
+  .song .ic{font-size:46px;line-height:1.1}
+  .song .nm{font-weight:800;font-size:17px;text-align:center;line-height:1.3;color:var(--d);min-height:2.6em;display:flex;align-items:center}
+  .song .stk{font-size:18px;letter-spacing:2px;min-height:24px}
+  .song .stk .off{opacity:.18;filter:grayscale(1)}
+
+  .modal-back{position:fixed;inset:0;background:rgba(90,60,110,.35);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+  .modal-back.open{display:flex}
+  .card{background:#fff;border-radius:30px;padding:22px 20px;width:min(92vw,440px);display:flex;flex-direction:column;align-items:center;gap:12px;
+    box-shadow:0 12px 40px rgba(120,60,120,.25);max-height:92vh;overflow:auto}
+  .card .ttl{font-size:26px;font-weight:800;color:#ff6fa8;text-align:center}
+  .diffs{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+  .diff{border-radius:22px;padding:12px 6px;font-weight:800;font-size:19px;color:#fff;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .diff .s{font-size:22px} .diff .k{font-size:13px;opacity:.95}
+  .diff:active{transform:translateY(3px)}
+
+  #game{padding:0;gap:0;justify-content:flex-start}
+  #cv{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
+
+  #result .stars{font-size:clamp(54px,15vw,84px);letter-spacing:6px;height:1.2em}
+  #result .stars span{display:inline-block;opacity:0;transform:scale(0)}
+  #result .stars span.on{animation:star .5s cubic-bezier(.3,1.6,.5,1) forwards}
+  @keyframes star{to{opacity:1;transform:scale(1)}}
+  #result .counts{display:flex;gap:16px;font-size:20px;font-weight:800;background:rgba(255,255,255,.85);padding:10px 18px;border-radius:999px}
+  #result .sticker{display:flex;flex-direction:column;align-items:center;gap:16px;margin:8px 0;font-weight:800;font-size:20px}
+  #result .sticker .em{font-size:84px;width:130px;height:130px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 6px #ffd1e6,0 10px 24px rgba(255,111,168,.35);animation:spin 1s cubic-bezier(.3,1.5,.5,1)}
+  #result .sticker .em.gold{box-shadow:0 0 0 6px #ffd54a,0 0 30px rgba(255,213,74,.9)}
+  @keyframes spin{from{transform:rotate(-180deg) scale(0)}}
+
+  .book{display:grid;grid-template-columns:auto repeat(4,1fr);gap:8px 10px;align-items:center;background:rgba(255,255,255,.85);padding:14px;border-radius:26px;width:min(94vw,560px)}
+  .book .rh{font-size:28px;text-align:center}
+  .book .hd{font-size:13px;font-weight:800;text-align:center}
+  .book .cell{aspect-ratio:1;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:clamp(26px,7vw,38px);box-shadow:0 0 0 3px #ffe0ef}
+  .book .cell.off{color:#e8dcef;font-size:22px;font-weight:800;background:#faf6fc}
+  .book .cell.gold{box-shadow:0 0 0 3px #ffd54a,0 0 12px rgba(255,213,74,.8)}
+
+  .set label{display:flex;align-items:center;gap:10px;width:100%;font-weight:800}
+  .set input[type=range]{flex:1;accent-color:#ff8fb8;height:30px}
+  .seg{display:flex;gap:8px}
+  .seg button{padding:10px 14px;border-radius:999px;background:#f3eaf7;font-weight:800}
+  .seg button.sel{background:#ff8fb8;color:#fff}
+</style>
+</head>
+<body>
+<div class="bg-stars"></div>
+
+<!-- タイトル -->
+<section class="screen active" id="title">
+  <h1><small>♪ どうぶつ おんがくたい ♪</small>るんるん<br>リズムステージ</h1>
+  <button class="big" id="goRhythm"><span class="emo">🥁</span> リズムで あそぶ</button>
+  <button class="big purple" id="goPiano"><span class="emo">🎹</span> まほうの ピアノ</button>
+  <button class="big yellow" id="goBook"><span class="emo">📒</span> シール ちょう</button>
+  <div class="friends" id="friends"><div class="lb">いっしょに おどる おともだち</div></div>
+  <button class="round corner r emo" id="goSet" aria-label="せってい">⚙️</button>
+</section>
+
+<!-- うた えらび -->
+<section class="screen" id="songs">
+  <button class="round corner l emo" data-back="title" aria-label="もどる">🏠</button>
+  <h2 id="songsTitle">うたを えらんでね</h2>
+  <div class="songs" id="songList"></div>
+</section>
+
+<!-- ゲーム -->
+<section class="screen" id="game">
+  <canvas id="cv"></canvas>
+  <button class="round corner l emo" id="pauseBtn" aria-label="ひとやすみ">⏸️</button>
+</section>
+
+<!-- けっか -->
+<section class="screen" id="result">
+  <h2 id="resTitle">すてきな えんそう！</h2>
+  <div class="stars" id="resStars"><span>⭐</span><span>⭐</span><span>⭐</span></div>
+  <div class="counts" id="resCounts"></div>
+  <div class="sticker" id="resSticker"><div class="em emo" id="resEm"></div><div>シール ゲット！</div></div>
+  <button class="big" id="resAgain"><span class="emo">🔁</span> もういちど</button>
+  <button class="big blue small" id="resSongs">ほかの うた</button>
+</section>
+
+<!-- シール ちょう -->
+<section class="screen" id="bookScr">
+  <button class="round corner l emo" data-back="title" aria-label="もどる">🏠</button>
+  <h2><span class="emo">📒</span> シール ちょう</h2>
+  <div class="book" id="book"></div>
+  <div style="font-weight:800" id="bookCount"></div>
+</section>
+
+<!-- むずかしさ -->
+<div class="modal-back" id="diffModal">
+  <div class="card">
+    <div class="emo" style="font-size:54px" id="diffIcon"></div>
+    <div class="ttl" id="diffSong"></div>
+    <div class="diffs">
+      <button class="diff" style="background:#7fd6a0" data-diff="easy"><span class="s">⭐</span>かんたん<span class="k">たいこ だけ</span></button>
+      <button class="diff" style="background:#ffbe4d" data-diff="normal"><span class="s">⭐⭐</span>ふつう<span class="k">がっき 2つ</span></button>
+      <button class="diff" style="background:#ff8fb8" data-diff="hard"><span class="s">⭐⭐⭐</span>むずかしい<span class="k">がっき 3つ</span></button>
+      <button class="diff" style="background:#b493ff" data-diff="free"><span class="s emo">🎶</span>じゆうに<span class="k">すきに たたこう</span></button>
+    </div>
+    <button class="big blue small" id="diffClose">やめる</button>
+  </div>
+</div>
+
+<!-- ひとやすみ -->
+<div class="modal-back" id="pauseModal">
+  <div class="card">
+    <div class="ttl">ひとやすみ</div>
+    <button class="big" id="resume"><span class="emo">▶️</span> つづける</button>
+    <button class="big blue small" id="quit">やめる</button>
+  </div>
+</div>
+
+<!-- せってい -->
+<div class="modal-back" id="setModal">
+  <div class="card set">
+    <div class="ttl"><span class="emo">⚙️</span> おとなの せってい</div>
+    <label>テンポ <span style="flex:1"></span><span class="seg" id="tempoSeg"><button data-v="0.8">ゆっくり</button><button data-v="1">ふつう</button></span></label>
+    <label>おと <span style="flex:1"></span><span class="seg" id="soundSeg"><button data-v="1">ON</button><button data-v="0">OFF</button></span></label>
+    <label>タイミング<input type="range" id="offset" min="-200" max="200" step="10"><span id="offsetV" style="width:4.5em;text-align:right"></span></label>
+    <div style="font-size:13px;line-height:1.5;color:#8a7898">たたいても「おしい」が おおいときに ずらします（ワイヤレスイヤホンでは ＋がわへ）</div>
+    <button class="big blue small" id="resetStk">シールを ぜんぶ けす</button>
+    <button class="big small" id="setClose">とじる</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =========================================================
+   るんるん リズムステージ v0.1
+   - きょくは すべて ちょさくけん の きれた メロディ（かし は のせていません）
+   - おとは すべて Web Audio で その場で つくる（おんせいファイル なし）
+   - 外部ライブラリ・外部通信なし。GitHub Pages に置くだけで動作
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const TAU = Math.PI * 2;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[(Math.random() * a.length) | 0];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('runrun_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('runrun_' + k, JSON.stringify(v)); } catch (e) {} }
+};
+const settings = Object.assign({ tempo: 1, sound: 1, offset: 0, friend: '🐰' }, store.get('settings', {}));
+const saveSettings = () => store.set('settings', settings);
+let stickers = store.get('stickers', {});   // "きょくid_むずかしさ": ほしの かず
+
+/* ---------- きょく（ちょさくけん の きれた メロディ） ----------
+   おと:はく（はく を かかないと 1はく）。 G3〜G5 */
+const SONGS = [
+  { id: 'kira', title: 'きらきらぼし', icon: '⭐', c: '#a7b4ff', d: '#6f7fe0', bpm: 92, meter: 4, pickup: 0, rep: 1,
+    from: 'フランス みんよう',
+    mel: 'C4 C4 G4 G4 A4 A4 G4:2 F4 F4 E4 E4 D4 D4 C4:2 G4 G4 F4 F4 E4 E4 D4:2 G4 G4 F4 F4 E4 E4 D4:2 C4 C4 G4 G4 A4 A4 G4:2 F4 F4 E4 E4 D4 D4 C4:2',
+    stk: ['⭐', '🌙', '🌟', '🌠'] },
+  { id: 'mary', title: 'メリーさんの ひつじ', icon: '🐑', c: '#ffc2dc', d: '#e8689a', bpm: 104, meter: 4, pickup: 0, rep: 2,
+    from: 'アメリカ みんよう',
+    mel: 'E4 D4 C4 D4 E4 E4 E4:2 D4 D4 D4:2 E4 G4 G4:2 E4 D4 C4 D4 E4 E4 E4 E4 D4 D4 E4 D4 C4:4',
+    stk: ['🐑', '🌷', '🎀', '🧸'] },
+  { id: 'kaeru', title: 'かえるの うた', icon: '🐸', c: '#a8e6a1', d: '#4fae5b', bpm: 100, meter: 4, pickup: 0, rep: 2,
+    from: 'ドイツ みんよう',
+    mel: 'C4 D4 E4 F4 E4 D4 C4:2 E4 F4 G4 A4 G4 F4 E4:2 C4:2 C4:2 C4:2 C4:2 C4:.5 C4:.5 D4:.5 D4:.5 E4:.5 E4:.5 F4:.5 F4:.5 E4 D4 C4:2',
+    stk: ['🐸', '☔', '🌈', '🍀'] },
+  { id: 'chou', title: 'ちょうちょう', icon: '🦋', c: '#ffe08a', d: '#e0a62a', bpm: 104, meter: 4, pickup: 0, rep: 1,
+    from: 'ドイツ みんよう',
+    mel: 'G4 E4 E4:2 F4 D4 D4:2 C4 D4 E4 F4 G4 G4 G4:2 G4 E4 E4:2 F4 D4 D4:2 C4 E4 G4 G4 E4 E4 E4:2 D4 D4 D4 D4 D4 E4 F4:2 E4 E4 E4 E4 E4 F4 G4:2 G4 E4 E4:2 F4 D4 D4:2 C4 E4 G4 G4 E4 E4 E4:2',
+    stk: ['🦋', '🌼', '🌸', '🐝'] },
+  { id: 'london', title: 'ロンドンばし', icon: '🏰', c: '#c6b3ff', d: '#8d6be0', bpm: 104, meter: 4, pickup: 0, rep: 2,
+    from: 'イギリス みんよう',
+    mel: 'G4:1.5 A4:.5 G4 F4 E4 F4 G4:2 D4 E4 F4:2 E4 F4 G4:2 G4:1.5 A4:.5 G4 F4 E4 F4 G4:2 D4:2 G4:2 E4 C4:3',
+    stk: ['🌉', '👑', '🏰', '💎'] },
+  { id: 'joy', title: 'よろこびの うた', icon: '🎻', c: '#9fdcff', d: '#4fa6e6', bpm: 104, meter: 4, pickup: 0, rep: 1,
+    from: 'ベートーヴェン',
+    mel: 'E4 E4 F4 G4 G4 F4 E4 D4 C4 C4 D4 E4 E4:1.5 D4:.5 D4:2 E4 E4 F4 G4 G4 F4 E4 D4 C4 C4 D4 E4 D4:1.5 C4:.5 C4:2 D4 D4 E4 C4 D4 E4:.5 F4:.5 E4 C4 D4 E4:.5 F4:.5 E4 D4 C4 D4 G3:2 E4 E4 F4 G4 G4 F4 E4 D4 C4 C4 D4 E4 D4:1.5 C4:.5 C4:2',
+    stk: ['🎻', '🎺', '🎼', '🎹'] },
+  { id: 'jingle', title: 'ジングルベル', icon: '🔔', c: '#ffb3b3', d: '#e05b5b', bpm: 112, meter: 4, pickup: 0, rep: 1,
+    from: 'J.ピアポント',
+    mel: 'E4 E4 E4:2 E4 E4 E4:2 E4 G4 C4:1.5 D4:.5 E4:4 F4 F4 F4:1.5 F4:.5 F4 E4 E4 E4:.5 E4:.5 E4 D4 D4 E4 D4:2 G4:2 E4 E4 E4:2 E4 E4 E4:2 E4 G4 C4:1.5 D4:.5 E4:4 F4 F4 F4 F4 F4 E4 E4 E4:.5 E4:.5 G4 G4 F4 D4 C4:4',
+    stk: ['🔔', '🎄', '⛄', '🎅'] },
+  { id: 'bday', title: 'おたんじょうびの うた', icon: '🎂', c: '#ffd0a8', d: '#e88a4a', bpm: 96, meter: 3, pickup: 1, rep: 1,
+    from: 'ヒル しまい',
+    mel: 'G4:.75 G4:.25 A4 G4 C5 B4:2 G4:.75 G4:.25 A4 G4 D5 C5:2 G4:.75 G4:.25 G5 E5 C5 B4 A4 F5:.75 F5:.25 E5 C5 D5 C5:3',
+    stk: ['🎂', '🎁', '🎈', '🧁'] },
+];
+const NOTE_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+function parseMel(s) {
+  return s.trim().split(/\s+/).map(tok => {
+    const [n, b] = tok.split(':');
+    return { midi: 12 * (+n[1] + 1) + NOTE_PC[n[0]], beats: b ? +b : 1 };
+  });
+}
+// メロディに あう わおん（C・F・G7・Am）を じどうで つける
+const CHORDS = [{ root: 0, pcs: [0, 4, 7] }, { root: 5, pcs: [5, 9, 0] }, { root: 7, pcs: [7, 11, 2, 5] }, { root: 9, pcs: [9, 0, 4] }];
+function prepare(song) {
+  if (song.notes) return;
+  const one = parseMel(song.mel), notes = [];
+  let pos = -song.pickup;
+  for (let r = 0; r < song.rep; r++) for (const n of one) { notes.push({ midi: n.midi, beats: n.beats, pos }); pos += n.beats; }
+  song.notes = notes; song.len = pos;
+  const seg = song.meter === 4 ? 2 : 3, harm = [];
+  let prev = 0;
+  for (let s = 0; s < pos; s += seg) {
+    const score = CHORDS.map(() => 0);
+    for (const n of notes) {
+      const ov = Math.min(n.pos + n.beats, s + seg) - Math.max(n.pos, s);
+      if (ov <= 0) continue;
+      const w = ov * (Math.abs(n.pos - s) < 1e-6 ? 1.6 : 1);
+      CHORDS.forEach((c, i) => { if (c.pcs.includes(n.midi % 12)) score[i] += w; });
+    }
+    score[0] += .25; score[prev] += .2; score[3] -= .15;
+    let best = score.indexOf(Math.max(...score));
+    if (s + seg >= pos) best = 0;
+    harm.push({ pos: s, ch: CHORDS[best] }); prev = best;
+  }
+  song.harm = harm;
+  const ms = notes.map(n => n.midi); song.lo = Math.min(...ms); song.hi = Math.max(...ms);
+}
+
+/* ---------- おと ---------- */
+const AU = {
+  ctx: null, out: null, noiseBuf: null,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      const c = this.ctx = new AC();
+      const comp = c.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 4;
+      this.out = c.createGain(); this.out.gain.value = settings.sound ? 0.9 : 0;
+      this.out.connect(comp); comp.connect(c.destination);
+      const b = c.createBuffer(1, c.sampleRate, c.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      this.noiseBuf = b;
+      // iOS の むおん かいじょ
+      const s = c.createBufferSource(); s.buffer = c.createBuffer(1, 1, 22050); s.connect(c.destination); s.start(0);
+    } catch (e) {}
+  },
+  get now() { return this.ctx ? this.ctx.currentTime : 0; },
+  get lat() { return this.ctx ? (this.ctx.outputLatency || this.ctx.baseLatency || 0) : 0; },
+};
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function env(g, t, vol, att, dur) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
+function osc(type, f, t, dur, vol, { to = null, att = 0.004 } = {}) {
+  const c = AU.ctx; if (!c) return;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  env(g, t, vol, att, dur); o.connect(g); g.connect(AU.out); o.start(t); o.stop(t + dur + .05);
+}
+function noise(t, dur, vol, { type = 'bandpass', freq = 1000, q = 1, att = 0.002 } = {}) {
+  const c = AU.ctx; if (!c) return;
+  const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+  s.buffer = AU.noiseBuf; f.type = type; f.frequency.value = freq; f.Q.value = q;
+  env(g, t, vol, att, dur); s.connect(f); f.connect(g); g.connect(AU.out); s.start(t, Math.random() * .5); s.stop(t + dur + .05);
+}
+// メロディ（オルゴールふう）
+function playMel(m, t, dur, vol = .16) {
+  const f = mtof(m), d = clamp(dur * 1.15, .35, 1.3);
+  osc('sine', f, t, d, vol); osc('triangle', f, t, d * .7, vol * .35); osc('sine', f * 2, t, d * .4, vol * .2); osc('sine', f * 3, t, .12, vol * .08);
+}
+function playBass(pc, t) { const m = 36 + pc + (pc > 4 ? 0 : 12); osc('sine', mtof(m), t, .4, .2); osc('triangle', mtof(m), t, .25, .06); }
+function playChord(pcs, t) { for (const pc of pcs.slice(0, 3)) osc('triangle', mtof(60 + pc), t, .2, .028); }
+const INST = {
+  taiko: { name: 'たいこ', col: '#ff7aa2', dark: '#e0507e', play(t) { osc('sine', 170, t, .32, .55, { to: 55 }); osc('triangle', 95, t, .12, .2, { to: 60 }); noise(t, .07, .25, { type: 'lowpass', freq: 900 }); } },
+  tamb: { name: 'タンバリン', col: '#ffc94d', dark: '#e0a62a', play(t) {
+    for (let i = 0; i < 4; i++) noise(t + i * .018, .1 - i * .015, .22 - i * .04, { type: 'highpass', freq: 6500, q: .7 });
+    osc('sine', 5200, t, .08, .02); noise(t, .05, .12, { type: 'bandpass', freq: 1800, q: 1 }); } },
+  casta: { name: 'カスタネット', col: '#7cc8ff', dark: '#4fa6e6', play(t) { for (const d of [0, .035]) { noise(t + d, .035, .4, { freq: 2600, q: 4 }); osc('sine', 1900, t + d, .025, .08); } } },
+  suzu: { name: 'すず', col: '#ffa95e', dark: '#e07f2a', play(t) { for (let i = 0; i < 5; i++) { const tt = t + i * .025 + Math.random() * .01; osc('sine', rnd(2800, 3600), tt, .25, .045); osc('sine', rnd(4200, 5200), tt, .15, .02); } } },
+  tri: { name: 'トライアングル', col: '#b493ff', dark: '#8d6be0', play(t) { osc('sine', 2350, t, 1.5, .09); osc('sine', 5980, t, 1, .035); osc('sine', 3720, t, .8, .025); } },
+};
+function click(t, acc) { noise(t, .03, acc ? .5 : .32, { freq: acc ? 2600 : 1900, q: 6 }); }
+function chime(t) { [1047, 1319, 1568, 2093].forEach((f, i) => osc('triangle', f, t + i * .07, .35, .07)); }
+function fanfare(t) { [[523, 0], [659, .15], [784, .3], [1047, .5], [784, .7], [1047, .85]].forEach(([f, d]) => { osc('triangle', f, t + d, .3, .1); osc('sine', f / 2, t + d, .3, .05); }); }
+function sparkleSnd(t) { for (let i = 0; i < 4; i++) osc('sine', 1800 + i * 400, t + i * .04, .15, .03); }
+
+/* ---------- がめん きりかえ ---------- */
+function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id)); }
+document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => { AU.init(); show(b.dataset.back); }));
+let pickMode = 'rhythm', curSong = null, curDiff = 'easy';
+
+const FRIENDS = ['🐰', '🐱', '🐻', '🐼', '🦄', '🐥'];
+function renderFriends() {
+  const box = $('#friends'); box.querySelectorAll('.friend').forEach(b => b.remove());
+  for (const f of FRIENDS) {
+    const b = document.createElement('button'); b.className = 'friend emo' + (settings.friend === f ? ' sel' : ''); b.textContent = f;
+    b.addEventListener('click', () => { AU.init(); settings.friend = f; saveSettings(); renderFriends(); if (AU.ctx) { const t = AU.now + .02; playMel(84, t, .2, .1); playMel(88, t + .1, .3, .1); } });
+    box.appendChild(b);
+  }
+}
+function renderSongs() {
+  const box = $('#songList'); box.innerHTML = '';
+  $('#songsTitle').textContent = pickMode === 'piano' ? '🎹 どの うたを ひく？' : 'うたを えらんでね';
+  for (const s of SONGS) {
+    const b = document.createElement('button'); b.className = 'song'; b.style.setProperty('--c', s.c); b.style.setProperty('--d', s.d);
+    const st = ['easy', 'normal', 'hard', 'piano'].map((d, i) => `<span class="${stickers[s.id + '_' + d] ? '' : 'off'}">${s.stk[i]}</span>`).join('');
+    b.innerHTML = `<span class="ic emo">${s.icon}</span><span class="nm">${s.title}</span><span class="stk emo">${st}</span>`;
+    b.addEventListener('click', () => {
+      AU.init(); curSong = s;
+      if (pickMode === 'piano') startGame(s, 'piano');
+      else { $('#diffIcon').textContent = s.icon; $('#diffSong').textContent = s.title; $('#diffModal').classList.add('open'); }
+    });
+    box.appendChild(b);
+  }
+}
+$('#goRhythm').addEventListener('click', () => { AU.init(); pickMode = 'rhythm'; renderSongs(); show('songs'); });
+$('#goPiano').addEventListener('click', () => { AU.init(); pickMode = 'piano'; renderSongs(); show('songs'); });
+$('#goBook').addEventListener('click', () => { AU.init(); renderBook(); show('bookScr'); });
+document.querySelectorAll('.diff').forEach(b => b.addEventListener('click', () => { $('#diffModal').classList.remove('open'); startGame(curSong, b.dataset.diff); }));
+$('#diffClose').addEventListener('click', () => $('#diffModal').classList.remove('open'));
+
+function renderBook() {
+  const box = $('#book'); box.innerHTML = '<div></div>' + ['⭐', '⭐⭐', '⭐⭐⭐', '🎹'].map(h => `<div class="hd emo">${h}</div>`).join('');
+  let n = 0;
+  for (const s of SONGS) {
+    box.insertAdjacentHTML('beforeend', `<div class="rh emo">${s.icon}</div>`);
+    ['easy', 'normal', 'hard', 'piano'].forEach((d, i) => {
+      const v = stickers[s.id + '_' + d];
+      if (v) n++;
+      box.insertAdjacentHTML('beforeend', v ? `<div class="cell emo ${v >= 3 ? 'gold' : ''}">${s.stk[i]}</div>` : `<div class="cell off">？</div>`);
+    });
+  }
+  $('#bookCount').textContent = `あつめた シール ${n} / ${SONGS.length * 4}`;
+}
+
+/* ---------- ゲーム ---------- */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+let W = 300, H = 300, DPR = 1, G = null, raf = 0, schedTimer = 0;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2.5); W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+}
+window.addEventListener('resize', resize);
+
+const LANES = { easy: ['taiko'], normal: ['taiko', 'tamb'], hard: ['taiko', 'casta', 'tamb'], free: ['taiko', 'tamb', 'casta', 'suzu', 'tri'], piano: [] };
+const LEAD = { easy: 2.2, normal: 2.0, hard: 1.8 };
+const WIN = { easy: 1.25, normal: 1.1, hard: 1 };
+const PIANO_KEYS = [60, 62, 64, 65, 67, 69, 71, 72];
+const KEY_COL = ['#ff8a8a', '#ffb36b', '#ffe066', '#9be38c', '#7fd3ff', '#8fa8ff', '#c29bff', '#ff9ad0'];
+const KEY_NAME = ['ド', 'レ', 'ミ', 'ファ', 'ソ', 'ラ', 'シ', 'ド'];
+
+function buildChart(song, diff) {
+  if (diff === 'free' || diff === 'piano') return [];
+  const m = song.meter, out = [];
+  const isInt = x => Math.abs(x - Math.round(x)) < 1e-6;
+  const strong = p => { const b = ((Math.round(p) % m) + m) % m; return m === 4 ? (b === 0 || b === 2) : b === 0; };
+  const minGap = diff === 'hard' ? .5 : 1;
+  const span = song.hi - song.lo || 1;
+  for (const n of song.notes) {
+    let lane = -1;
+    if (diff === 'easy') { if (isInt(n.pos) && (strong(n.pos) || n.beats >= 2)) lane = 0; }
+    else if (diff === 'normal') { if (isInt(n.pos)) lane = strong(n.pos) || n.beats >= 2 ? 0 : 1; }
+    else { const k = (n.midi - song.lo) / span; lane = k < .34 ? 0 : k < .67 ? 1 : 2; }
+    if (lane < 0) continue;
+    if (out.length && n.pos - out[out.length - 1].pos < minGap - 1e-6) continue;
+    out.push({ pos: n.pos, lane });
+  }
+  return out;
+}
+
+function startGame(song, diff) {
+  AU.init(); prepare(song); resize();
+  curSong = song; curDiff = diff;
+  const bd = 60 / (song.bpm * settings.tempo);
+  const countBeats = song.meter;
+  const t0 = AU.now + .5 + (countBeats + song.pickup) * bd;   // 1しょうせつめ の あたま
+  const T = p => t0 + p * bd;
+  const ev = [];
+  // カウント
+  if (diff !== 'piano') for (let i = 0; i < countBeats; i++) { const p = -song.pickup - countBeats + i; ev.push({ t: T(p), f: t => click(t, i === 0) }); }
+  // メロディ（ピアノ では こどもが ひく）
+  if (diff !== 'piano') for (const n of song.notes) ev.push({ t: T(n.pos), f: t => playMel(n.midi, t, n.beats * bd) });
+  // ばんそう
+  if (diff !== 'piano') for (const h of song.harm) {
+    ev.push({ t: T(h.pos), f: t => playBass(h.ch.root, t) });
+    const seg = song.meter === 4 ? 2 : 3;
+    for (let k = 1; k < seg; k++) if (h.pos + k < song.len) ev.push({ t: T(h.pos + k), f: t => playChord(h.ch.pcs, t) });
+  }
+  ev.sort((a, b) => a.t - b.t);
+  const chart = buildChart(song, diff).map(c => ({ ...c, t: T(c.pos), done: false, res: null, y: 0 }));
+  G = { song, diff, bd, t0, ev, ei: 0, chart, lanes: LANES[diff], counts: { p: 0, g: 0, o: 0, m: 0 }, combo: 0, best: 0,
+    fx: [], texts: [], flash: [], press: [], dancer: { jump: 0, spin: 0, happy: 0 }, endT: T(song.len) + 1.6, ended: false, paused: false,
+    pianoIdx: 0, pianoHits: 0, keyFlash: PIANO_KEYS.map(() => 0), lastBeat: -99 };
+  G.flash = G.lanes.map(() => 0); G.press = G.lanes.map(() => 0);
+  show('game');
+  clearInterval(schedTimer); schedTimer = setInterval(schedule, 25); schedule();
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+}
+function schedule() {
+  if (!G || G.paused || !AU.ctx) return;
+  const lim = AU.now + .15;
+  while (G.ei < G.ev.length && G.ev[G.ei].t < lim) { const e = G.ev[G.ei++]; if (e.t > AU.now - .05) e.f(Math.max(e.t, AU.now)); }
+}
+const vtime = () => AU.now - AU.lat;   // いま きこえている じかん
+
+/* ---------- ばしょ ---------- */
+function layout() {
+  const stageH = Math.min(H * .38, 330), stageW = Math.min(W, 760);
+  const laneW = Math.min(W - 16, 720), n = Math.max(1, G.lanes.length), lw = laneW / n, lx = (W - laneW) / 2;
+  const padH = clamp(H * .15, 86, 150), sb = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sb')) || 0;
+  const padY = H - padH - 8 - sb;
+  const ringR = Math.min(lw * .3, 40, padH * .4);
+  const hitY = padY - ringR - 10;
+  return { stageH, stageW, lx, lw, n, laneW, padY, padH, ringR, hitY, top: stageH + 8 };
+}
+
+/* ---------- たたく ---------- */
+cv.addEventListener('pointerdown', e => {
+  if (!G || G.paused || G.ended) return;
+  e.preventDefault(); AU.init();
+  const L = layout();
+  if (G.diff === 'piano') { pianoTap(e.clientX, e.clientY, L); return; }
+  const lane = clamp(Math.floor((e.clientX - L.lx) / L.lw), 0, L.n - 1);
+  hitLane(lane, L);
+});
+const KEYMAP = { f: 0, j: 1, k: 2, d: 0, ' ': 0, a: 0, s: 1, l: 2, ';': 3, g: 3, h: 4 };
+window.addEventListener('keydown', e => {
+  if (!G || G.paused || G.ended || e.repeat) return;
+  const L = layout();
+  if (G.diff === 'piano') { pianoTap(L.lx + L.laneW / 2, H - 40, L); return; }
+  const lane = KEYMAP[e.key.toLowerCase()];
+  if (lane !== undefined && lane < L.n) hitLane(lane, L);
+});
+function hitLane(lane, L) {
+  const id = G.lanes[lane];
+  INST[id].play(AU.now);
+  G.press[lane] = 1; G.flash[lane] = .6;
+  const x = L.lx + (lane + .5) * L.lw;
+  if (G.diff === 'free') { burst(x, L.padY, 6, INST[id].col); G.dancer.jump = Math.max(G.dancer.jump, .6); return; }
+  const tt = vtime() - settings.offset / 1000, w = WIN[G.diff];
+  let best = null, bd = .4 * w;
+  for (const c of G.chart) {
+    if (c.done || c.lane !== lane) continue;
+    const d = Math.abs(c.t - tt);
+    if (d < bd) { bd = d; best = c; }
+    if (c.t - tt > .5) break;
+  }
+  if (!best) return;
+  best.done = true;
+  let res, txt, col;
+  if (bd < .11 * w) { res = 'p'; txt = 'すてき！'; col = '#ff5a9a'; }
+  else if (bd < .22 * w) { res = 'g'; txt = 'いいね！'; col = '#ff9f1c'; }
+  else { res = 'o'; txt = 'おしい！'; col = '#4fa6e6'; }
+  best.res = res; G.counts[res]++;
+  G.combo++; G.best = Math.max(G.best, G.combo);
+  G.texts.push({ x, y: L.hitY - L.ringR - 14, txt, col, life: .8 });
+  burst(x, L.hitY, res === 'p' ? 14 : 8, INST[id].col, res === 'p');
+  G.dancer.jump = res === 'p' ? 1 : .6;
+  if (res === 'p') G.dancer.happy = .5;
+  if (G.combo > 0 && G.combo % 10 === 0) {
+    chime(AU.now + .02); G.dancer.spin = 1;
+    G.texts.push({ x: W / 2, y: L.top + 40, txt: `💖 ${G.combo} れんぞく！`, col: '#ff5a9a', life: 1.2, big: true });
+    for (let i = 0; i < 24; i++) G.fx.push(confetto(rnd(0, W), rnd(-40, 0)));
+  }
+}
+function pianoTap(x, y, L) {
+  const song = G.song, n = song.notes[G.pianoIdx];
+  const kw = L.laneW / PIANO_KEYS.length, k = clamp(Math.floor((x - L.lx) / kw), 0, PIANO_KEYS.length - 1);
+  G.keyFlash[k] = 1;
+  if (!n) { playMel(PIANO_KEYS[k], AU.now, .5); return; }
+  const t = AU.now;
+  playMel(n.midi, t, .55, .2);
+  // ばんそう：その わおん の はじめ なら ならす
+  const h = song.harm.find(hh => Math.abs(hh.pos - n.pos) < 1e-6) || (G.pianoIdx === 0 ? song.harm[0] : null);
+  if (h) { playBass(h.ch.root, t); playChord(h.ch.pcs, t + .12); }
+  const want = keyOf(n.midi), kx = L.lx + (k + .5) * kw;
+  if (want === k) { G.pianoHits++; G.texts.push({ x: kx, y: L.padY - 30, txt: 'ぴったり！', col: '#ff5a9a', life: .7 }); burst(kx, L.padY - 10, 12, KEY_COL[k], true); }
+  else burst(kx, L.padY - 10, 6, KEY_COL[k]);
+  G.dancer.jump = .8;
+  G.pianoIdx++;
+  if (G.pianoIdx >= song.notes.length) { G.endT = AU.now + 1.4; G.pianoDone = true; }
+}
+function keyOf(m) { let mm = m; while (mm < 60) mm += 12; while (mm > 72) mm -= 12; const i = PIANO_KEYS.indexOf(mm); return i >= 0 ? i : PIANO_KEYS.indexOf(mm - 1 >= 60 ? mm - 1 : mm + 1); }
+
+/* ---------- つぶつぶ ---------- */
+function burst(x, y, n, col, star) {
+  for (let i = 0; i < n; i++) { const a = rnd(0, TAU), s = rnd(120, 320); G.fx.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 100, g: 500, life: rnd(.5, .9), max: .9, r: rnd(5, 10), col: Math.random() < .4 ? '#fff' : col, k: star || Math.random() < .5 ? 'star' : 'heart', rot: rnd(0, TAU) }); }
+}
+function confetto(x, y) { return { x, y, vx: rnd(-40, 40), vy: rnd(120, 260), g: 60, life: rnd(2.5, 3.5), max: 3.5, r: rnd(6, 10), col: pick(['#ff8fb8', '#ffd54a', '#7cc8ff', '#b493ff', '#8fe08a']), k: 'conf', rot: rnd(0, TAU) }; }
+function starPath(c, r) { c.beginPath(); for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * .45 : r, a = i * Math.PI / 5 - Math.PI / 2; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } c.closePath(); }
+function heartPath(c, r) { c.beginPath(); c.moveTo(0, r * .35); c.bezierCurveTo(-r * 1.2, -r * .4, -r * .5, -r * 1.2, 0, -r * .45); c.bezierCurveTo(r * .5, -r * 1.2, r * 1.2, -r * .4, 0, r * .35); c.closePath(); }
+function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+
+/* ---------- がっき の え ---------- */
+function drawInst(c, id, x, y, s, press) {
+  c.save(); c.translate(x, y); const k = 1 - press * .12; c.scale(s * (1 + press * .06), s * k);
+  const I = INST[id];
+  if (id === 'taiko') {
+    c.fillStyle = '#e0507e'; rr(c, -40, -18, 80, 46, 10); c.fill();
+    c.fillStyle = '#ff7aa2'; rr(c, -40, -18, 80, 40, 10); c.fill();
+    c.strokeStyle = '#ffe08a'; c.lineWidth = 4; for (const yy of [-6, 14]) { c.beginPath(); c.moveTo(-40, yy); c.lineTo(40, yy); c.stroke(); }
+    c.fillStyle = '#fff7ea'; c.beginPath(); c.ellipse(0, -18, 40, 13, 0, 0, TAU); c.fill();
+    c.strokeStyle = '#e0507e'; c.lineWidth = 3; c.stroke();
+    c.strokeStyle = '#b07a45'; c.lineWidth = 6; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-28, -50 + press * 22); c.lineTo(-6, -24); c.moveTo(30, -52 + press * 22); c.lineTo(8, -24); c.stroke();
+    c.fillStyle = '#ff9ac0'; c.beginPath(); c.arc(-28, -50 + press * 22, 6, 0, TAU); c.arc(30, -52 + press * 22, 6, 0, TAU); c.fill();
+  } else if (id === 'tamb') {
+    c.rotate(-.2 + press * .25);
+    c.fillStyle = '#fff4dc'; c.beginPath(); c.arc(0, 0, 34, 0, TAU); c.fill();
+    c.strokeStyle = I.col; c.lineWidth = 11; c.beginPath(); c.arc(0, 0, 34, 0, TAU); c.stroke();
+    for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + .3; c.fillStyle = '#dfe3ee'; c.beginPath(); c.ellipse(Math.cos(a) * 34, Math.sin(a) * 34, 7, 4, a + Math.PI / 2, 0, TAU); c.fill(); c.strokeStyle = '#a9b0c2'; c.lineWidth = 1.5; c.stroke(); }
+    c.fillStyle = '#ff8fb8'; c.beginPath(); c.moveTo(30, 18); c.quadraticCurveTo(48, 30, 40, 48); c.quadraticCurveTo(34, 34, 26, 26); c.fill();
+    c.fillStyle = '#ffd54a'; starPath(c, 10); c.fill();
+  } else if (id === 'casta') {
+    const open = (1 - press) * .5;
+    c.strokeStyle = '#ff8fb8'; c.lineWidth = 4; c.beginPath(); c.arc(0, -30, 9, 0, TAU); c.stroke();
+    for (const s2 of [-1, 1]) {
+      c.save(); c.translate(0, -22); c.rotate(s2 * open);
+      c.fillStyle = s2 < 0 ? '#4fa6e6' : '#7cc8ff';
+      c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 32, Math.PI / 2 - .9, Math.PI / 2 + .9); c.closePath();
+      c.beginPath(); c.ellipse(s2 * 4, 26, 30, 22, 0, 0, TAU); c.fill();
+      c.fillStyle = 'rgba(255,255,255,.4)'; c.beginPath(); c.ellipse(s2 * 4 - 8, 20, 9, 6, -.4, 0, TAU); c.fill();
+      c.restore();
+    }
+  } else if (id === 'suzu') {
+    c.rotate(press * .3 - .1);
+    c.fillStyle = '#ff6f91'; rr(c, -8, -10, 16, 56, 6); c.fill();
+    for (const [bx, by] of [[-22, -18], [22, -18], [-24, 14], [24, 14], [0, -34]]) {
+      const g = c.createRadialGradient(bx - 4, by - 4, 2, bx, by, 13); g.addColorStop(0, '#fff6b8'); g.addColorStop(1, '#f0b62a');
+      c.fillStyle = g; c.beginPath(); c.arc(bx, by, 12, 0, TAU); c.fill();
+      c.strokeStyle = '#a47410'; c.lineWidth = 2; c.beginPath(); c.moveTo(bx - 6, by + 3); c.lineTo(bx + 6, by + 3); c.stroke();
+    }
+  } else if (id === 'tri') {
+    c.strokeStyle = I.col; c.lineWidth = 8; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath(); c.moveTo(-10, -36); c.lineTo(-36, 30); c.lineTo(36, 30); c.lineTo(8, -38); c.stroke();
+    c.strokeStyle = '#ff8fb8'; c.lineWidth = 3; c.beginPath(); c.moveTo(-2, -38); c.lineTo(-2, -52); c.stroke();
+    c.strokeStyle = '#8a93b0'; c.lineWidth = 5; c.beginPath(); c.moveTo(30 - press * 14, -30); c.lineTo(10 - press * 14, 10); c.stroke();
+  }
+  c.restore();
+}
+function drawNoteFace(c, x, y, r, col, a = 1) {
+  c.save(); c.globalAlpha = a; c.translate(x, y);
+  c.fillStyle = 'rgba(0,0,0,.12)'; c.beginPath(); c.ellipse(0, r * .9, r * .8, r * .25, 0, 0, TAU); c.fill();
+  c.fillStyle = col; c.beginPath(); c.arc(0, 0, r, 0, TAU); c.fill();
+  c.lineWidth = Math.max(3, r * .14); c.strokeStyle = '#fff'; c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(-r * .38, -r * .42, r * .25, r * .16, -.5, 0, TAU); c.fill();
+  c.fillStyle = '#5a4466'; c.beginPath(); c.arc(-r * .3, -r * .05, r * .1, 0, TAU); c.arc(r * .3, -r * .05, r * .1, 0, TAU); c.fill();
+  c.strokeStyle = '#5a4466'; c.lineWidth = r * .08; c.beginPath(); c.arc(0, r * .12, r * .18, .2, Math.PI - .2); c.stroke();
+  c.fillStyle = 'rgba(255,90,150,.45)'; c.beginPath(); c.arc(-r * .55, r * .2, r * .12, 0, TAU); c.arc(r * .55, r * .2, r * .12, 0, TAU); c.fill();
+  c.restore();
+}
+
+/* ---------- ステージ ---------- */
+function drawStage(L, beat, dt) {
+  const sw = L.stageW, sx = (W - sw) / 2, sh = L.stageH, song = G.song;
+  const g = ctx.createLinearGradient(0, 0, 0, sh);
+  g.addColorStop(0, '#3b2a6b'); g.addColorStop(1, '#7b4fa8');
+  ctx.fillStyle = g; rr(ctx, sx + 6, 6, sw - 12, sh - 6, 26); ctx.fill();
+  ctx.save(); rr(ctx, sx + 6, 6, sw - 12, sh - 6, 26); ctx.clip();
+  // きらきら
+  for (let i = 0; i < 26; i++) {
+    const x = sx + ((i * 97) % sw), y = 14 + ((i * 53) % (sh * .6)), tw = .5 + .5 * Math.sin(performance.now() / 400 + i);
+    ctx.globalAlpha = .3 + .6 * tw; ctx.fillStyle = '#fff'; ctx.save(); ctx.translate(x, y); starPath(ctx, 2 + tw * 2.5); ctx.fill(); ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  // スポットライト
+  const beatK = Math.pow(1 - (beat - Math.floor(beat)), 2);
+  for (const [lx, col] of [[sx + sw * .2, 'rgba(255,170,220,'], [sx + sw * .8, 'rgba(170,210,255,']]) {
+    const gr = ctx.createLinearGradient(0, 0, 0, sh);
+    gr.addColorStop(0, col + (.25 + beatK * .2) + ')'); gr.addColorStop(1, col + '0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(lx - 10, 0); ctx.lineTo(lx + 10, 0); ctx.lineTo(W / 2 + (lx - W / 2) * .2 + 90, sh); ctx.lineTo(W / 2 + (lx - W / 2) * .2 - 90, sh); ctx.closePath(); ctx.fill();
+  }
+  // ゆか
+  ctx.fillStyle = '#ffcfe6'; ctx.beginPath(); ctx.ellipse(W / 2, sh, sw * .45, sh * .2, 0, Math.PI, TAU); ctx.fill();
+  ctx.fillStyle = '#ffb3d6'; ctx.beginPath(); ctx.ellipse(W / 2, sh, sw * .34, sh * .13, 0, Math.PI, TAU); ctx.fill();
+  // おどる おともだち
+  const D = G.dancer;
+  D.jump = Math.max(0, D.jump - dt * 2.5); D.spin = Math.max(0, D.spin - dt * 1.4); D.happy = Math.max(0, D.happy - dt);
+  const ph = beat - Math.floor(beat), bounce = beat >= 0 && !G.ended ? Math.abs(Math.sin(ph * Math.PI)) : .3 * Math.abs(Math.sin(performance.now() / 600));
+  const size = sh * .42, fx = W / 2, fy = sh - sh * .08;
+  const jy = -bounce * size * .12 - Math.sin(D.jump * Math.PI) * size * .25;
+  ctx.fillStyle = 'rgba(80,30,90,.25)'; ctx.beginPath(); ctx.ellipse(fx, fy, size * .35 * (1 - D.jump * .3), size * .07, 0, 0, TAU); ctx.fill();
+  ctx.save(); ctx.translate(fx, fy + jy);
+  ctx.rotate(Math.sin(beat * Math.PI) * .12 + (D.spin > 0 ? (1 - D.spin) * TAU : 0));
+  const sq = 1 + (1 - bounce) * .06;
+  ctx.scale(1 / sq, sq);
+  ctx.font = `${size}px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#000';
+  ctx.fillText(settings.friend, 0, 0);
+  ctx.font = `${size * .36}px ${EMOJI_FONT}`; ctx.fillText('🎀', size * .3, -size * .7);
+  ctx.restore();
+  // おどりの おんぷ
+  if (D.happy > 0 || D.jump > .9) {
+    ctx.font = `bold ${size * .25}px sans-serif`; ctx.fillStyle = '#ffd54a';
+    ctx.fillText('♪', fx - size * .55, fy - size * .8 - D.happy * 20); ctx.fillText('♫', fx + size * .6, fy - size * .6 - D.happy * 26);
+  }
+  // バックダンサー の おんぷちゃん
+  for (const s of [-1, 1]) {
+    const bx = W / 2 + s * sw * .3, by = sh - sh * .12 - Math.abs(Math.sin((beat + (s > 0 ? .5 : 0)) * Math.PI)) * sh * .08;
+    drawNoteFace(ctx, bx, by - sh * .1, sh * .09, s < 0 ? '#ff8fb8' : '#7cc8ff');
+  }
+  ctx.restore();
+  // カーテン
+  ctx.fillStyle = '#ff6f9e';
+  for (const s of [-1, 1]) {
+    const ex = s < 0 ? sx + 6 : sx + sw - 6, w = sw * .1;
+    ctx.beginPath(); ctx.moveTo(ex, 6); ctx.lineTo(ex - s * w * 1.4, 6);
+    ctx.quadraticCurveTo(ex - s * w * .5, sh * .5, ex - s * w * .9, sh); ctx.lineTo(ex, sh); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = '#ff8fb8';
+  ctx.beginPath(); ctx.moveTo(sx + 6, 6); for (let i = 0; i <= 8; i++) { const x = sx + 6 + (sw - 12) * i / 8; ctx.quadraticCurveTo(x - (sw - 12) / 16, 32, x, 12); } ctx.lineTo(sx + sw - 6, 6); ctx.closePath(); ctx.fill();
+  // タイトル と すすみぐあい
+  const prog = clamp((vtime() - G.t0) / (G.song.len * G.bd), 0, 1);
+  const pw = Math.min(sw * .5, 260), px = W / 2 - pw / 2, py = 34;
+  ctx.fillStyle = 'rgba(255,255,255,.85)'; rr(ctx, px - 6, py - 6, pw + 12, 28, 14); ctx.fill();
+  ctx.fillStyle = '#ffe0ef'; rr(ctx, px, py + 8, pw, 8, 4); ctx.fill();
+  const pr = G.diff === 'piano' ? G.pianoIdx / G.song.notes.length : prog;
+  ctx.fillStyle = song.d; rr(ctx, px, py + 8, Math.max(8, pw * pr), 8, 4); ctx.fill();
+  ctx.font = `bold 13px "Hiragino Maru Gothic ProN",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#5a4466';
+  ctx.fillText(song.icon + ' ' + song.title, W / 2, py + 5);
+}
+
+/* ---------- メインループ ---------- */
+let lastT = 0;
+function frame(ts) {
+  if (!G) return;
+  raf = requestAnimationFrame(frame);
+  const dt = Math.min(.05, (ts - (lastT || ts)) / 1000); lastT = ts;
+  if (G.paused) return;
+  const L = layout(), vt = vtime(), beat = (vt - G.t0) / G.bd;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#fff0f7'); bg.addColorStop(1, G.song.c);
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  drawStage(L, beat, dt);
+
+  if (G.diff === 'piano') drawPiano(L);
+  else drawLanes(L, vt, dt);
+
+  // カウントダウン
+  const firstT = G.t0 - G.song.pickup * G.bd;
+  if (vt < firstT && G.diff !== 'piano') {
+    const left = Math.ceil((firstT - vt) / G.bd);
+    if (left >= 1 && left <= G.song.meter) {
+      const k = 1 - ((firstT - vt) / G.bd - (left - 1));
+      ctx.save(); ctx.translate(W / 2, L.top + (L.hitY - L.top) * .45); ctx.scale(1 + k * .4, 1 + k * .4); ctx.globalAlpha = 1 - k * .6;
+      ctx.font = `900 ${Math.min(W, H) * .18}px "Hiragino Maru Gothic ProN",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 10; ctx.strokeStyle = '#fff'; ctx.strokeText(left, 0, 0); ctx.fillStyle = '#ff6fa8'; ctx.fillText(left, 0, 0);
+      ctx.restore();
+    }
+  }
+  // つぶつぶ・もじ
+  for (const p of G.fx) { p.life -= dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += dt * 4; }
+  G.fx = G.fx.filter(p => p.life > 0 && p.y < H + 40);
+  for (const p of G.fx) {
+    ctx.save(); ctx.globalAlpha = clamp(p.life / (p.max * .5), 0, 1); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.col;
+    if (p.k === 'star') starPath(ctx, p.r); else if (p.k === 'heart') heartPath(ctx, p.r); else { ctx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); ctx.restore(); continue; }
+    ctx.fill(); ctx.restore();
+  }
+  for (const t of G.texts) {
+    t.life -= dt; t.y -= dt * 50;
+    ctx.save(); ctx.globalAlpha = clamp(t.life * 3, 0, 1);
+    const s = t.big ? Math.min(W, H) * .07 : clamp(Math.min(W, H) * .055, 20, 34);
+    ctx.font = `900 ${s}px "Hiragino Maru Gothic ProN",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 7; ctx.strokeStyle = '#fff'; ctx.strokeText(t.txt, t.x, t.y); ctx.fillStyle = t.col; ctx.fillText(t.txt, t.x, t.y);
+    ctx.restore();
+  }
+  G.texts = G.texts.filter(t => t.life > 0);
+
+  if (!G.ended && AU.now > G.endT && (G.diff !== 'piano' || G.pianoDone)) finish();
+}
+function drawLanes(L, vt, dt) {
+  const free = G.diff === 'free';
+  for (let i = 0; i < L.n; i++) {
+    const id = G.lanes[i], I = INST[id], x = L.lx + i * L.lw, cx = x + L.lw / 2;
+    G.flash[i] = Math.max(0, G.flash[i] - dt * 2); G.press[i] = Math.max(0, G.press[i] - dt * 7);
+    // レーン
+    ctx.fillStyle = `rgba(255,255,255,${.45 + G.flash[i] * .4})`; rr(ctx, x + 4, L.top, L.lw - 8, H - L.top - 4, 22); ctx.fill();
+    if (!free) {
+      ctx.save(); ctx.setLineDash([8, 8]); ctx.lineWidth = 5; ctx.strokeStyle = I.col;
+      ctx.beginPath(); ctx.arc(cx, L.hitY, L.ringR * (1 + G.flash[i] * .15), 0, TAU); ctx.stroke(); ctx.restore();
+    }
+    // がっき
+    const s = Math.min(L.lw / 120, L.padH / 105) * (free ? 1.15 : 1);
+    drawInst(ctx, id, cx, L.padY + L.padH * .5, s, G.press[i]);
+    ctx.font = `bold ${clamp(L.lw * .12, 11, 16)}px "Hiragino Maru Gothic ProN",sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = I.dark;
+    ctx.fillText(I.name, cx, H - 6 - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sb')) || 0));
+  }
+  if (free) {
+    ctx.font = `bold ${clamp(W * .045, 16, 24)}px "Hiragino Maru Gothic ProN",sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = '#a07ad6';
+    ctx.fillText('すきな がっきを たたいてね ♪', W / 2, L.top + (L.padY - L.top) * .4);
+    return;
+  }
+  // おんぷちゃん
+  const lead = LEAD[G.diff] / settings.tempo * .9 + .3;
+  for (const c of G.chart) {
+    const d = c.t - vt;
+    if (d > lead) break;
+    const cx = L.lx + (c.lane + .5) * L.lw, col = INST[G.lanes[c.lane]].col;
+    if (c.done) continue;
+    if (d < -.4 * WIN[G.diff]) { c.done = true; c.res = 'm'; G.counts.m++; G.combo = 0; continue; }
+    const y = L.hitY - d / lead * (L.hitY - L.top - L.ringR);
+    const near = Math.abs(d) < .12 ? 1.12 : 1;
+    drawNoteFace(ctx, cx, y, L.ringR * .85 * near, col, clamp((lead - d) * 3, 0, 1));
+  }
+  if (G.combo >= 3) {
+    ctx.font = `900 ${clamp(W * .05, 18, 28)}px "Hiragino Maru Gothic ProN",sans-serif`; ctx.textAlign = 'right';
+    ctx.lineWidth = 6; ctx.strokeStyle = '#fff'; const tx = L.lx + L.laneW - 14, ty = L.top + 34;
+    ctx.strokeText(`💖${G.combo}`, tx, ty); ctx.fillStyle = '#ff5a9a'; ctx.fillText(`💖${G.combo}`, tx, ty);
+  }
+}
+function drawPiano(L) {
+  const n = PIANO_KEYS.length, kw = L.laneW / n, top = L.top + (H - L.top) * .36, bottom = H - 10 - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sb')) || 0);
+  const next = G.song.notes[G.pianoIdx], want = next ? keyOf(next.midi) : -1;
+  ctx.font = `bold ${clamp(W * .045, 16, 24)}px "Hiragino Maru Gothic ProN",sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = '#a07ad6';
+  ctx.fillText(next ? 'どこを おしても うたが すすむよ ♪' : 'さいごまで ひけたね！', W / 2, L.top + 36);
+  // すすみぐあい の はな
+  const total = G.song.notes.length, rowW = Math.min(L.laneW, 560), per = Math.min(28, rowW / Math.min(total, 24));
+  const shown = Math.min(total, Math.floor(rowW / per)), startI = Math.max(0, Math.min(G.pianoIdx - 3, total - shown));
+  for (let i = 0; i < shown; i++) {
+    const idx = startI + i, x = W / 2 - shown * per / 2 + (i + .5) * per, y = L.top + 72;
+    ctx.font = `${per * .8}px ${EMOJI_FONT}`; ctx.fillStyle = '#000';
+    ctx.globalAlpha = idx < G.pianoIdx ? 1 : idx === G.pianoIdx ? .9 : .25;
+    ctx.fillText(idx < G.pianoIdx ? '🌸' : idx === G.pianoIdx ? '💗' : '・', x, y + (idx === G.pianoIdx ? Math.sin(performance.now() / 150) * 3 : 0));
+  }
+  ctx.globalAlpha = 1;
+  for (let k = 0; k < n; k++) {
+    G.keyFlash[k] = Math.max(0, G.keyFlash[k] - .05);
+    const x = L.lx + k * kw, press = G.keyFlash[k];
+    ctx.fillStyle = 'rgba(0,0,0,.1)'; rr(ctx, x + 3, top + 6, kw - 6, bottom - top, 16); ctx.fill();
+    ctx.fillStyle = KEY_COL[k]; rr(ctx, x + 3, top + press * 6, kw - 6, bottom - top - press * 6, 16); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; rr(ctx, x + 8, top + 8 + press * 6, kw - 16, (bottom - top) * .3, 10); ctx.fill();
+    if (k === want) {
+      const p = .5 + .5 * Math.sin(performance.now() / 160);
+      ctx.strokeStyle = `rgba(255,255,255,${.6 + p * .4})`; ctx.lineWidth = 5; rr(ctx, x + 6, top + 3, kw - 12, bottom - top - 6, 14); ctx.stroke();
+      ctx.font = `${kw * .5}px ${EMOJI_FONT}`; ctx.fillStyle = '#000'; ctx.textAlign = 'center';
+      ctx.fillText('⭐', x + kw / 2, top - 8 - p * 6);
+    }
+    ctx.font = `900 ${clamp(kw * .3, 13, 24)}px "Hiragino Maru Gothic ProN",sans-serif`; ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+    ctx.fillText(KEY_NAME[k], x + kw / 2, bottom - 16);
+  }
+}
+
+/* ---------- おわり ---------- */
+function finish() {
+  G.ended = true; clearInterval(schedTimer);
+  const song = G.song, diff = G.diff;
+  let stars = 0, key = null, title = 'すてきな えんそう！';
+  if (diff === 'free') { stars = 0; title = '🎶 すてきな えんそう！'; }
+  else if (diff === 'piano') {
+    const r = G.pianoHits / song.notes.length; stars = r >= .6 ? 3 : r >= .3 ? 2 : 1; key = song.id + '_piano';
+  } else {
+    const c = G.counts, tot = G.chart.length || 1, sc = (c.p + c.g * .8 + c.o * .5) / tot;
+    stars = sc >= .75 ? 3 : sc >= .45 ? 2 : 1; key = song.id + '_' + diff;
+    if (stars === 3) title = 'かんぺき！ すごーい！';
+  }
+  if (song.id === 'bday') title = '🎂 おたんじょうび おめでとう！';
+  $('#resTitle').textContent = title;
+  const spans = [...$('#resStars').children];
+  $('#resStars').style.display = stars ? '' : 'none';
+  spans.forEach(s => s.className = '');
+  spans.forEach((s, i) => { if (i < stars) setTimeout(() => { s.className = 'on'; if (AU.ctx) sparkleSnd(AU.now); }, 400 + i * 350); });
+  const c = G.counts;
+  $('#resCounts').style.display = diff === 'free' || diff === 'piano' ? 'none' : '';
+  $('#resCounts').innerHTML = `<span style="color:#ff5a9a">すてき ${c.p}</span><span style="color:#ff9f1c">いいね ${c.g}</span><span style="color:#4fa6e6">おしい ${c.o}</span>`;
+  if (key) {
+    const idx = ['easy', 'normal', 'hard', 'piano'].indexOf(key.split('_')[1]);
+    stickers[key] = Math.max(stickers[key] || 0, stars); store.set('stickers', stickers);
+    $('#resEm').textContent = song.stk[idx]; $('#resEm').classList.toggle('gold', stars >= 3);
+    $('#resSticker').style.display = '';
+  } else $('#resSticker').style.display = 'none';
+  if (AU.ctx) fanfare(AU.now + .05);
+  setTimeout(() => { show('result'); G = null; }, 300);
+}
+$('#resAgain').addEventListener('click', () => startGame(curSong, curDiff));
+$('#resSongs').addEventListener('click', () => { pickMode = curDiff === 'piano' ? 'piano' : 'rhythm'; renderSongs(); show('songs'); });
+
+/* ---------- ひとやすみ ---------- */
+function pause() {
+  if (!G || G.ended || G.paused) return;
+  G.paused = true; if (AU.ctx) AU.ctx.suspend();
+  $('#pauseModal').classList.add('open');
+}
+$('#pauseBtn').addEventListener('click', pause);
+$('#resume').addEventListener('click', () => { $('#pauseModal').classList.remove('open'); if (G) { G.paused = false; AU.ctx && AU.ctx.resume(); lastT = 0; } });
+$('#quit').addEventListener('click', () => {
+  $('#pauseModal').classList.remove('open'); clearInterval(schedTimer);
+  G = null; if (AU.ctx) { AU.ctx.close(); AU.ctx = null; }   // ならしかけの おとも すべて とめる
+  AU.init(); renderSongs(); show('songs');
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+/* ---------- せってい ---------- */
+function renderSet() {
+  document.querySelectorAll('#tempoSeg button').forEach(b => b.classList.toggle('sel', +b.dataset.v === settings.tempo));
+  document.querySelectorAll('#soundSeg button').forEach(b => b.classList.toggle('sel', +b.dataset.v === settings.sound));
+  $('#offset').value = settings.offset; $('#offsetV').textContent = (settings.offset > 0 ? '+' : '') + settings.offset + 'ms';
+}
+document.querySelectorAll('#tempoSeg button').forEach(b => b.addEventListener('click', () => { settings.tempo = +b.dataset.v; saveSettings(); renderSet(); }));
+document.querySelectorAll('#soundSeg button').forEach(b => b.addEventListener('click', () => { settings.sound = +b.dataset.v; saveSettings(); if (AU.out) AU.out.gain.value = settings.sound ? .9 : 0; renderSet(); }));
+$('#offset').addEventListener('input', e => { settings.offset = +e.target.value; saveSettings(); renderSet(); });
+$('#goSet').addEventListener('click', () => { renderSet(); $('#setModal').classList.add('open'); });
+$('#setClose').addEventListener('click', () => $('#setModal').classList.remove('open'));
+$('#resetStk').addEventListener('click', () => { if (confirm('シールを ぜんぶ けしますか？')) { stickers = {}; store.set('stickers', stickers); } });
+
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+renderFriends(); resize();
+</script>
+</body>
+</html>
