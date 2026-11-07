@@ -1,60 +1,100 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="つくったもの">
-<meta name="theme-color" content="#bfe9ff">
-<title>つくったもの</title>
-<style>
-  * { box-sizing: border-box; }
-  html, body { margin: 0; min-height: 100%; }
-  body {
-    min-height: 100vh; min-height: 100dvh; background: linear-gradient(180deg,#bfe9ff 0%,#e8f7ff 50%,#ffe6f2 100%); color: #3d3355;
-    font-family: "Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",system-ui,sans-serif; -webkit-tap-highlight-color: transparent;
-    display: flex; flex-direction: column; align-items: center;
-    padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-  }
-  main { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 16px; margin: auto 0; }
-  h1 { margin: 8px 0 0; text-align: center; font-size: clamp(30px, 7vw, 46px); color: #ff6fa0; text-shadow: 0 4px 0 #fff; letter-spacing: .04em; }
-  .sub { margin: 0 0 6px; text-align: center; color: #7a7396; font-size: clamp(15px, 3.6vw, 18px); }
-  .card {
-    display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-radius: 26px;
-    background: #fff; color: inherit; text-decoration: none;
-    border: 5px solid var(--c); box-shadow: 0 8px 0 var(--d); transition: transform .08s;
-  }
-  .card:active { transform: translateY(6px); box-shadow: 0 2px 0 var(--d); }
-  .ic { flex: none; width: 68px; height: 68px; border-radius: 20px; background: var(--c); display: flex; align-items: center; justify-content: center;
-    font-size: 40px; font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif; }
-  .tx { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-  .nm { font-size: clamp(21px, 5vw, 26px); font-weight: bold; color: var(--d); }
-  .ds { font-size: clamp(13px, 3.3vw, 16px); line-height: 1.45; color: #6a6488; }
-  .go { flex: none; font-size: 40px; color: var(--d); line-height: 1; }
-  .back { margin-top: 22px; padding: 10px 22px; border-radius: 999px; background: #fff; color: #6a7396; text-decoration: none; font-weight: bold;
-    box-shadow: 0 4px 0 #d3daea; }
-</style>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2a6f3b">
+<title>のんびり島ぐらし</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
-  <h1>つくったもの</h1>
-  <p class="sub">あそぶ ものを えらんでね</p>
-    <a class="card" href="hana-game/gameselect.html" style="--c:#ffc2d9;--d:#e0578a">
-      <span class="ic">🌸</span>
-      <span class="tx"><span class="nm">花ちゃんゲーム</span><span class="ds">パズル・サッカー・おえかき・リズムなど</span></span>
-      <span class="go">›</span>
-    </a>
-    <a class="card" href="yumi-game/index.html" style="--c:#b9d6ff;--d:#2f6fd1">
-      <span class="ic">🎮</span>
-      <span class="tx"><span class="nm">ゆみゲーム</span><span class="ds">ドローンファーム・のんびり島ぐらし</span></span>
-      <span class="go">›</span>
-    </a>
-    <a class="card" href="tool/index.html" style="--c:#c9ecd2;--d:#3fa673">
-      <span class="ic">🛠️</span>
-      <span class="tx"><span class="nm">ツール</span><span class="ds">ペイント・動画作成・PDF編集</span></span>
-      <span class="go">›</span>
-    </a>
-</main>
+<canvas id="map"></canvas>
+
+<!-- 上部バー -->
+<div id="topbar">
+  <div class="stat" id="st-coins">🪙 <span>0</span></div>
+  <div class="stat" id="st-pop">👤 <span>0</span></div>
+  <div class="stat" id="st-free" title="未割り当て">🙋 <span>0</span></div>
+  <div class="stat" id="st-happy">😊 <span>0</span></div>
+  <!-- ボタンはまとめて右寄せ。幅が足りないときは2段目に回る（⚙️が画面の外に出ないように） -->
+  <div class="topbtns">
+    <button class="icon-btn" id="btn-goal" title="目標">🎯</button>
+    <button class="icon-btn" id="btn-store" title="インベントリ">📦</button>
+    <button class="icon-btn wide" id="btn-speed" title="時間加速">⏩×1</button>
+    <button class="icon-btn" id="btn-reset" title="設定">⚙️</button>
+  </div>
+</div>
+
+<!-- 目標（常時表示） -->
+<div id="goalbar" class="hidden"></div>
+
+<!-- 下部ボタン -->
+<div id="bottombar">
+  <button id="btn-build">🔨 建築<span id="build-badge" class="badge hidden">NEW</span></button>
+</div>
+
+<!-- 建築メニュー -->
+<div id="buildmenu" class="sheet hidden">
+  <div class="sheet-head">
+    <div class="tabs" id="build-tabs"></div>
+    <button class="close" data-close="buildmenu">✕</button>
+  </div>
+  <div id="build-list"></div>
+  <div class="hint">タップで配置 / 長押しで詳細</div>
+</div>
+
+<!-- 配置プレビュー -->
+<div id="placepanel" class="sheet hidden">
+  <div class="sheet-head"><div class="title" id="place-title"></div></div>
+  <div id="place-cost"></div>
+  <div class="row">
+    <button class="btn" id="place-cancel">キャンセル</button>
+    <button class="btn primary" id="place-ok">建築する</button>
+  </div>
+</div>
+
+<!-- 施設情報パネル -->
+<div id="infopanel" class="sheet hidden">
+  <div class="sheet-head">
+    <div class="title" id="info-title"></div>
+    <button class="close" data-close="infopanel">✕</button>
+  </div>
+  <div id="info-body"></div>
+  <div class="row" id="info-actions"></div>
+</div>
+
+<!-- インベントリ -->
+<div id="storepanel" class="sheet hidden">
+  <div class="sheet-head"><div class="title">インベントリ</div><button class="close" data-close="storepanel">✕</button></div>
+  <div id="store-body"></div>
+</div>
+
+<!-- 住民パネル -->
+<div id="peoplepanel" class="sheet hidden">
+  <div class="sheet-head"><div class="title">住民</div><button class="close" data-close="peoplepanel">✕</button></div>
+  <div id="people-body"></div>
+</div>
+
+<!-- 目標パネル -->
+<div id="goalpanel" class="sheet hidden">
+  <div class="sheet-head"><div class="title">目標</div><button class="close" data-close="goalpanel">✕</button></div>
+  <div id="goal-body"></div>
+</div>
+
+<!-- 汎用モーダル（施設詳細・オフライン結果など） -->
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="title" id="modal-title"></div>
+    <div id="modal-body"></div>
+    <div class="row"><button class="btn hidden" id="modal-cancel">キャンセル</button><button class="btn primary" id="modal-ok">OK</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="ver"></div>
+
+<script src="game.js"></script>
 </body>
 </html>
