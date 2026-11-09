@@ -71,6 +71,7 @@
   .g10 { --c: #8fd46b; --d: #4f9e35; --bg: #eaf8df; }
   .g11 { --c: #ff9ac8; --d: #e0609a; --bg: #fff0f7; }
   .g12 { --c: #8fa6f0; --d: #3a4d8f; --bg: #eef2ff; }
+  .g13 { --c: #ffb98a; --d: #d9773a; --bg: #fff6e0; }
 </style>
 </head>
 <body>
@@ -173,6 +174,14 @@
         <div class="desc">やまの なかから おなじ えを 3つ そろえよう！</div>
         <div class="stars">★★☆</div>
         <div class="note">🌐 ネットに つないでね</div>
+      </div>
+    </a>
+    <a class="game g13" href="kakikata/index.html">
+      <canvas class="thumb" id="th13"></canvas>
+      <div class="body">
+        <div class="name">かいてみよう</div>
+        <div class="desc">ひらがなや すうじを ゆびで なぞって かこう！</div>
+        <div class="stars">★☆☆</div>
       </div>
     </a>
   </div>
@@ -725,6 +734,36 @@
         c.font = `20px ${EM}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#000'; c.fillText('🍓', x + 16.5, 246); }
     }
     c.font = `26px ${EM}`; c.fillText('✨', 72, 214); c.fillText('✨', 186, 214);
+  }
+
+  // 13. かいてみよう
+  {
+    const c = setup('th13');
+    c.fillStyle = '#fff6e0'; c.fillRect(0, 0, W, H);
+    const EM = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    const FT = '"Hiragino Maru Gothic ProN","M PLUS Rounded 1c","Yu Gothic",sans-serif';
+    // かみ
+    c.fillStyle = 'rgba(0,0,0,.1)'; rr(c, 118, 58, 174, 186, 22); c.fill();
+    c.fillStyle = '#fff'; rr(c, 112, 50, 174, 186, 22); c.fill();
+    c.strokeStyle = '#eadfca'; c.lineWidth = 2; c.setLineDash([6, 6]);
+    c.beginPath(); c.moveTo(199, 62); c.lineTo(199, 224); c.moveTo(124, 143); c.lineTo(274, 143); c.stroke(); c.setLineDash([]);
+    // おてほん の じ と なぞった せん
+    c.font = `800 140px ${FT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#eadfca';
+    c.fillText('あ', 199, 148);
+    c.save(); c.beginPath(); c.rect(112, 50, 174, 98); c.clip();
+    c.fillStyle = '#ff8a5c'; c.fillText('あ', 199, 148); c.restore();
+    // えんぴつ
+    c.save(); c.translate(262, 132); c.rotate(.75);
+    c.fillStyle = '#ffd23f'; c.fillRect(-7, -64, 14, 56);
+    c.fillStyle = '#ff8fb5'; rr(c, -7, -76, 14, 13, 4); c.fill();
+    c.fillStyle = '#f3c08a'; c.beginPath(); c.moveTo(-7, -8); c.lineTo(7, -8); c.lineTo(0, 10); c.closePath(); c.fill();
+    c.fillStyle = '#5a3a22'; c.beginPath(); c.moveTo(-2.4, 3); c.lineTo(2.4, 3); c.lineTo(0, 10); c.closePath(); c.fill();
+    c.restore();
+    // まわりの もじ
+    const chip = (x, y, t, col, rot) => { c.save(); c.translate(x, y); c.rotate(rot); c.fillStyle = 'rgba(0,0,0,.12)'; rr(c, -24, -20, 48, 48, 14); c.fill();
+      c.fillStyle = col; rr(c, -24, -24, 48, 48, 14); c.fill(); c.font = `800 30px ${FT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#5a3a22'; c.fillText(t, 0, 1); c.restore(); };
+    chip(64, 100, 'い', '#8fd9bd', -.15); chip(70, 190, '1', '#ffe27a', .12); chip(336, 96, 'う', '#ffe27a', .15); chip(330, 190, '2', '#8fd9bd', -.1);
+    c.font = `26px ${EM}`; c.textAlign = 'center'; c.fillStyle = '#000'; c.fillText('✨', 132, 70); c.fillText('⭐', 286, 224);
   }
 })();
 </script>
