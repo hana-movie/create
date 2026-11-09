@@ -5,7 +5,7 @@
    仮置きの数値は CONFIG にまとめる。
    ============================================================ */
 
-const VERSION = '0.37.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
+const VERSION = '0.39.0';   // 画面左下と ⚙️ に表示。更新時はここを上げる
 
 // ---------- 調整用の定数 ----------
 const CONFIG = {
@@ -68,9 +68,9 @@ const CONFIG = {
   DENOM_RATE: 0.7,      // 島レベル9までは、分母が「ポイントの合計×0.7」を超えない
   DENOM_MULT: 1.6,      // v0.37：分母＝そのカテゴリで配れる品の最高ポイント×1.6（四捨五入）。ただし配れる品のポイントの合計より大きくしない
   MARKET_SLOT_UP: { cost: { plank: 20, brick: 20 }, slots: 10, stage: 3 },  // 島レベル3から5→10個（作業員は島レベル2から）
-  MARKET_SLOT_UP2: { cost: { plank: 30, brick: 30, coins: 2000 }, slots: 15, stage: 6 },  // v0.36：島レベル6から10→15個
+  MARKET_SLOT_UP2: { cost: { plank: 30, brick: 30, coins: 2000 }, slots: 15, stage: 5 },  // v0.39：島レベル5から10→15個
   // ---- 2島・港 ----
-  ISLANDS: { stage: 10, cost: [0, 0, 10000, 20000, 30000, 40000, 50000], popPer: 100 },   // v0.37：島レベル10で2〜6島を順に買える（値段は仮）。人口が100人×持っている島の数になると次を買える。上限も島1つにつき100人
+  ISLANDS: { stage: 10, cost: [0, 0, 10000, 20000, 30000, 40000, 50000], popPer: 100 },   // 島レベル10で2〜6島を順に買える（値段は仮）。v0.38：ひとつ前の島の住民が100人になると次を買える。人口の上限はなし
   PORT: {
     cost: { plank: 15, brick: 10 },      // 港1つの値段（仮）。材料は1島の倉庫から
     workers: 5,                          // 作業員の上限＝船の数（作業員1人で船1隻）。v0.37：5隻
@@ -99,7 +99,7 @@ const rangeText = R => CONFIG.HEX ? `${R}マス以内（${3 * R * (R + 1)}マス
 const ITEMS = {
   // v0.37：ポイントは材料のポイントの合計（燃料の木材も2p）。isle は、その島を買うと作れるようになる品
   wood:   { name: '木材',   color: '#8b5a2b', tier: 0, time: 10 },
-  stone:  { name: '石材',   color: '#8a8a8a', tier: 0, time: 10, cat: 'luxury' },   // 贅沢品として配れるのは島レベル5から
+  stone:  { name: '石材',   color: '#8a8a8a', tier: 0, time: 10 },   // v0.38：材料（配る品ではない）
   water:  { name: '水',     color: '#4a90e2', tier: 0, time: 10, cat: 'drink' },
   wheat:  { name: '小麦',   color: '#c9a43a', tier: 0, time: 10, cat: 'food' },
   orange: { name: 'オレンジ', color: '#e07a1c', tier: 0, time: 10, cat: 'drink' },
@@ -281,28 +281,27 @@ const STAGES = [
       { id: 'c4', text: '石のオノで伐採を速める', n: 1, prog: () => pv('boost_axe'), req: ['c3'], hint: '伐採所のパネルから石のオノを入れます' },
       { id: 'c5', text: '住民を28人にする', n: 28, prog: () => S.pop },
     ] },
-  { n: 4, cap: 36, unlock: [],
-    intro: '島レベル4：パンのレシピが買えるようになりました（食の中間の品）',
-    goals: [
-      { id: 'd3', text: '住民を36人にする', n: 36, prog: () => S.pop },
-    ] },
-  { n: 5, cap: 44, unlock: ['apiary', 'polisher', 'furniture'],
-    intro: '島レベル5：贅沢品のカテゴリが始まりました（石材・磨き石）。養蜂場で綿花畑からハチミツを採れます。衣に布が加わりました',
+  { n: 4, cap: 36, unlock: ['polisher'],
+    intro: '島レベル4：贅沢品のカテゴリが始まりました（磨き石）。研磨所で石材＋水から磨き石を作りましょう。パンのレシピも買えます',
     goals: [
       { id: 'e1', text: '研磨所を建てて磨き石を10個作る', n: 10, prog: () => pv('made_polish'), hint: '磨き石のレシピ（🪙800）が必要です' },
+      { id: 'd3', text: '住民を36人にする', n: 36, prog: () => S.pop },
+    ] },
+  { n: 5, cap: 44, unlock: ['apiary', 'furniture'],
+    intro: '島レベル5：養蜂場で綿花畑からハチミツを採れます。衣に布が加わりました。市場の販売スロットを15個に増やせます',
+    goals: [
       { id: 'e2', text: '養蜂場を建ててハチミツを10個採る', n: 10, prog: () => pv('made_honey'), hint: '綿花畑の近くに養蜂場を建てます' },
       { id: 'e3', text: '紡績所で布を10個作る', n: 10, prog: () => pv('made_cloth'), hint: '布のレシピ（🪙800）を買い、紡績所のレシピを布に変えます' },
       { id: 'e4', text: '家具屋で木のベッドを4個作る', n: 4, prog: () => pv('made_bed'), hint: 'ベッドのレシピ（🪙800）が必要です' },
       { id: 'e5', text: '木のベッド4個と1000コインで住居をアップグレードする', n: 1, prog: () => (S.buildings.some(b => b.type === 'house' && (b.lv || 0) >= 1) ? 1 : 0), req: ['e4'], hint: '自宅をタップして「アップグレード」' },
+      { id: 'e7', text: '市場の販売スロットを15個にする', n: 1, prog: () => (S.buildings.some(b => b.type === 'market' && b.slots && b.slots.length >= 15) ? 1 : 0), hint: '市場をタップして「販売スロット」をアップグレード（板材30＋石レンガ30＋2000コイン）' },
       { id: 'e6', text: '住民を44人にする', n: 44, prog: () => S.pop },
     ] },
   // 島レベル6〜9：分母は「そのカテゴリの品の全ポイント×0.75」（品ぞろえを求める）。house は住居レベル1の必要な割合
   { n: 6, cap: 56, house: 50, unlock: ['pharmacy', 'tailor'],
-    intro: '島レベル6：衛生（ハーブ・軟膏）と住（住居レベル1の割合50%）のカテゴリが始まりました。オレンジパン・シャツも加わりました。古い住居をアップグレード（木のベッド4＋1000コイン）しましょう',
+    intro: '島レベル6：衛生（ハーブ・軟膏）と住（住居レベル1の割合50%）のカテゴリが始まりました。オレンジパン・シャツのレシピも買えます。古い住居をアップグレード（木のベッド4＋1000コイン）しましょう',
     goals: [
-      { id: 'f1', text: '採集所でハーブを10個採る', n: 10, prog: () => pv('made_herb'), hint: '左下・右下のハーブの近くに採集所を建て、「ハーブ」を選びます' },
-      { id: 'f2', text: '薬局で軟膏を10個作る', n: 10, prog: () => pv('made_oint'), hint: '軟膏のレシピ（🪙1000）が必要です' },
-      { id: 'f3', text: 'オレンジパンを10個作る', n: 10, prog: () => pv('made_obread'), hint: '食品工房でレシピ（🪙1000）を買います' },
+      { id: 'f2', text: '薬局で軟膏を10個作る', n: 10, prog: () => pv('made_oint'), hint: '軟膏（ハーブ＋水）のレシピ（🪙1000）が必要です。ハーブは採集所で「ハーブ」を選んで採ります' },
       { id: 'f4', text: '仕立て屋でシャツを10個作る', n: 10, prog: () => pv('made_clothes'), hint: 'シャツのレシピ（🪙1000）が必要です' },
       { id: 'f5', text: '住居レベル1の割合を50%以上にする', n: 50, prog: () => Math.floor(housePct()), hint: '自宅をアップグレード（ベッド4＋1000コイン）' },
       { id: 'f6', text: '住民を56人にする', n: 56, prog: () => S.pop },
@@ -329,7 +328,7 @@ const STAGES = [
       { id: 'i3', text: '住民を100人にする', n: 100, prog: () => S.pop },
     ] },
   { n: 10, cap: Infinity, house: 75, unlock: [],
-    intro: '島レベル10：自由モード。新しい島（2〜6島）を買うと、人口の上限が100人ずつ増えます。コインで島を強化できます（📦倉庫の拡張、施設の作業員の上限アップ・2つのレシピ、市場の配達範囲の拡大）',
+    intro: '島レベル10：自由モード。満足度を保てば、住居を置けるかぎり住民が増えます。新しい島（2〜6島）も買えます（ひとつ前の島の住民が100人になると次の島）。コインで島を強化できます（📦倉庫の拡張、施設の作業員の上限アップ・2つのレシピ、市場の配達範囲の拡大）',
     goals: [
       { id: 'j1', text: '2島を買う（🪙10,000）', n: 1, prog: () => (owned(2) ? 1 : 0), hint: '目標の画面（🎯）の「2島を買う」ボタンで買えます' },
       { id: 'j2', text: '港を建てて1島と2島をつなぐ', n: 1, prog: () => (S.buildings.some(b => b.type === 'port' && (b.ships || []).some(s => { const d = getB(s.dest); return d && islandOf(d.x) !== islandOf(b.x); })) ? 1 : 0), req: ['j1'], hint: '1島と2島の砂浜に港を建て、船の行き先を相手の島の港にします' },
@@ -577,14 +576,13 @@ const RAW_SRC = { water: 'well', wheat: 'collect', orange: 'collect', cotton: 'c
 function itemAvail(k) {
   const it = ITEMS[k]; if (!it || !it.cat) return false;
   if (it.isle) return owned(it.isle);
-  if (k === 'stone') return S.stage >= 5;   // 石材が贅沢品になるのは島レベル5から
   if (RAW_SRC[k]) return S.unlocked.includes(RAW_SRC[k]) && resAvailable(k);
   return Object.keys(RECIPES).some(r => RECIPES[r].out === k && recipeOwned(r) && Object.values(BUILD).some(d => (d.recipes || []).includes(r)));
 }
 function availItems() { return Object.keys(ITEMS).filter(itemAvail); }
 // 分母＝最高ポイント×1.6（四捨五入）。ただし島レベル9までは「ポイントの合計×0.7」を超えない（品が少ない序盤がきつくなりすぎないように）
-// 島レベル10からは最高ポイント×1.6。1島の品がそろうと、5カテゴリとも19
-function denoms() { const mx = {}, sum = {}; for (const k of availItems()) { const c = ITEMS[k].cat, p = ITEMS[k].pts; mx[c] = Math.max(mx[c] || 0, p); sum[c] = (sum[c] || 0) + p; } const o = {}; for (const c of CAT_ORDER) if (mx[c]) { const top = Math.round(mx[c] * CONFIG.DENOM_MULT); o[c] = S.stage >= CONFIG.ISLANDS.stage ? top : Math.min(top, Math.round(sum[c] * CONFIG.DENOM_RATE * 10) / 10); } return o; }
+// 島レベル10からは最高ポイント×1.6（ポイントの合計を超えない）。1島の品がそろうと19（贅沢品は磨き石4＋輝き石12で16）
+function denoms() { const mx = {}, sum = {}; for (const k of availItems()) { const c = ITEMS[k].cat, p = ITEMS[k].pts; mx[c] = Math.max(mx[c] || 0, p); sum[c] = (sum[c] || 0) + p; } const o = {}; for (const c of CAT_ORDER) if (mx[c]) { const top = Math.round(mx[c] * CONFIG.DENOM_MULT); o[c] = S.stage >= CONFIG.ISLANDS.stage ? Math.min(top, sum[c]) : Math.min(top, Math.round(sum[c] * CONFIG.DENOM_RATE * 10) / 10); } return o; }
 function activeCats() { return Object.keys(denoms()); }
 // 住民1人のカテゴリ満足度（%）：ポイント × ゲージ ÷ 分母
 function resSat(r, cat) { const d = denoms()[cat]; if (!d) return 100; let p = 0; for (const k in r.demand) if (ITEMS[k].cat === cat && itemCounts(k)) p += ITEMS[k].pts * r.demand[k] / 100; return Math.min(100, p / d * 100); }
@@ -594,7 +592,7 @@ function minSat() { const cs = activeCats(); return cs.length ? Math.min(...cs.m
 // 今の島レベルで満足度に数える品（分母に入っている品）。それ以外の品は届けても満足度にならない
 function stageItems() { return availItems(); }
 function itemCounts(k) { return itemAvail(k); }
-function stageCap() { return S.stage >= CONFIG.ISLANDS.stage ? CONFIG.ISLANDS.popPer * ownedList().length : stageDef().cap; }
+function stageCap() { return stageDef().cap; }
 // 住の満足度：人が住んでいる住居のうち、住居レベル1以上の割合（%）。島レベルごとに必要な割合 house がある
 function housePct() { const hs = S.buildings.filter(b => b.type === 'house' && residentsOf(b).length); return hs.length ? hs.filter(b => (b.lv || 0) >= 1).length / hs.length * 100 : 0; }
 function houseNeed() { return stageDef().house || 0; }
@@ -606,7 +604,6 @@ function buildCost(type) { return type === 'house' && S.stage >= CONFIG.HOUSE_LV
 function popCap() { return Math.min(stageCap(), houseCapacity()); }
 // 人口が増えない理由（増えるなら null）
 function growBlock() {
-  if (S.pop >= stageCap() && !hasNextStage()) return ownedList().length < 6 ? `人口の上限は${stageCap()}人（持っている島1つにつき100人）。目標の画面から次の島を買いましょう` : `人口の上限は${stageCap()}人です`;
   if (S.pop >= stageCap() && stageCap() !== Infinity) return hasNextStage() ? `島レベル${S.stage}は${stageCap()}人まで。目標をすべて達成して島レベルを上げましょう` : `島レベル${S.stage}は${stageCap()}人まで（次の島レベルは準備中）`;
   if (!countType('house')) return '自宅を建てて住民を住まわせましょう';
   if (S.pop >= houseCapacity()) return '住居が満員です。自宅を建てましょう';
@@ -719,18 +716,20 @@ function isl2Content() {
     for (const t of ISLE_PLAN[i].unlock) unlockType(t);
   }
   delete S.isl2v;
+  for (const st of STAGES) if (st.n <= S.stage) for (const ty of st.unlock) if (!S.unlocked.includes(ty)) S.unlocked.push(ty);   // v0.39：研磨所がL4に移ったので、前のセーブにも
 }
 function nextIsland() { const n = ownedList().length + 1; return n <= 6 ? n : 0; }
 function islandCost(i) { return CONFIG.ISLANDS.cost[i] || 0; }
-function islandPopNeed() { return CONFIG.ISLANDS.popPer * ownedList().length; }
-function canBuyIsland() { const i = nextIsland(); return !!i && S.stage >= CONFIG.ISLANDS.stage && S.pop >= islandPopNeed() && S.coins >= islandCost(i); }
+function islandPopNeed() { return CONFIG.ISLANDS.popPer; }
+function prevIslandPop() { const i = nextIsland(); return i ? islandPop(i - 1) : 0; }   // v0.38：ひとつ前の島の住民が100人になると次の島を買える
+function canBuyIsland() { const i = nextIsland(); return !!i && S.stage >= CONFIG.ISLANDS.stage && prevIslandPop() >= islandPopNeed() && S.coins >= islandCost(i); }
 function buyIsland() {
   if (!canBuyIsland()) return false;
   const i = nextIsland();
   S.coins -= islandCost(i); S.owned = [...(S.owned || []), i]; S.isl2 = true; ST(i);
   islandLand(i, S.land); buildKinds(S.land); rebuildOcc();
   isl2Content(); S.stats['isl' + i] = 1; if (i === 2) S.stats.isl2 = 1;
-  notify(`🏝 ${i}島を買いました！（${ISLE_WHERE[i]}）人口の上限が${stageCap()}人になりました。港を建ててつなぎましょう`);
+  notify(`🏝 ${i}島を買いました！（${ISLE_WHERE[i]}）港を建ててつなぎましょう`);
   return true;
 }
 // 前の版のセーブ：なくなった品・施設・レシピを片づける（返却なし）。ジュース・ハーブ茶は飲料工房へ
@@ -751,7 +750,7 @@ function migrateV32() {
     if (b.recipe2 && !BUILD[b.type].recipes.includes(b.recipe2)) b.recipe2 = null;
     if (b.type === 'ranch' && !['milk', 'wool'].includes(b.res)) b.res = 'wool';
     if (b.type === 'apiary' && !['honey', 'wax'].includes(b.res)) b.res = 'honey';
-    if (b.slots) for (const s of b.slots) if (s.item && !ITEMS[s.item]) { s.item = null; s.stock = 0; }
+    if (b.slots) for (const s of b.slots) if (s.item && !(ITEMS[s.item] && ITEMS[s.item].cat)) { if (ITEMS[s.item] && s.stock) withIsl(islandOf(b.x), () => invAdd(s.item, s.stock)); s.item = null; s.stock = 0; }
     if (b.ships) for (const s of b.ships) { for (const o of [s.go, s.back, s.cargo]) for (const k in o) if (!ITEMS[k]) delete o[k]; }
   }
   for (const r of S.residents) for (const k in r.demand) if (!ITEMS[k]) delete r.demand[k];
@@ -849,7 +848,7 @@ function boostLeftSec(b) { return b.workers ? (b.boost || 0) / b.workers : (b.bo
 // ---------- レシピ ----------
 function recipeOwned(r) { return !RECIPES[r].buy || S.recipes.includes(r); }
 // レシピの価格：そのレシピの品が初めて満足度・材料に使われる島レベルで決まる
-const RECIPE_LV = { brick: 1, flour: 2, juice: 2, thread: 3, axe: 3, pickaxe: 3, scissors: 3, bread: 4, cloth: 5, polish: 5, bed: 5, press: 5, obread: 6, clothes: 6, oint: 6, shine: 7, tea: 8, otea: 8, comp: 9, kitchen: 10, net: 10, bucket: 10,
+const RECIPE_LV = { brick: 1, flour: 2, juice: 2, thread: 3, axe: 3, pickaxe: 3, scissors: 3, bread: 4, cloth: 5, polish: 4, bed: 5, press: 5, obread: 6, clothes: 6, oint: 6, shine: 7, tea: 8, otea: 8, comp: 9, kitchen: 10, net: 10, bucket: 10,
   fillet: 10, saute: 10, roast: 10, hmcof: 10, soapliq: 10, osoap: 10, thread_w: 10, dress: 10, ingot: 10, plate: 10, cutlery: 10 };
 function recipeCost(r) { return CONFIG.RECIPE_COST_BY_LV[RECIPE_LV[r]] || CONFIG.RECIPE_COST; }
 // レシピはその品が使えるようになる島レベルから買える
@@ -2289,7 +2288,7 @@ $('goalbar').addEventListener('click', () => { if (UI.mode !== 'normal') return;
 function openGoals() { $('goalpanel').classList.remove('hidden'); renderGoal(); }
 function renderGoal() {
   const sd = stageDef();
-  let h = `<div class="sub">島レベル${S.stage} <small>${sd.cap === Infinity ? `自由モード（人口${stageCap()}人まで・島1つにつき100人）` : `人口${sd.cap}人まで`}${sd.house ? `・住居レベル1 ${sd.house}%` : ''}・${activeCats().map(c => CATS_SAT[c]).join('・')}の満足度</small></div>`;
+  let h = `<div class="sub">島レベル${S.stage} <small>${sd.cap === Infinity ? '自由モード（人口の上限なし）' : `人口${sd.cap}人まで`}${sd.house ? `・住居レベル1 ${sd.house}%` : ''}・${activeCats().map(c => CATS_SAT[c]).join('・')}の満足度</small></div>`;
   const hidden = sd.goals.filter(g => !goalDone(g.id) && !goalVisible(g)).length;
   for (const g of sd.goals) {
     const done = goalDone(g.id), vis = goalVisible(g); if (!done && !vis) continue;
@@ -2297,7 +2296,7 @@ function renderGoal() {
     h += `<div class="goal ${done ? 'done' : ''}"><div class="gt">${done ? '✅' : '🎯'} ${g.text}</div>${done ? '' : `<div class="gr">進捗 ${p} / ${g.n}${g.unlock ? '　達成で ' + g.unlock.map(t => BUILD[t].name).join('・') + ' を解放' : ''}</div>`}${hint}</div>`;
   }
   const ni = nextIsland();
-  if (S.stage >= CONFIG.ISLANDS.stage && ni) h += `<div class="row"><button class="btn primary" id="buy-isl" ${canBuyIsland() ? '' : 'disabled'}>🏝 ${ni}島を買う 🪙${islandCost(ni).toLocaleString()}</button></div><div class="hint">人口${islandPopNeed()}人から買えます（今${S.pop}人）。${ISLE_WHERE[ni]}に現れます。資源：${[...new Set(ISLE_PLAN[ni].res.map(e => e[0]))].map(resName).join('・')}${ISLE_PLAN[ni].rand ? '＋ランダムに2種類' : ''}${ISLE_PLAN[ni].fish ? '・魚影' : ''}。買うと人口の上限が100人増え、その島の品が満足度の分母に加わります</div>`;
+  if (S.stage >= CONFIG.ISLANDS.stage && ni) h += `<div class="row"><button class="btn primary" id="buy-isl" ${canBuyIsland() ? '' : 'disabled'}>🏝 ${ni}島を買う 🪙${islandCost(ni).toLocaleString()}</button></div><div class="hint">${ni - 1}島の住民が${islandPopNeed()}人になると買えます（今${prevIslandPop()}人）。${ISLE_WHERE[ni]}に現れます。資源：${[...new Set(ISLE_PLAN[ni].res.map(e => e[0]))].map(resName).join('・')}${ISLE_PLAN[ni].rand ? '＋ランダムに2種類' : ''}${ISLE_PLAN[ni].fish ? '・魚影' : ''}。買うと、その島の品が満足度の分母に加わります</div>`;
   if (hidden) h += `<div class="goal locked"><div class="gt">🔒 ほかに${hidden}つの目標（今の目標を進めると出てきます）</div></div>`;
   if (stageComplete()) h += hasNextStage() ? `<div class="row"><button class="btn primary" id="stage-up">🎉 島レベル${S.stage}を達成！ 島レベル${S.stage + 1}へ</button></div>` : `<div class="hint">🎉 島レベル${S.stage}の目標をすべて達成しました。ここからは自由モードです</div>`;
   $('goal-body').innerHTML = h;
