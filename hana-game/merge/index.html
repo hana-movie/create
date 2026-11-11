@@ -15,8 +15,8 @@
     --retry: #f08a24;
     --warn: #d6442f;
   }
-  /* touch-action: manipulation … iPad/iPhone の ダブルタップ拡大を とめる（.item は ドラッグ用に none のまま） */
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; -webkit-touch-callout: none; }
+  /* touch-action: manipulation = ダブルタップでの拡大を無効にする(ドラッグするアイテムは .item で none を指定) */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   html, body { margin: 0; height: 100%; }
   body {
     background: var(--bg);
@@ -30,16 +30,18 @@
   #app {
     /* 盤面の幅:画面の横幅いっぱい(左右10pxの余白)。PCは最大690px(従来460pxの1.5倍)。
        縦に収まるよう、画面の高さからも上限を決める(盤面+供給行=盤面の約1.2倍) */
-    --board-w: min(100vw - 20px, 690px, max(260px, calc((100dvh - 300px) / 1.2)));
-    --cell-h: calc((var(--board-w) - 40px) / 5);   /* 盤面1マス分の高さ */
+    --board-w: min(100vw - 20px, 690px, max(260px, calc((100dvh - 290px) / 1.2)));
+    --cell-h: calc((var(--board-w) - 16px - (var(--cols) - 1) * 6px) / var(--cols));   /* 盤面1マス分の高さ */
     width: var(--board-w);
     display: flex; flex-direction: column; gap: 8px;
   }
 
-  .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
-  .stat { font-weight: 800; font-size: 2rem; line-height: 1.1; }
-  .stat small { display: block; font-size: 1rem; font-weight: 700; }
-  .stat .goal { font-size: 1.2rem; font-weight: 700; }
+  .stat {
+    flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 1.8rem; line-height: 1.1; white-space: nowrap;
+  }
+  .stat small { display: block; font-size: .9rem; font-weight: 700; }
+  .stat .goal { font-size: 1.1rem; font-weight: 700; }
 
   button.btn {
     font: inherit; font-weight: 800; font-size: 1.5rem;
@@ -53,18 +55,26 @@
   button.btn.retry { background: var(--retry); }
   button.btn.sub { background: #fff; color: var(--ink); border: 4px solid var(--accent); }
   #supplyBtn { flex: 1 1 0; min-width: 0; min-height: 0; padding: 0 10px; font-size: clamp(1.2rem, calc(var(--board-w) / 16), 2rem); }
-  #retryBtn { width: 100%; min-height: 72px; font-size: 1.8rem; }
+  #retryBtn { flex: 1 1 0; min-width: 0; min-height: 72px; padding: 0 8px; font-size: clamp(1.1rem, 5vw, 1.8rem); white-space: nowrap; }
+  .top-row { display: flex; align-items: stretch; gap: 8px; }
+  button.btn.home {
+    flex: 0 0 auto; min-width: 84px; min-height: 72px; padding: 4px 10px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 1rem; line-height: 1.1;
+  }
+  button.btn.home .icon { font-size: 1.9rem; line-height: 1.1; }
 
   /* 注文カード */
   #orders { display: flex; justify-content: center; gap: 8px; }
   .order {
     flex: 1 1 0; min-width: 0; max-width: 200px;
     display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px;
-    padding: 2px 6px; background: #fff; border: 4px solid var(--accent); border-radius: 16px;
+    min-height: 100px;   /* 従来の約2倍の高さ */
+    padding: 6px 8px; background: #fff; border: 4px solid var(--accent); border-radius: 20px;
     line-height: 1.1;
   }
-  .order .o-emoji { font-size: 2.1rem; line-height: 1.1; }
-  .order .o-lv { font-size: 1.2rem; font-weight: 800; color: var(--accent); }
+  .order .o-emoji { font-size: 3.4rem; line-height: 1.1; }
+  .order .o-lv { font-size: 1.7rem; font-weight: 800; color: var(--accent); }
 
   #message { min-height: 1.6em; text-align: center; font-weight: 800; font-size: 1.3rem; color: var(--warn); }
 
@@ -103,7 +113,7 @@
     pointer-events: none;
   }
 
-  /* 供給ボタン(左)+ バイバイ(右) */
+  /* 供給ボタン(左)+ ごみ箱(右) */
   .bottom-row { display: flex; align-items: stretch; gap: 8px; height: max(56px, var(--cell-h)); }
   #byeArea {
     flex: 0 0 28%; min-width: 0;
@@ -115,7 +125,7 @@
   }
   #byeArea .icon { font-size: 1.6em; line-height: 1.1; }
 
-  /* ドラッグ中:ドロップ先(注文カード・バイバイ)を少し強調 */
+  /* ドラッグ中:ドロップ先(注文カード・ごみ箱)を少し強調 */
   .order { transition: transform .12s, background .12s; }
   body.dragging .order, body.dragging #byeArea {
     border-color: var(--retry);
@@ -153,8 +163,10 @@
 </head>
 <body>
 <div id="app">
-  <div class="top">
-    <div class="stat"><small id="labelDone"></small><span id="done">0</span> <span class="goal">/ <span id="goal">0</span></span></div>
+  <div class="top-row">
+    <button id="homeBtn" type="button" class="btn sub home"><span class="icon" id="homeIcon"></span><span id="homeText"></span></button>
+    <div class="stat"><small id="labelDone"></small><span id="done">0</span> <span class="goal" id="goalWrap">/ <span id="goal">0</span></span></div>
+    <button id="retryBtn" type="button" class="btn retry"></button>
   </div>
   <div id="orders"></div>
   <div id="message" aria-live="polite"></div>
@@ -163,7 +175,6 @@
     <button id="supplyBtn" type="button" class="btn"></button>
     <div id="byeArea"><span class="icon" id="byeIcon"></span><span id="byeText"></span></div>
   </div>
-  <button id="retryBtn" type="button" class="btn retry"></button>
 </div>
 <div id="ghost"></div>
 
@@ -171,7 +182,6 @@
   <div class="panel">
     <h2 id="selectTitle"></h2>
     <div id="difficultyList" style="display:flex;flex-direction:column;gap:14px"></div>
-    <a href="../gameselect.html" style="display:flex;align-items:center;justify-content:center;min-height:64px;border-radius:20px;border:4px solid var(--accent);background:#fff;color:var(--ink);font-weight:800;font-size:1.3rem;text-decoration:none;box-shadow:0 5px 0 rgba(0,0,0,.18)">🏠 ゲームを えらぶ</a>
   </div>
 </div>
 
@@ -190,40 +200,41 @@
    設定(数値・絵文字・文言はここだけ変えればOK)
    ============================================================ */
 const CONFIG = {
-  COLS: 5,
-  ROWS: 5,
-
   // 系統ごとの絵文字。配列の index = レベル(0は未使用)
   LINES: [
     [null, '🌾', '🍞', '🥐', '🎂', '🏆'],
     [null, '🍇', '🍷', '🥂', '🍾', '👑'],
     [null, '🐟', '🍣', '🍱', '🦞', '💎'],
+    [null, '🚲', '🚗', '🚌', '🚄', '🚀'],
+    [null, '🌱', '🌿', '🌷', '🌻', '🌈'],
   ],
   MAX_LEVEL: 5,
 
   // 難易度の設定(1つの配列)
+  //   cols/rows: 盤面のマス数(列×行)
   //   lines    : 系統数(LINESの先頭から使う。供給と注文の両方に使う)
   //   orders   : 同時に出る注文の数
   //   minLevel : 注文のレベルの下限
   //   maxLevel : 注文のレベルの上限
-  //   goal     : クリアまでに達成する注文の数
+  //   goal     : クリアまでに達成する注文の数(null = たくさん:クリアなし)
   DIFFICULTIES: [
-    { label: 'やさしい',   lines: 2, orders: 1, minLevel: 2, maxLevel: 3, goal: 3 },
-    { label: 'ふつう',     lines: 3, orders: 2, minLevel: 2, maxLevel: 4, goal: 5 },
-    { label: 'むずかしい', lines: 3, orders: 3, minLevel: 3, maxLevel: 5, goal: 8 },
+    { label: '8こ',        cols: 5, rows: 5, lines: 3, orders: 3, minLevel: 3, maxLevel: 5, goal: 8 },
+    { label: 'たくさん',   cols: 5, rows: 5, lines: 3, orders: 3, minLevel: 3, maxLevel: 5, goal: null },
+    { label: 'いっぱい',   cols: 6, rows: 6, lines: 5, orders: 3, minLevel: 3, maxLevel: 5, goal: null },
   ],
 
   MESSAGE_MS: 1800,
 
   // 画面で使う絵文字
-  ICONS: { BYE: '👋', CLEAR: '🎉' },
+  ICONS: { BYE: '🗑️', CLEAR: '🎉', HOME: '🏠' },
 
   // 画面で使う文言
   TEXT: {
     DONE: 'たっせい',
     LEVEL: (n) => 'Lv' + n,
     SUPPLY_BTN: 'あたらしくだす',
-    BYE: 'バイバイ',
+    BYE: 'すてる',
+    HOME: 'ホーム',
     FULL: 'いっぱいだよ',
     RETRY: 'もう一度',
     SELECT_TITLE: 'むずかしさを えらんでね',
@@ -231,7 +242,7 @@ const CONFIG = {
     CLEAR_BODY: 'やったね! だいせいこう!',
     CONTINUE: 'つづける',
     TO_SELECT: 'むずかしさをかえる',
-    DIFF_DETAIL: (d) => 'ぜんぶで ' + d.goal + 'こ / しゅるい ' + d.lines,
+    DIFF_DETAIL: (d) => d.lines + 'しゅるい',
   },
 };
 
@@ -243,6 +254,8 @@ const CONFIG = {
    ============================================================ */
 const state = {
   board: [],
+  cols: 0,
+  rows: 0,
   orders: [],
   done: 0,
   goal: 0,
@@ -352,7 +365,7 @@ function handleDrop(from, target) {
    クリア判定
    ============================================================ */
 function isCleared() {
-  return state.done >= state.goal;
+  return state.goal !== null && state.done >= state.goal;   // goal が null なら たくさん(終わりなし)
 }
 
 function afterAction() {
@@ -371,7 +384,10 @@ function showSelect() {
 
 function startGame(difficulty) {
   state.difficulty = difficulty;
-  state.board = new Array(CONFIG.COLS * CONFIG.ROWS).fill(null);
+  state.cols = difficulty.cols;
+  state.rows = difficulty.rows;
+  buildBoard();
+  state.board = new Array(state.cols * state.rows).fill(null);
   state.done = 0;
   state.goal = difficulty.goal;
   state.lineCount = difficulty.lines;
@@ -401,10 +417,11 @@ function showClear() {
    描画
    ============================================================ */
 function buildBoard() {
-  $board.style.setProperty('--cols', CONFIG.COLS);
-  $board.style.setProperty('--rows', CONFIG.ROWS);
+  // --cols / --rows は #app に置く(盤面と、供給行の高さ計算の両方で使う)
+  $('app').style.setProperty('--cols', state.cols);
+  $('app').style.setProperty('--rows', state.rows);
   $board.innerHTML = '';
-  for (let i = 0; i < CONFIG.COLS * CONFIG.ROWS; i++) {
+  for (let i = 0; i < state.cols * state.rows; i++) {
     const c = document.createElement('div');
     c.className = 'cell';
     c.dataset.index = i;
@@ -431,6 +448,8 @@ function applyStaticText() {
   $supply.textContent = T.SUPPLY_BTN;
   $('retryBtn').textContent = T.RETRY;
   $('byeIcon').textContent = I.BYE;
+  $('homeIcon').textContent = I.HOME;
+  $('homeText').textContent = T.HOME;
   $('byeText').textContent = T.BYE;
   $('selectTitle').textContent = T.SELECT_TITLE;
   $('clearIcon').textContent = I.CLEAR;
@@ -480,6 +499,7 @@ function render() {
   renderOrders();
   $done.textContent = state.done;
   $goal.textContent = state.goal;
+  $('goalWrap').style.display = state.goal === null ? 'none' : '';
   $supply.disabled = state.phase !== 'play';
 }
 
@@ -551,24 +571,13 @@ function endDrag(e, cancelled) {
 }
 
 function setupEvents() {
-  // iPad/iPhone：はやく タップしても かくだい しないように
-  // （ボタン以外の ところを つづけて タップしたときの ダブルタップ拡大と、2本ゆびの ピンチ拡大を とめる）
-  let lastTouchEnd = 0;
-  document.addEventListener('touchend', (e) => {
-    const t = Date.now();
-    if (t - lastTouchEnd < 350 && !e.target.closest('button, a, input, select, textarea')) e.preventDefault();
-    lastTouchEnd = t;
-  }, { passive: false });
-  document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
-  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
-  document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-
   $board.addEventListener('pointerdown', onPointerDown);
   $board.addEventListener('pointermove', onPointerMove);
   $board.addEventListener('pointerup', (e) => endDrag(e, false));
   $board.addEventListener('pointercancel', (e) => endDrag(e, true));
   $supply.addEventListener('click', spawnItem);
   $('retryBtn').addEventListener('click', restartSameDifficulty);
+  $('homeBtn').addEventListener('click', showSelect);   // ホーム = 難易度選択画面
   $('continueBtn').addEventListener('click', restartSameDifficulty);
   $('toSelectBtn').addEventListener('click', showSelect);
 }
@@ -577,11 +586,13 @@ function setupEvents() {
    初期化
    ============================================================ */
 function init() {
+  state.cols = CONFIG.DIFFICULTIES[0].cols;
+  state.rows = CONFIG.DIFFICULTIES[0].rows;
   buildBoard();
   buildDifficultyButtons();
   applyStaticText();
   setupEvents();
-  state.board = new Array(CONFIG.COLS * CONFIG.ROWS).fill(null);
+  state.board = new Array(state.cols * state.rows).fill(null);
   render();
   showSelect();
 }
