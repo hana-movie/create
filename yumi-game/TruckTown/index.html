@@ -8,38 +8,62 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:#2b2f36;background:#b9d6a0}
 canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
-#top{position:fixed;left:12px;right:324px;top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;pointer-events:none}
+#top{position:fixed;left:12px;right:344px;top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;pointer-events:none}
 .chip{pointer-events:auto;background:rgba(255,253,246,.95);border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(40,60,20,.18);white-space:nowrap}
 .chip small{font-weight:500;color:#6b7280;margin-right:4px}
 .chip button{border:0;background:transparent;font:inherit;font-weight:700;padding:2px 8px;border-radius:999px;cursor:pointer;color:#6b7280}
 .chip button.on{background:#2f6f4f;color:#fff}
-#panel{position:fixed;right:12px;top:12px;width:300px;max-height:calc(100% - 24px);overflow:auto;background:rgba(255,253,246,.96);border-radius:16px;padding:14px;box-shadow:0 4px 18px rgba(40,60,20,.22);font-size:13px}
+#panel{position:fixed;right:12px;top:12px;width:320px;max-height:calc(100% - 24px);overflow:auto;background:rgba(255,253,246,.96);border-radius:16px;padding:14px;box-shadow:0 4px 18px rgba(40,60,20,.22);font-size:13px}
 #panel h2{font-size:12px;letter-spacing:.08em;color:#6b7280;margin:12px 0 6px;font-weight:700}
 #panel h2:first-child{margin-top:0}
-.row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #ece7d6}
+.row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #ece7d6;height:50px;font-variant-numeric:tabular-nums}
+.row.rt{height:64px;padding:4px 0;box-sizing:border-box;display:grid;grid-template-columns:12px minmax(0,1fr) 26px 84px;grid-template-rows:20px 18px 16px;column-gap:6px;row-gap:0;align-items:center}
+.row.rt .dot{grid-column:1;grid-row:1}
+.row.rt .nm{display:contents}
+.row.rt .nm b{grid-column:2/5;grid-row:1}
+.row.rt .nm .l2{grid-column:2;grid-row:2}
+.row.rt .nm .l3{grid-column:2;grid-row:3}
+.row.rt .sell{grid-column:3;grid-row:2/4;height:32px}
+.row.rt .buy{grid-column:4;grid-row:2/4;height:32px;padding:0 2px;width:84px;font-size:11.5px}
+.row.rt .nm .l3 span,.row.rt .nm .l2 span{display:inline}
+.row.rt .nm .l2,.row.rt .nm .l3{display:block;height:auto}
+.row.rt .l3 .pf{font-weight:700;color:#2f6f4f}
+.row.rt .l3 .pf.neg{color:#c0392b}
+.row.rt .l3 .wn,.row.rt .l2 .wt{color:#c0392b;font-weight:700}
 .row:last-child{border-bottom:0}
 .row .nm{flex:1;min-width:0}
-.row .nm b{display:block;font-size:13px}
+.row .nm b,.row .nm span,.row .nm .l2,.row .nm .l3{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .nm b{font-size:13px}
 .row .nm span{color:#6b7280;font-size:11px}
+.row .nm .l2{display:flex;gap:6px;font-size:11px;color:#6b7280;line-height:16px}
+.row .nm .l2 .st{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.row .nm .l2 .pf{font-weight:700;color:#2f6f4f}
+.row .nm .l2 .pf.neg{color:#c0392b}
+.row .nm .l3{font-size:11px;color:#c0392b;height:15px;line-height:15px}
+.row button.buy{width:96px;flex:none}
+.row button.sell{width:28px;flex:none;padding:7px 0}
 .dot{width:12px;height:12px;border-radius:3px;flex:none}
 button.buy{border:0;border-radius:10px;background:#2f6f4f;color:#fff;font:inherit;font-weight:700;font-size:12px;padding:7px 10px;cursor:pointer;white-space:nowrap}
 button.buy:disabled{background:#c9cfc4;color:#fff;cursor:default}
 .locked{opacity:.45}
-#flow{font-size:11.5px;color:#6b7280;margin-top:8px;line-height:1.6}
+#flow{font-size:11.5px;color:#6b7280;margin-top:8px;line-height:1.6;height:56px;overflow:hidden;font-variant-numeric:tabular-nums}
 #flow b{color:#2b2f36}
 #flow .red{color:#c0392b;font-weight:700}
 #top .chip.red{background:#fde8e6;color:#c0392b}
 #netChip.red{background:#fde8e6;color:#c0392b}
 button.sell{border:0;border-radius:10px;background:#e9e4d4;color:#6b5a3a;font:inherit;font-weight:700;font-size:12px;padding:7px 8px;cursor:pointer;white-space:nowrap}
 button.sell:disabled{opacity:.4;cursor:default}
-#evs .ev{display:flex;align-items:center;gap:8px;background:#f3eee0;border-radius:10px;padding:6px 10px;font-size:12px;margin-top:6px}
+#evs{display:flex;flex-direction:column;gap:6px}
+#evs .ev{display:flex;align-items:center;gap:8px;background:#f3eee0;border-radius:10px;padding:6px 10px;font-size:12px;box-shadow:0 2px 10px rgba(40,60,20,.2);font-variant-numeric:tabular-nums}
 #evs .ev.bad{background:#fde8e6}
 #evs .ev.good{background:#e6f3e0}
 #evs .ev span{flex:1}
 #evs button,#con button{border:0;border-radius:8px;background:#2f6f4f;color:#fff;font:inherit;font-size:11.5px;font-weight:700;padding:5px 8px;cursor:pointer;white-space:nowrap}
 #evs button:disabled{background:#c9cfc4}
 #con button.no{background:#b8ad95}
-#goal{background:#eef4e2;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5}
+#goalWrap{height:112px;display:flex;flex-direction:column;gap:6px}
+#goalWrap #move{padding:9px;flex:none}
+#goal{background:#eef4e2;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5;flex:1;overflow:hidden;font-variant-numeric:tabular-nums}
 #bar{height:6px;border-radius:3px;background:#d5dfc5;margin-top:5px;overflow:hidden}
 #bar i{display:block;height:100%;background:#2f6f4f;width:0}
 #hint{color:#6b7280;font-size:11.5px;line-height:1.6;margin-top:10px}
@@ -51,22 +75,25 @@ button.sell:disabled{opacity:.4;cursor:default}
 #menu button:disabled{color:#b6b9b0;cursor:default}
 #menu button small{display:block;font-size:11px;opacity:.75}
 #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#2b2f36;color:#fff;padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:6}
-#con{background:#fff3d6;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5;margin-top:8px}
+#side{position:fixed;left:12px;bottom:12px;width:300px;display:flex;flex-direction:column;gap:6px;z-index:3;pointer-events:none}
+#side>*{pointer-events:auto}
+#con{background:#fff3d6;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 2px 10px rgba(40,60,20,.2);font-variant-numeric:tabular-nums}
 #con i{display:block;height:6px;border-radius:3px;background:#ecd9a0;margin-top:5px;overflow:hidden}
 #con i b{display:block;height:100%;background:#d98a1f}
-.ach{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #ece7d6;font-size:12.5px}
+.ach{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #ece7d6;font-size:12.5px;white-space:nowrap;height:30px;align-items:center}
 .ach:last-child{border-bottom:0}
 .ach span{margin-left:auto;color:#2f6f4f;font-weight:700;white-space:nowrap}
-#tut{position:fixed;left:12px;bottom:12px;max-width:330px;background:#2b2f36;color:#fff;border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.6;box-shadow:0 4px 18px rgba(0,0,0,.3);display:none;z-index:4}
+#tut{position:fixed;left:12px;top:118px;max-width:330px;background:#2b2f36;color:#fff;border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.6;box-shadow:0 4px 18px rgba(0,0,0,.3);display:none;z-index:4}
 #tut b{color:#ffd66b}
 #tut div{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11.5px;color:#aab}
 #tut button{border:0;background:#4a505a;color:#fff;border-radius:8px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}
 #reset{border:0;background:transparent;color:#9a5a4a;font:inherit;font-size:11.5px;cursor:pointer;padding:6px 0;text-decoration:underline}
 @media(max-width:720px){
  #top{left:8px;right:8px;top:8px;gap:6px}
- #tut{left:8px;right:8px;bottom:calc(40% + 16px);max-width:none}
+ #tut{left:8px;right:8px;top:150px;max-width:none}
+ #side{left:8px;right:8px;width:auto;bottom:calc(40% + 16px)}
+ #toast{top:8px;bottom:auto;z-index:7;max-width:calc(100% - 16px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  #panel{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:40%}
- #toast{bottom:44%}
 }
 </style>
 </head>
@@ -82,10 +109,7 @@ button.sell:disabled{opacity:.4;cursor:default}
   <div class="chip" id="view"><button data-v="in">＋</button><button data-v="out">－</button><button data-v="fit">全体</button><button data-v="jam" class="on">渋滞</button><button data-v="snd" id="snd">🔊</button></div>
 </div>
 <div id="panel">
-  <div id="goal"></div>
-  <button id="move" class="buy" style="display:none;width:100%;margin-top:8px;padding:10px"></button>
-  <div id="con" style="display:none"></div>
-  <div id="evs"></div>
+  <div id="goalWrap"><div id="goal"></div><button id="move" class="buy" style="display:none"></button></div>
   <div id="flow"></div>
   <h2>目標 <span id="achN" style="font-weight:500"></span></h2>
   <div id="ach"></div>
@@ -96,6 +120,7 @@ button.sell:disabled{opacity:.4;cursor:default}
   <div id="hint">交差点をクリックすると交通ルールを、道路をクリックすると車線の追加や一方通行化ができます。白い点線は買い足せる道です。走っているのは全部あなたのトラックなので、増やすほど渋滞します。150秒まったく動けない車はレッカーされ、積荷を失います。<br>赤く光る車線は渋滞中です（「渋滞」ボタンで切替）。<br>ドラッグか矢印キーで移動、ホイール/ピンチ/＋－ボタンで拡大縮小。</div>
   <button id="reset">最初からやり直す</button>
 </div>
+<div id="side"><div id="con" style="display:none"></div><div id="evs"></div></div>
 <div id="tut"></div>
 <div id="menu"></div>
 <div id="toast"></div>
@@ -1067,9 +1092,9 @@ const cam={x:0,y:0,z:1};let cw=0,ch=0,sel=null,selE=null,selC=null,showJam=true;
 function resize(){const d=window.devicePixelRatio||1;cw=window.innerWidth;ch=window.innerHeight;cv.width=cw*d;cv.height=ch*d;}
 function fit(){
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const n of W.nodes){x0=Math.min(x0,n.x);y0=Math.min(y0,n.y);x1=Math.max(x1,n.x);y1=Math.max(y1,n.y);}
-  const narrow=cw<=720,aw=narrow?cw:cw-330,ah=narrow?ch*0.56:ch-70;
+  const narrow=cw<=720,aw=narrow?cw:cw-350,ah=narrow?ch*0.56:ch-70;
   cam.z=Math.min(aw/(x1-x0+120),ah/(y1-y0+120));
-  cam.x=(x0+x1)/2+(narrow?0:165/cam.z);cam.y=(y0+y1)/2+(narrow?ch*0.16/cam.z:-25/cam.z);
+  cam.x=(x0+x1)/2+(narrow?0:175/cam.z);cam.y=(y0+y1)/2+(narrow?ch*0.16/cam.z:-25/cam.z);
 }
 const toWorld=(sx,sy)=>[(sx-cw/2)/cam.z+cam.x,(sy-ch/2)/cam.z+cam.y];
 const toScreen=(x,y)=>[(x-cam.x)*cam.z+cw/2,(y-cam.y)*cam.z+ch/2];
@@ -1205,7 +1230,7 @@ function buildPanel(){
   const rt=$('routes');rt.innerHTML='';
   for(const r of W.routes){
     const row=document.createElement('div');row.className='row';
-    row.innerHTML='<i class="dot" style="background:'+r.color+'"></i><div class="nm"><b>'+r.src.icon+r.src.name+' → '+r.dst.icon+r.dst.name+'</b><span></span></div><button class="sell" title="1台売る（半額で戻る）">−</button><button class="buy"></button>';
+    row.className='row rt';row.innerHTML='<i class="dot" style="background:'+r.color+'"></i><div class="nm"><b>'+r.src.icon+r.src.name+' → '+r.dst.icon+r.dst.name+'</b><div class="l2"><span class="st"></span></div><div class="l3"><span class="pf"></span> <span class="wn"></span></div></div><button class="sell" title="1台売る（半額で戻る）">−</button><button class="buy"></button>';
     row.querySelector('.buy').onclick=()=>{const c=buyCost(r);if((c<=0||G.money>=c)&&UNLOCK[r.chain]<=G.delivered){G.money-=c;addTruck(r);fx('buy');refresh();}};
     row.querySelector('.sell').onclick=()=>{const m=sellTruck(r);if(m||r.trucks>=0){fx('click');refresh();}};
     r.el=row;rt.appendChild(row);
@@ -1239,12 +1264,12 @@ $('deliv').textContent=fmt(G.delivered);$('tows').textContent=G.tows;
     const locked=UNLOCK[r.chain]>G.delivered,c=buyCost(r),b=r.el.querySelector('.buy'),sb=r.el.querySelector('.sell');
     sb.disabled=r.trucks<=0;sb.style.visibility=locked?'hidden':'';
     r.el.classList.toggle('locked',locked);
-    {let h;if(locked)h='配達 '+UNLOCK[r.chain]+' 回で解放';
+    {const st=r.el.querySelector('.st'),pf=r.el.querySelector('.pf'),l3=r.el.querySelector('.wn'),put=(el,t)=>{if(el.textContent!==t)el.textContent=t;};
+     if(locked){put(st,'配達 '+UNLOCK[r.chain]+' 回で解放');put(pf,'');put(l3,'');}
      else{const pr=routeProfit(r),wt=waitingFor(r),late=r.pf!==undefined&&r.pf<0.92;
-       h='🚚 '+r.trucks+'台 ・ ¥'+fmt(payOf(r))+'/回 ・ 利益 '+(r.trucks?'<b style="color:'+(pr<0?'#c0392b':'#2f6f4f')+'">'+(pr<0?'−':'')+'¥'+fmt(Math.abs(pr))+'/分</b>':'—');
-       if(late)h+=' ・ <span style="color:#c0392b">遅れで −'+Math.round((1-r.pf)*100)+'%</span>';
-       if(wt)h+=' ・ <span style="color:#c0392b">⚠ 荷待ち '+wt+'台</span>';}
-     const sp=r.el.querySelector('span');if(sp._h!==h){sp._h=h;sp.innerHTML=h;}}
+       put(st,'🚚 '+r.trucks+'台 ・ ¥'+fmt(payOf(r))+'/回');
+       put(pf,r.trucks?'利益 '+(pr<0?'−':'')+'¥'+fmt(Math.abs(pr))+'/分':'利益 —');pf.classList.toggle('neg',r.trucks>0&&pr<0);
+       put(l3,[wt?'⚠待ち'+wt+'台':'',late?'遅れ−'+Math.round((1-r.pf)*100)+'%':''].filter(x=>x).join(' '));}}
     b.textContent=c<=0?'+1台 無料':'+1台 ¥'+fmt(c);b.disabled=locked||(c>0&&G.money<c);
   }
   for(const u of UPS){
@@ -1269,9 +1294,9 @@ $('deliv').textContent=fmt(G.delivered);$('tows').textContent=G.tows;
   else{
     const need=moveAt(G.lv),pv=UNLOCK[UNLOCK.length-1],tg=moveProfit(),ap=avgProfit();canMove=canMoveNow();
     if(canMove)setH(g,'この町はうまく回っています。<b>次の町</b>はもっと広く、報酬が25%上がります。');
-    else if(G.delivered<need)setH(g,'全路線を解放。<b>次の町へ引っ越す</b>には ① 配達 '+fmt(G.delivered)+' / '+fmt(need)+'　② 3分平均の利益 ¥'+fmt(tg)+'/分<div id="bar"><i style="width:'+Math.min(100,(G.delivered-pv)/(need-pv)*100)+'%"></i></div>');
+    else if(G.delivered<need)setH(g,'<b>次の町へ引っ越す</b>には<br>① 配達 '+fmt(G.delivered)+' / '+fmt(need)+'<br>② 利益 ¥'+fmt(tg)+'/分と定時率 '+Math.round(ONTIME_NEED*100)+'%<div id="bar"><i style="width:'+Math.min(100,(G.delivered-pv)/(need-pv)*100)+'%"></i></div>');
     else{const ot=onTimeRate(),okP=ap>=tg,okT=ot>=ONTIME_NEED;
-      setH(g,'<b>次の町へ引っ越す</b>条件（直近3分）<br>'+(okP?'✅':'⬜')+' 利益 ¥'+fmt(Math.max(0,ap))+' / ¥'+fmt(tg)+'/分<br>'+(okT?'✅':'⬜')+' 定時率 '+Math.round(ot*100)+'% / '+Math.round(ONTIME_NEED*100)+'%'+(okT?'':'（渋滞で遅れすぎ。台数を減らすか道を良くする）')+'<div id="bar"><i style="width:'+Math.max(0,Math.min(100,Math.min(ap/tg,ot/ONTIME_NEED)*100))+'%"></i></div>');}
+      setH(g,'<b>次の町へ引っ越す</b>条件（直近3分）<br>'+(okP?'✅':'⬜')+' 利益 ¥'+fmt(Math.max(0,ap))+' / ¥'+fmt(tg)+'/分<br>'+(okT?'✅':'⬜')+' 定時率 '+Math.round(ot*100)+'% / '+Math.round(ONTIME_NEED*100)+'%'+(okT?'':' ・ 遅れすぎ')+'<div id="bar"><i style="width:'+Math.max(0,Math.min(100,Math.min(ap/tg,ot/ONTIME_NEED)*100))+'%"></i></div>');}
   }
   mv.style.display=canMove?'block':'none';
   if(canMove&&Date.now()-moveArm>4000)mv.textContent='次の町へ引っ越す（名声 ★+1）';
