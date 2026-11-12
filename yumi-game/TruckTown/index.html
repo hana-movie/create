@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>じわじわ渋滞タウン</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:#2b2f36;background:#b9d6a0}
+canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+#top{position:fixed;left:12px;right:324px;top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;pointer-events:none}
+.chip{pointer-events:auto;background:rgba(255,253,246,.95);border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(40,60,20,.18);white-space:nowrap}
+.chip small{font-weight:500;color:#6b7280;margin-right:4px}
+.chip button{border:0;background:transparent;font:inherit;font-weight:700;padding:2px 8px;border-radius:999px;cursor:pointer;color:#6b7280}
+.chip button.on{background:#2f6f4f;color:#fff}
+#panel{position:fixed;right:12px;top:12px;width:300px;max-height:calc(100% - 24px);overflow:auto;background:rgba(255,253,246,.96);border-radius:16px;padding:14px;box-shadow:0 4px 18px rgba(40,60,20,.22);font-size:13px}
+#panel h2{font-size:12px;letter-spacing:.08em;color:#6b7280;margin:12px 0 6px;font-weight:700}
+#panel h2:first-child{margin-top:0}
+.row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #ece7d6}
+.row:last-child{border-bottom:0}
+.row .nm{flex:1;min-width:0}
+.row .nm b{display:block;font-size:13px}
+.row .nm span{color:#6b7280;font-size:11px}
+.dot{width:12px;height:12px;border-radius:3px;flex:none}
+button.buy{border:0;border-radius:10px;background:#2f6f4f;color:#fff;font:inherit;font-weight:700;font-size:12px;padding:7px 10px;cursor:pointer;white-space:nowrap}
+button.buy:disabled{background:#c9cfc4;color:#fff;cursor:default}
+.locked{opacity:.45}
+#flow{font-size:11.5px;color:#6b7280;margin-top:8px;line-height:1.6}
+#flow b{color:#2b2f36}
+#flow .red{color:#c0392b;font-weight:700}
+#top .chip.red{background:#fde8e6;color:#c0392b}
+#netChip.red{background:#fde8e6;color:#c0392b}
+button.sell{border:0;border-radius:10px;background:#e9e4d4;color:#6b5a3a;font:inherit;font-weight:700;font-size:12px;padding:7px 8px;cursor:pointer;white-space:nowrap}
+button.sell:disabled{opacity:.4;cursor:default}
+#evs .ev{display:flex;align-items:center;gap:8px;background:#f3eee0;border-radius:10px;padding:6px 10px;font-size:12px;margin-top:6px}
+#evs .ev.bad{background:#fde8e6}
+#evs .ev.good{background:#e6f3e0}
+#evs .ev span{flex:1}
+#evs button,#con button{border:0;border-radius:8px;background:#2f6f4f;color:#fff;font:inherit;font-size:11.5px;font-weight:700;padding:5px 8px;cursor:pointer;white-space:nowrap}
+#evs button:disabled{background:#c9cfc4}
+#con button.no{background:#b8ad95}
+#goal{background:#eef4e2;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5}
+#bar{height:6px;border-radius:3px;background:#d5dfc5;margin-top:5px;overflow:hidden}
+#bar i{display:block;height:100%;background:#2f6f4f;width:0}
+#hint{color:#6b7280;font-size:11.5px;line-height:1.6;margin-top:10px}
+#menu{position:fixed;display:none;background:#fffdf6;border-radius:14px;padding:8px;box-shadow:0 6px 24px rgba(0,0,0,.28);width:230px;font-size:13px;z-index:5}
+#menu h3{margin:4px 6px 6px;font-size:12px;color:#6b7280}
+#menu button{display:block;width:100%;text-align:left;border:0;background:transparent;font:inherit;padding:8px 10px;border-radius:9px;cursor:pointer}
+#menu button:hover:not(:disabled){background:#eef4e2}
+#menu button.cur{background:#2f6f4f;color:#fff}
+#menu button:disabled{color:#b6b9b0;cursor:default}
+#menu button small{display:block;font-size:11px;opacity:.75}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#2b2f36;color:#fff;padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:6}
+#con{background:#fff3d6;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5;margin-top:8px}
+#con i{display:block;height:6px;border-radius:3px;background:#ecd9a0;margin-top:5px;overflow:hidden}
+#con i b{display:block;height:100%;background:#d98a1f}
+.ach{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #ece7d6;font-size:12.5px}
+.ach:last-child{border-bottom:0}
+.ach span{margin-left:auto;color:#2f6f4f;font-weight:700;white-space:nowrap}
+#tut{position:fixed;left:12px;bottom:12px;max-width:330px;background:#2b2f36;color:#fff;border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.6;box-shadow:0 4px 18px rgba(0,0,0,.3);display:none;z-index:4}
+#tut b{color:#ffd66b}
+#tut div{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11.5px;color:#aab}
+#tut button{border:0;background:#4a505a;color:#fff;border-radius:8px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}
+#reset{border:0;background:transparent;color:#9a5a4a;font:inherit;font-size:11.5px;cursor:pointer;padding:6px 0;text-decoration:underline}
+@media(max-width:720px){
+ #top{left:8px;right:8px;top:8px;gap:6px}
+ #tut{left:8px;right:8px;bottom:calc(40% + 16px);max-width:none}
+ #panel{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:40%}
+ #toast{bottom:44%}
+}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="top">
+  <div class="chip"><small>所持金</small>¥<span id="money">0</span></div>
+  <div class="chip" id="netChip"><small>収支</small><span id="rate">0</span>/分</div>
+  <div class="chip"><small>配達</small><span id="deliv">0</span></div>
+  <div class="chip"><small>レッカー</small><span id="tows">0</span></div>
+  <div class="chip"><small>町</small>Lv<span id="lv">1</span> <span id="fame"></span></div>
+  <div class="chip" id="speed"><button data-s="0">⏸</button><button data-s="1" class="on">1×</button><button data-s="2">2×</button><button data-s="4">4×</button><button data-s="8">8×</button><button data-s="16">16×</button></div>
+  <div class="chip" id="view"><button data-v="in">＋</button><button data-v="out">－</button><button data-v="fit">全体</button><button data-v="jam" class="on">渋滞</button><button data-v="snd" id="snd">🔊</button></div>
+</div>
+<div id="panel">
+  <div id="goal"></div>
+  <button id="move" class="buy" style="display:none;width:100%;margin-top:8px;padding:10px"></button>
+  <div id="con" style="display:none"></div>
+  <div id="evs"></div>
+  <div id="flow"></div>
+  <h2>目標 <span id="achN" style="font-weight:500"></span></h2>
+  <div id="ach"></div>
+  <h2>路線とトラック</h2>
+  <div id="routes"></div>
+  <h2>強化</h2>
+  <div id="ups"></div>
+  <div id="hint">交差点をクリックすると交通ルールを、道路をクリックすると車線の追加や一方通行化ができます。白い点線は買い足せる道です。走っているのは全部あなたのトラックなので、増やすほど渋滞します。150秒まったく動けない車はレッカーされ、積荷を失います。<br>赤く光る車線は渋滞中です（「渋滞」ボタンで切替）。<br>ドラッグか矢印キーで移動、ホイール/ピンチ/＋－ボタンで拡大縮小。</div>
+  <button id="reset">最初からやり直す</button>
+</div>
+<div id="tut"></div>
+<div id="menu"></div>
+<div id="toast"></div>
+<script>
+'use strict';
+const HEADLESS = typeof document === 'undefined';
+/* ================= util ================= */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const TAU=Math.PI*2;
+const angDiff=(a,b)=>{let d=(a-b)%TAU;if(d>Math.PI)d-=TAU;if(d<-Math.PI)d+=TAU;return d};
+
+/* ================= constants ================= */
+const LANE_OFF=3.4, LANE2=[6.9,2.4], OW_OFF=[2.3,-2.3], TRIM=21, RING_R=11.5, TRUCK_LEN=8.5, DT=1/30;
+const V_LINK=13, V_STRAIGHT=12, V_CONN=6.5, V_RING=6, V_STUB=8;
+const IDM_A=1.8, IDM_B=2.8, IDM_T=0.9, IDM_S0=1.6;
+const SHORT_BLOCK=80, OW_COST=100;
+// route choice: [weight on trucks per metre, weight on stopped traffic]; level 0 = drivers mostly take the shortest way
+const NAV=[[1.5,0],[4,3]], NAV_LIVE=1;
+const SIG_MODE=0, NR_COST=150;
+const METER_TH=0.7, METER_MAX=60, METER_RETRY=1.5;
+const NONE_MODE=1, STOP_T=1;
+const CTRL_COST={none:0,prio:60,signal:150,round:600,round2:1200};
+const RB_GAP=11, RB_FOLLOW=0;
+const SG_MIN=7, SG_GAP=55, SG_LO=16, SG_HI=16;
+// roundabouts get dearer with every one you own, so they go where they matter most
+const RB_GROW=1.3;
+const nRound=ex=>W.nodes.filter(n=>n!==ex&&n.type==='junction'&&isRound(n)).length;
+const ctrlCost=(n,kind)=>{
+  if(n.ctrl.kind===kind)return 0;
+  if(kind!=='round'&&kind!=='round2')return CTRL_COST[kind];
+  const base=kind==='round2'&&n.ctrl.kind==='round'?CTRL_COST.round2-CTRL_COST.round:CTRL_COST[kind]; // upgrading only pays the difference
+  return Math.round(base*Math.pow(RB_GROW,nRound(n))/10)*10;
+};
+const isRound=n=>n.ctrl.kind==='round'||n.ctrl.kind==='round2';
+const RING_O=RING_R+4.7;
+const UNLOCK=[0,25,100,300,700];
+const BDEF=[
+ {key:'farm',name:'畑',icon:'🌾',col:'#e2b93b',cs:[0],rs:[0,1,2,3,4]},
+ {key:'mill',name:'製粉所',icon:'🥖',col:'#c98a3a',cs:[3,4],rs:[1,2,3],fac:1},
+ {key:'market',name:'市場',icon:'🏪',col:'#d9534f',cs:[6],rs:[1,2,3]},
+ {key:'forest',name:'森',icon:'🌲',col:'#3f8f5a',cs:[2,3,4],rs:[0,4]},
+ {key:'saw',name:'製材所',icon:'🪵',col:'#8a6a4a',cs:[1,2],rs:[1,2,3],fac:1},
+ {key:'quarry',name:'採石場',icon:'⛰️',col:'#7d8794',cs:[5,6],rs:[0,4]},
+ {key:'mason',name:'石工所',icon:'🧱',col:'#a05a48',cs:[0,1],rs:[1,2,3],fac:1},
+ {key:'port',name:'港',icon:'⚓',col:'#3b6ea5',cs:[0,1,2],rs:[4]},
+ {key:'ranch',name:'牧場',icon:'🐄',col:'#9bbf5a',cs:[5,6],rs:[0,1,2,3,4]},
+ {key:'dairy',name:'乳業',icon:'🧀',col:'#e0a84a',cs:[3,4,5],rs:[1,2,3],fac:1},
+ {key:'mine',name:'鉱山',icon:'⛏️',col:'#5d6470',cs:[4,5,6],rs:[0]},
+ {key:'steel',name:'製鉄所',icon:'🏭',col:'#6b5b7b',cs:[2,3,4],rs:[1,2,3],fac:1}
+];
+const RDEF=[['farm','mill',0,0,'#e8c547'],['mill','market',0,1,'#e07b39'],['forest','saw',1,0,'#4caf7a'],['saw','market',1,1,'#2f7d6b'],['quarry','mason',2,0,'#8d99ae'],['mason','market',2,1,'#b0584a'],['ranch','dairy',3,0,'#a9cf6a'],['dairy','port',3,1,'#f0b955'],['mine','steel',4,0,'#6f7684'],['steel','port',4,1,'#8a6fa8']];
+const CHAIN_MULT=[1,1.6,2.4,3.6,5.5];
+
+/* ================= lanes ================= */
+let laneSeq=0;
+function mkLane(kind,pts,vmax,node){
+  const cum=[0];
+  for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+  return {id:laneSeq++,kind,pts,cum,len:cum[cum.length-1],vmax,node,vehicles:[],tails:[],spawnQ:[],ghosts:[],wanters:[],stop:null,dirty:false};
+}
+function lanePt(L,s){
+  const c=L.cum,p=L.pts;if(s<0)s=0;if(s>L.len)s=L.len;
+  let i=1;while(i<c.length-1&&c[i]<s)i++;
+  const t=(s-c[i-1])/((c[i]-c[i-1])||1);
+  return [p[i-1][0]+(p[i][0]-p[i-1][0])*t,p[i-1][1]+(p[i][1]-p[i-1][1])*t];
+}
+function bez(p0,d0,p3,d3,n){
+  n=n||14;const k=Math.hypot(p3[0]-p0[0],p3[1]-p0[1])*0.38;
+  const p1=[p0[0]+d0[0]*k,p0[1]+d0[1]*k],p2=[p3[0]-d3[0]*k,p3[1]-d3[1]*k],out=[];
+  for(let i=0;i<=n;i++){const t=i/n,u=1-t;out.push([u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]]);}
+  return out;
+}
+
+/* ================= world generation ================= */
+let W=null,G=null,trucks=[],tid=0;
+let notify=()=>{},fx=()=>{}; // set by the UI (messages, sounds); the simulation core must not touch the page directly
+function genWorld(seed,lv){
+  const rnd=mulberry32(seed);laneSeq=0;lv=lv|0;
+  const COLS=7+Math.min(lv,3),ROWS=5+Math.min(lv>>1,2),SP=125,nodes=[]; // later towns are bigger
+  const nid=(c,r)=>r*COLS+c;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)
+    nodes.push({id:nid(c,r),x:c*SP+(rnd()-.5)*44,y:r*SP+(rnd()-.5)*44,type:'junction',ctrl:{kind:'none',axis:0},nb:[]});
+  let edges=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(c<COLS-1)edges.push([nid(c,r),nid(c+1,r)]);
+    if(r<ROWS-1)edges.push([nid(c,r),nid(c,r+1)]);
+  }
+  const deg=id=>edges.filter(e=>e[0]===id||e[1]===id).length;
+  const connected=es=>{const seen=new Set([0]),st=[0];while(st.length){const a=st.pop();for(const e of es){const b=e[0]===a?e[1]:e[1]===a?e[0]:-1;if(b>=0&&!seen.has(b)){seen.add(b);st.push(b);}}}return seen.size===nodes.length;};
+  const order=edges.slice();
+  for(let i=order.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+  let rem=Math.floor(edges.length*0.22);const cand=[];
+  for(const e of order){
+    if(rem<=0)break;
+    if(deg(e[0])<=2||deg(e[1])<=2)continue;
+    const es=edges.filter(x=>x!==e);
+    if(connected(es)){edges=es;rem--;cand.push(e);}
+  }
+  // buildings on lots
+  const used=new Set(),bld=[];
+  for(const d of BDEF){
+    let gid=-1;const cs=[...new Set(d.cs.map(c=>Math.round(c*(COLS-1)/6)))],rs=[...new Set(d.rs.map(r=>Math.round(r*(ROWS-1)/4)))];
+    for(let t=0;t<80&&gid<0;t++){const k=nid(cs[Math.floor(rnd()*cs.length)],rs[Math.floor(rnd()*rs.length)]);if(!used.has(k))gid=k;}
+    if(gid<0)for(let k=0;k<COLS*ROWS;k++)if(!used.has(k)){gid=k;break;}
+    used.add(gid);
+    const g=nodes[gid];
+    const angs=edges.filter(e=>e[0]===g.id||e[1]===g.id).map(e=>{const o=nodes[e[0]===g.id?e[1]:e[0]];return Math.atan2(o.y-g.y,o.x-g.x);});
+    let best=0,bs=-99;
+    for(let q=0;q<16;q++){
+      const a=q*TAU/16;let sc=Math.min(0.75,Math.min.apply(null,angs.map(x=>Math.abs(angDiff(a,x)))));
+      sc+=0.9*Math.min.apply(null,angs.map(x=>{const d=Math.abs(angDiff(a,x))%(Math.PI/2);return Math.min(d,Math.PI/2-d);})); // diagonal to the streets, not in line with them
+      const px=g.x+Math.cos(a)*64,py=g.y+Math.sin(a)*64;
+      for(const o of nodes)if(o!==g&&Math.hypot(o.x-px,o.y-py)<(o.type==='lot'?62:52))sc-=2;
+      if(sc>bs){bs=sc;best=a;}
+    }
+    const lot={id:nodes.length,x:g.x+Math.cos(best)*64,y:g.y+Math.sin(best)*64,type:'lot',ctrl:{kind:'none',axis:0},nb:[]};
+    nodes.push(lot);edges.push([g.id,lot.id]);
+    bld.push({key:d.key,name:d.name,icon:d.icon,col:d.col,fac:!!d.fac,node:lot,grid:g,stock:0,inside:[],bays:2});
+  }
+  const w={seed,ops:[],nodes,cand:cand.map(e=>({a:nodes[e[0]],b:nodes[e[1]],built:false})),bought:[],edges:edges.map(e=>{const x=[nodes[e[0]],nodes[e[1]]];x.lanes=1;x.ow=0;return x;}),bld,link:{},links:[],lanes:[],lotB:{}};
+  for(const b of bld)w.lotB[b.node.id]=b;
+  w.edgeOf={};for(const e of w.edges){w.edgeOf[e[0].id+'>'+e[1].id]=e;w.edgeOf[e[1].id+'>'+e[0].id]=e;}
+  for(const [a,b] of w.edges){
+    a.nb.push({to:b,ang:Math.atan2(b.y-a.y,b.x-a.x)});
+    b.nb.push({to:a,ang:Math.atan2(a.y-b.y,a.x-b.x)});
+  }
+  for(const n of nodes){n.nb.sort((p,q)=>p.ang-q.ang);if(n.type!=='lot'&&n.nb.length===2)n.type='bend';}
+  for(const e of w.edges)for(const [a,b] of [[e[0],e[1]],[e[1],e[0]]]){const arr=w.link[a.id+'>'+b.id]=[];addLinkLane(w,a,b,arr);layoutLink(arr,0);}
+  for(const n of nodes)for(const a of n.nb){a.ins=w.link[a.to.id+'>'+n.id];a.outs=w.link[n.id+'>'+a.to.id];}
+  for(const n of nodes){n.groups=mkGroups(n);n.pairs=n.groups.filter(g=>g.length===2);if(!n.pairs.length)n.pairs=[[0,1]];}
+  W=w;
+  for(const n of nodes)buildNode(n);
+  relane();
+  // routes
+  const B=k=>bld.find(b=>b.key===k);
+  w.routes=RDEF.map((d,i)=>routeInfo({i,src:B(d[0]),dst:B(d[1]),chain:d[2],prod:d[3],color:d[4],trucks:0,done:0,log:[],earn:[]}));
+  return w;
+}
+function laneGeom(L,off){
+  const a=L.from,b=L.to,dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy),ux=dx/l,uy=dy/l,nx=uy,ny=-ux,ta=a.type==='lot'?4:TRIM,tb=b.type==='lot'?4:TRIM; // left-hand traffic: keep left
+  L.off=off;L.pts=[[a.x+ux*ta+nx*off,a.y+uy*ta+ny*off],[b.x-ux*tb+nx*off,b.y-uy*tb+ny*off]];L.len=l-ta-tb;L.cum=[0,L.len];L.dir=[ux,uy];
+}
+function addLinkLane(w,a,b,arr){const L=mkLane('link',[[0,0],[1,0]],(a.type==='lot'||b.type==='lot')?V_STUB:V_LINK,null);L.from=a;L.to=b;L.jam=0;L.li=arr.length;arr.push(L);w.links.push(L);return L;}
+function layoutLink(arr,ow){if(!arr.length)return;if(ow)arr.forEach((L,i)=>laneGeom(L,OW_OFF[i]));else if(arr.length===1)laneGeom(arr[0],LANE_OFF);else arr.forEach((L,i)=>laneGeom(L,LANE2[i]));}
+// one-way: the whole road becomes two lanes in one direction (d=1: e[0]→e[1], d=-1: reverse, 0: two-way again)
+function applyOneWay(e,d){
+  e.ow=d;
+  for(const [a,b,sg] of [[e[0],e[1],1],[e[1],e[0],-1]]){
+    const arr=W.link[a.id+'>'+b.id],want=d===0?e.lanes:(d===sg?2:0);
+    while(arr.length>want){
+      const L=arr.pop(),keep=arr[0];
+      const move=v=>{if(keep){v.q=keep;keep.spawnQ.push(v);}else{v.q=null;v.cargo=0;enterBuilding(v,v.route.src);}};
+      for(const v of L.vehicles.slice()){detach(v);move(v);}
+      for(const v of L.spawnQ)move(v);
+      L.spawnQ=[];W.links.splice(W.links.indexOf(L),1);
+    }
+    while(arr.length<want)addLinkLane(W,a,b,arr);
+    layoutLink(arr,d);
+  }
+}
+function canOneWay(e,d){ // every route must still be drivable there and back
+  if(e[0].type==='lot'||e[1].type==='lot')return false;
+  const h={e,d};
+  for(const r of W.routes)if(!findPath(r.src.node,r.dst.node,false,h)||!findPath(r.dst.node,r.src.node,false,h))return false;
+  return true;
+}
+function setOneWay(e,d){if(e.ow===d)return;rebuildNodes([e[0],e[1]],()=>applyOneWay(e,d));}
+function widenEdge(e){e.lanes=2;if(e.ow)return;for(const [a,b] of [[e[0],e[1]],[e[1],e[0]]]){const arr=W.link[a.id+'>'+b.id];addLinkLane(W,a,b,arr);layoutLink(arr,0);}}
+function widen(e){if(e.lanes>1)return;rebuildNodes([e[0],e[1]],()=>widenEdge(e));}
+const laneCost=e=>Math.round(Math.hypot(e[1].x-e[0].x,e[1].y-e[0].y)*3/10)*10;
+// build one of the purchasable roads (a grid road that was missing from this town)
+function addEdgeRaw(c){
+  const a=c.a,b=c.b,e=[a,b];e.lanes=1;e.ow=0;c.built=true;W.edges.push(e);W.bought.push(W.cand.indexOf(c));W.ops.push(['r',W.cand.indexOf(c)]);
+  W.edgeOf[a.id+'>'+b.id]=e;W.edgeOf[b.id+'>'+a.id]=e;
+  for(const [x,y] of [[a,b],[b,a]]){const arr=W.link[x.id+'>'+y.id]=[];addLinkLane(W,x,y,arr);layoutLink(arr,0);}
+  for(const [x,y] of [[a,b],[b,a]]){x.nb.push({to:y,ang:Math.atan2(y.y-x.y,y.x-x.x),ins:W.link[y.id+'>'+x.id],outs:W.link[x.id+'>'+y.id]});x.nb.sort((p,q)=>p.ang-q.ang);}
+  for(const n of [a,b]){if(n.type==='bend')n.type='junction';n.groups=mkGroups(n);n.pairs=n.groups.filter(g=>g.length===2);if(!n.pairs.length)n.pairs=[[0,1]];}
+}
+function buildRoad(c){if(c.built)return;rebuildNodes([c.a,c.b],()=>addEdgeRaw(c));}
+const roadCost=()=>Math.round(1500*Math.pow(1.35,W.bought.length)/100)*100;
+const bayCost=b=>Math.round(300*Math.pow(1.9,b.bays-2)/10)*10;
+function routeInfo(r){
+  const p=findPath(r.src.node,r.dst.node,false)||[r.src.node,r.dst.node];let dist=0;
+  for(let k=0;k<p.length-1;k++)dist+=Math.hypot(p[k+1].x-p[k].x,p[k+1].y-p[k].y);
+  r.dist=dist;r.pay=Math.round((r.prod?26:13)*CHAIN_MULT[r.chain]*Math.sqrt(dist/300));
+  return r;
+}
+/* ---------- the town grows: new facilities appear in quiet corners, each with a new route ---------- */
+const EXTRA=[
+ {key:'whs',name:'倉庫',icon:'📦',col:'#6f8fb0',src:'port',rc:'#5b86c4'},
+ {key:'mall',name:'商店街',icon:'🛍️',col:'#c86a9a',src:'market',rc:'#d873a8'},
+ {key:'power',name:'発電所',icon:'⚡',col:'#c9a227',src:'mine',rc:'#d4b23a'},
+ {key:'site',name:'工事現場',icon:'🏗️',col:'#d08a3a',src:'quarry',rc:'#c47a3c'},
+ {key:'school',name:'給食センター',icon:'🍱',col:'#d9695a',src:'ranch',rc:'#e3786a'},
+ {key:'craft',name:'木工所',icon:'🪑',col:'#9b7a55',src:'forest',rc:'#a4845e'}
+];
+const GROW_AT=[0.15,0.35,0.55,0.75,0.9,0.97];
+const growMax=()=>Math.min(EXTRA.length,4+Math.min(G.lv,2));
+const segDist=(px,py,a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((px-a.x)*dx+(py-a.y)*dy)/(dx*dx+dy*dy)));return Math.hypot(a.x+dx*t-px,a.y+dy*t-py);};
+function lotAngle(g){ // same rule as town generation: a diagonal driveway clear of other streets, roads and buildings
+  const angs=g.nb.map(a=>a.ang);let best=null,bs=-1e9;
+  for(let q=0;q<16;q++){
+    const a=q*TAU/16;let sc=Math.min(0.75,Math.min.apply(null,angs.map(x=>Math.abs(angDiff(a,x)))));
+    sc+=0.9*Math.min.apply(null,angs.map(x=>{const d=Math.abs(angDiff(a,x))%(Math.PI/2);return Math.min(d,Math.PI/2-d);}));
+    const px=g.x+Math.cos(a)*64,py=g.y+Math.sin(a)*64;
+    for(const o of W.nodes)if(o!==g&&Math.hypot(o.x-px,o.y-py)<(o.type==='lot'?62:52))sc-=2;
+    for(const e of W.edges)if(e[0]!==g&&e[1]!==g&&segDist(px,py,e[0],e[1])<26)sc-=3;
+    for(const c of W.cand)if(!c.built&&segDist(px,py,c.a,c.b)<26)sc-=3;
+    if(sc>bs){bs=sc;best=a;}
+  }
+  return bs>0?best:null;
+}
+function addExtraRaw(xi,g,ang){
+  const d=EXTRA[xi],lot={id:W.nodes.length,x:g.x+Math.cos(ang)*64,y:g.y+Math.sin(ang)*64,type:'lot',ctrl:{kind:'none',axis:0},nb:[]};
+  W.nodes.push(lot);
+  const e=[g,lot];e.lanes=1;e.ow=0;W.edges.push(e);W.edgeOf[g.id+'>'+lot.id]=e;W.edgeOf[lot.id+'>'+g.id]=e;
+  for(const [x,y] of [[g,lot],[lot,g]]){const arr=W.link[x.id+'>'+y.id]=[];addLinkLane(W,x,y,arr);layoutLink(arr,0);}
+  for(const [x,y] of [[g,lot],[lot,g]]){x.nb.push({to:y,ang:Math.atan2(y.y-x.y,y.x-x.x),ins:W.link[y.id+'>'+x.id],outs:W.link[x.id+'>'+y.id]});x.nb.sort((p,q)=>p.ang-q.ang);}
+  if(g.type==='bend')g.type='junction';g.groups=mkGroups(g);g.pairs=g.groups.filter(q=>q.length===2);if(!g.pairs.length)g.pairs=[[0,1]];
+  buildNode(lot);
+  const b={key:d.key,name:d.name,icon:d.icon,col:d.col,fac:false,node:lot,grid:g,stock:0,inside:[],bays:2,extra:true};
+  W.bld.push(b);W.lotB[lot.id]=b;
+  W.routes.push(routeInfo({i:W.routes.length,src:W.bld.find(x=>x.key===d.src),dst:b,chain:2,prod:1,color:d.rc,trucks:0,done:0,log:[],earn:[],extra:true}));
+  W.ops.push(['b',xi,g.id,ang]);
+  return b;
+}
+function growTown(){
+  const have=W.bld.filter(b=>b.extra).length;
+  if(have>=growMax()||G.delivered<moveAt(G.lv)*GROW_AT[have])return null;
+  const xi=EXTRA.findIndex(d=>!W.bld.some(b=>b.key===d.key));if(xi<0)return null;
+  // the junction farthest from every existing building, i.e. the quietest corner of town
+  const cs=W.nodes.filter(n=>n.type!=='lot'&&n.nb.length<=4&&!n.nb.some(a=>a.to.type==='lot'));
+  cs.sort((p,q)=>Math.min(...W.bld.map(b=>Math.hypot(b.node.x-q.x,b.node.y-q.y)))-Math.min(...W.bld.map(b=>Math.hypot(b.node.x-p.x,b.node.y-p.y))));
+  for(const g of cs.slice(0,8)){
+    const ang=lotAngle(g);if(ang===null)continue;
+    let b=null;rebuildNodes([g],()=>{b=addExtraRaw(xi,g,ang);});
+    notify('町に新しい施設: '+b.icon+b.name+'（'+W.routes[W.routes.length-1].src.name+'から配達）');fx('win');
+    return b;
+  }
+  return null;
+}
+function relane(){W.wide=Object.keys(W.link).map(k=>W.link[k]).filter(a=>a.length>1);W.lanes=W.links.slice();for(const n of W.nodes)for(const L of n.internal)W.lanes.push(L);}
+function mkGroups(n){
+  const k=n.nb.length,used=new Array(k).fill(false),gs=[];
+  for(let i=0;i<k;i++){
+    if(used[i])continue;used[i]=true;let best=-1,bd=0.9;
+    for(let j=i+1;j<k;j++){if(used[j])continue;const d=Math.abs(Math.abs(angDiff(n.nb[i].ang,n.nb[j].ang))-Math.PI);if(d<bd){bd=d;best=j;}}
+    if(best>=0){used[best]=true;gs.push([i,best]);}else gs.push([i]);
+  }
+  return gs;
+}
+
+/* ================= junction construction ================= */
+function buildNode(n){
+  n.internal=[];n.active=[];n.hold=[];n.holdL=[];n.holdE=[];n.path={};n.sig={g:0,t:0,mode:'g',next:0,lastA:0};n.inL=[];
+  if(n.type==='lot')return;
+  const k=n.nb.length;
+  n.nb.forEach((a,i)=>{for(const L of a.ins){L.stop=v=>v.grant!==n;L.ai=i;n.inL.push(L);}});
+  // signal phases: SIG_MODE 0 = opposite approaches together (+right-turn arrow), 1 = one approach at a time, 2 = one at a time only where an approach has a single lane
+  n.sgr=(SIG_MODE===1||(SIG_MODE===2&&n.nb.some(a=>a.ins.length===1)))?n.nb.map((a,i)=>[i]).filter(g=>n.nb[g[0]].ins.length):n.groups;
+  if(isRound(n)&&n.type==='junction'){
+    // inner ring: classic roundabout. round2 adds an outer lane that only carries traffic leaving at the very next exit,
+    // so the two ring lanes never have to cross each other.
+    const two=n.ctrl.kind==='round2';
+    let minGap=TAU;
+    for(let i=0;i<k;i++){let g=n.nb[(i+1)%k].ang-n.nb[i].ang;if(g<=0)g+=TAU;minGap=Math.min(minGap,g);}
+    const dl=Math.min(Math.asin(LANE_OFF/RING_R),minGap*0.38),dlo=Math.min(Math.asin(LANE2[0]/RING_O),minGap*0.4);
+    const P=(a,R)=>[n.x+Math.cos(a)*R,n.y+Math.sin(a)*R],Tn=a=>[-Math.sin(a),Math.cos(a)];
+    const arc=(a0,a1,R)=>{while(a1<=a0)a1+=TAU;const m=Math.max(2,Math.ceil((a1-a0)/0.18)),pts=[];for(let q=0;q<=m;q++)pts.push(P(a0+(a1-a0)*q/m,R));return pts;};
+    n.front=[];n.mid=[];n.entry=[];n.exit=[];n.midO=[];n.entryO=[];n.exitO=[];n.gate=[];n.lastEnt=[];
+    for(let i=0;i<k;i++){
+      const A=n.nb[i],eA=A.ang-dl,nA=A.ang+dl,nx=n.nb[(i+1)%k].ang;
+      n.front[i]=mkLane('ring',arc(eA,nA,RING_R),V_RING,n);
+      n.mid[i]=mkLane('ring',arc(nA,nx-dl,RING_R),V_RING,n);
+      n.entry[i]=A.ins.map(L=>{const e=mkLane('entry',bez(L.pts[1],L.dir,P(nA,RING_R),Tn(nA),8),V_RING,n);e.inL=L;e.ai=i;e.r=1;return e;});
+      n.exit[i]=A.outs.map(L=>{const x=mkLane('exit',bez(P(eA,RING_R),Tn(eA),L.pts[0],L.dir,8),V_RING,n);x.out=L;x.ai=i;x.r=1;return x;});
+      n.front[i].stop=v=>!!n.hold[i*2+1]&&n.hold[i*2+1]!==v;
+      n.internal.push(n.front[i],n.mid[i],...n.entry[i],...n.exit[i]);
+      n.gate[i]=[];
+      if(two){
+        const oN=A.ang+dlo,oX=A.ang-dlo;
+        n.midO[i]=mkLane('ring',arc(oN,nx-dlo,RING_O),V_RING,n);
+        n.entryO[i]=A.ins.map(L=>{const e=mkLane('entry',bez(L.pts[1],L.dir,P(oN,RING_O),Tn(oN),6),V_RING,n);e.inL=L;e.ai=i;e.r=0;return e;});
+        n.exitO[i]=A.outs.map(L=>{const x=mkLane('exit',bez(P(oX,RING_O),Tn(oX),L.pts[0],L.dir,6),V_RING,n);x.out=L;x.ai=i;x.r=0;return x;});
+        n.internal.push(n.midO[i],...n.entryO[i],...n.exitO[i]);
+      }
+    }
+    if(two)for(let j=0;j<k;j++){
+      const pj=(j-1+k)%k;
+      n.midO[pj].stop=v=>!gateOK(n,j,v);
+      n.mid[pj].stop=v=>{const x=v.plan[v.plan.indexOf(n.mid[pj],v.pi)+1];return !!x&&x.kind==='exit'&&!gateOK(n,j,v);};
+    }
+    for(let i=0;i<k;i++)for(let j=0;j<k;j++){
+      if(i===j)continue;
+      if(two&&j===(i+1)%k){for(const e of n.entryO[i])for(const x of n.exitO[j])n.path[e.inL.id+'_'+x.out.id]=[e,n.midO[i],x];continue;}
+      const ring=[n.mid[i]];let m=(i+1)%k;
+      while(m!==j){ring.push(n.front[m],n.mid[m]);m=(m+1)%k;}
+      for(const e of n.entry[i])for(const x of n.exit[j])n.path[e.inL.id+'_'+x.out.id]=[e,...ring,x];
+    }
+    return;
+  }
+  const conns=[];
+  for(let i=0;i<k;i++)for(let j=0;j<k;j++){
+    if(i===j)continue;
+    for(const Li of n.nb[i].ins)for(const Lo of n.nb[j].outs){
+      const d0=Li.dir,d3=Lo.dir,c=mkLane('conn',bez(Li.pts[1],d0,Lo.pts[0],d3),V_CONN,n);
+      c.i=i;c.j=j;c.inL=Li;c.out=Lo;c.conf=new Set();
+      c.crossing=(d0[0]*d3[1]-d0[1]*d3[0])>0.35; // right turn crosses oncoming traffic
+      if(Math.abs(d0[0]*d3[1]-d0[1]*d3[0])<0.3&&d0[0]*d3[0]+d0[1]*d3[1]>0)c.vmax=V_STRAIGHT; // going straight on: no need to slow down like a turning truck
+      conns.push(c);n.internal.push(c);n.path[Li.id+'_'+Lo.id]=[c];
+    }
+  }
+  for(let a=0;a<conns.length;a++)for(let b=a+1;b<conns.length;b++){
+    const c1=conns[a],c2=conns[b];if(c1.inL===c2.inL)continue;
+    let hit=c1.out===c2.out;
+    if(!hit){outer:for(const p of c1.pts)for(const q of c2.pts)if(Math.hypot(p[0]-q[0],p[1]-q[1])<4.1){hit=true;break outer;}}
+    if(hit){c1.conf.add(c2.id);c2.conf.add(c1.id);}
+  }
+}
+const gateOK=(n,j,v)=>n.gate[j].some(h=>h.v===v);
+function rebuildNodes(list,mut){
+  for(const ev of G.ev||[])if(ev.type==='crash'&&W.links.indexOf(ev.L)<0)ev.tEnd=G.time;
+  for(const n of list)for(const L of n.internal)for(const v of L.vehicles.slice()){
+    let tgt=null;for(let k=v.pi+1;k<v.plan.length;k++)if(v.plan[k].kind==='link'){tgt=v.plan[k];break;}
+    detach(v);if(tgt){tgt.spawnQ.push(v);v.q=tgt;}else enterBuilding(v,v.route.src);
+  }
+  if(mut)mut();
+  for(const n of list)buildNode(n);
+  relane();
+  for(const v of trucks){if(list.indexOf(v.grant)>=0)v.grant=null;if(v.nodes)replan(v);}
+}
+function setCtrl(n,kind,axis){rebuildNodes([n],()=>{n.ctrl={kind,axis:axis||0};});}
+
+/* ================= routing ================= */
+// is the turn p→n→b forbidden? (right turns at a junction with a no-right-turn sign)
+function turnBanned(p,n,b,hyp){
+  if(!p||n.type!=='junction')return false;
+  const nr=hyp&&hyp.n===n?hyp.nr:n.noRight;if(!nr||isRound(n))return false;
+  const d0x=n.x-p.x,d0y=n.y-p.y,d3x=b.x-n.x,d3y=b.y-n.y;
+  return (d0x*d3y-d0y*d3x)/(Math.hypot(d0x,d0y)*Math.hypot(d3x,d3y))>0.35;
+}
+// shortest path over (road, direction) states so that turn bans, one-ways and "no U-turn" are respected.
+// prev: the node we are coming from when starting mid-route. hyp: a hypothetical change to test ({e,d} one-way or {n,nr} turn ban).
+function findPath(a,b,cong,hyp,prev){
+  if(a===b)return [a];
+  const D=new Map(),P=new Map(),S=new Map(),done=new Set(),k0=(prev?prev.id:'s')+'>'+a.id;
+  D.set(k0,0);S.set(k0,[prev||null,a]);
+  let end=null;
+  for(;;){
+    let u=null,bd=Infinity;for(const [k,d] of D)if(!done.has(k)&&d<bd){bd=d;u=k;}
+    if(u===null)break;done.add(u);
+    const st=S.get(u),from=st[0],nu=st[1];
+    if(nu===b){end=u;break;}
+    for(const e of nu.nb){
+      const to=e.to;
+      if(to.type==='lot'&&to!==b)continue;
+      if(from&&to===from)continue; // no U-turns
+      const ed=W.edgeOf[nu.id+'>'+to.id],ow=hyp&&hyp.e===ed?hyp.d:ed.ow;
+      if(ow&&((ow===1)!==(ed[0]===nu)))continue; // one-way, wrong direction
+      if(turnBanned(from,nu,to,hyp))continue;
+      const LL=e.outs,len=LL.length?LL[0].len:Math.hypot(to.x-nu.x,to.y-nu.y);let w=len+22;
+      if(cong){if(ed.works)w+=len*2.2;for(const x of LL)if(x.block)w+=(navActive()?400:120)/LL.length;}
+      if(cong&&LL.length){let c=0,jm=0;for(const x of LL){c+=x.vehicles.length;jm+=x.jam;}const nv=NAV[navActive()?1:0];w+=len*nv[0]*Math.min(1,c*11/(len*LL.length))+len*nv[1]*jm/LL.length;}
+      const k=nu.id+'>'+to.id,nd=bd+w;
+      if(!D.has(k)||nd<D.get(k)){D.set(k,nd);P.set(k,u);S.set(k,[nu,to]);}
+    }
+  }
+  if(end===null)return null;
+  const p=[];for(let k=end;k!==undefined;k=P.get(k))p.unshift(S.get(k)[1]);
+  return p;
+}
+function canNoRight(n){
+  const h={n,nr:true};
+  for(const r of W.routes)if(!findPath(r.src.node,r.dst.node,false,h)||!findPath(r.dst.node,r.src.node,false,h))return false;
+  return true;
+}
+// geometric turn at the end of link j of a node path: -1 left, 1 right, 0 straight/none
+function turnGeo(ns,j){
+  if(j<0||j+2>=ns.length)return 0;
+  const a=ns[j],n=ns[j+1],b=ns[j+2],d0x=n.x-a.x,d0y=n.y-a.y,d3x=b.x-n.x,d3y=b.y-n.y,cr=(d0x*d3y-d0y*d3x)/(Math.hypot(d0x,d0y)*Math.hypot(d3x,d3y));
+  return cr>0.35?1:cr<-0.35?-1:0;
+}
+// lane required at the end of link j (only sign/signal junctions sort traffic by lane)
+function turnAt(ns,j){
+  if(j+2>=ns.length)return 0;const n=ns[j+1];if(n.type!=='junction'||n.ctrl.kind==='round')return 0;
+  if(n.ctrl.kind==='round2'){ // kerb lane feeds the outer ring (next exit only), centre lane the inner ring
+    const k=n.nb.length;let i=-1,x=-1;for(let q=0;q<k;q++){if(n.nb[q].to===ns[j])i=q;if(n.nb[q].to===ns[j+2])x=q;}
+    return x===(i+1)%k?-1:1;
+  }
+  return turnGeo(ns,j);
+}
+const linksOf=(ns,j)=>W.link[ns[j].id+'>'+ns[j+1].id];
+// natural lane when entering each road: left turn lands on the kerb lane, right turn on the centre lane, straight keeps its lane
+function naturalFrom(v,j0){
+  const ns=v.nodes;
+  for(let j=Math.max(1,j0+1);j<ns.length-1;j++){
+    const LL=linksOf(ns,j),k=LL.length,t=turnGeo(ns,j-1);
+    let c=k<2?0:t<0?0:t>0?k-1:Math.min(v.lc[j-1],k-1);
+    if(k>1&&LL[0].len<SHORT_BLOCK){const nd=turnAt(ns,j);if(nd)c=nd<0?0:k-1;} // short block: no room to change lanes, so pick the turn lane straight away
+    v.lc[j]=c;
+  }
+}
+function defLc(v){v.lc=[0];naturalFrom(v,0);}
+function linkIdx(v,L){const ns=v.nodes;for(let j=0;j<ns.length-1;j++)if(ns[j]===L.from&&ns[j+1]===L.to)return j;return -1;}
+function setNeed(v){
+  const L=v.lane,k=W.link[L.from.id+'>'+L.to.id].length,j=linkIdx(v,L),t=j<0?0:turnAt(v.nodes,j);
+  v.need=k<2?-1:t<0?0:t>0?k-1:-1;
+}
+function planFor(v){
+  const ns=v.nodes,out=[];let prev=null;
+  for(let j=0;j<ns.length-1;j++){
+    const LL=linksOf(ns,j),L=LL[Math.min(v.lc[j],LL.length-1)];
+    if(prev){const p=ns[j].path[prev.id+'_'+L.id];for(const x of p)out.push(x);}
+    out.push(L);prev=L;
+  }
+  return out;
+}
+function sendHome(v){detach(v);v.q=null;v.cargo=0;enterBuilding(v,v.route.src);}
+// the road ahead was closed (one-way change): find a new way from where the truck is, or send it back to its depot
+// navigation: on entering a road, look for a faster way from the next junction given current traffic
+function navReroute(v){
+  const L=v.lane,ns=v.nodes,j=linkIdx(v,L);if(j<0||j+2>=ns.length)return;
+  const dest=ns[ns.length-1],tail=findPath(L.to,dest,true,null,L.from);if(!tail)return;
+  const old=ns.slice(j+1);if(old.length===tail.length&&old.every((n,i)=>n===tail[i]))return;
+  v.nodes=[L.from].concat(tail);replan(v);G.navCount++;
+}
+function reroute(v){
+  const c=v.lane||v.q,ns=v.nodes;let Lc=c;
+  if(c&&c.kind!=='link'){Lc=null;for(let k=v.pi+1;k<v.plan.length;k++)if(v.plan[k].kind==='link'){Lc=v.plan[k];break;}}
+  if(!Lc||W.links.indexOf(Lc)<0){sendHome(v);return false;}
+  const jc=linkIdx(v,Lc),dest=ns[ns.length-1],tail=jc<0?null:findPath(Lc.to,dest,true,null,Lc.from);
+  if(!tail){sendHome(v);return false;}
+  v.nodes=ns.slice(c.kind==='link'?jc:Math.max(0,jc-1),jc+1).concat(tail);
+  for(let j=0;j<v.nodes.length-1;j++)if(!linksOf(v.nodes,j).length){sendHome(v);return false;}
+  return true;
+}
+function replan(v){
+  for(let j=0;j<v.nodes.length-1;j++)if(!linksOf(v.nodes,j).length){if(!reroute(v))return;break;}
+  defLc(v);
+  let jm=-1;const fix=L=>{if(!L)return;const j=linkIdx(v,L);if(j>=0){v.lc[j]=L.li;if(j>jm)jm=j;}};
+  const c=v.lane||v.q;
+  if(c){if(c.kind==='link')fix(c);fix(c.inL);fix(c.out);}
+  if(jm>=0)naturalFrom(v,jm);
+  v.plan=planFor(v);
+  if(v.lane){v.pi=v.plan.indexOf(v.lane);if(v.pi<0){detach(v);enterBuilding(v,v.route.src);}else if(v.lane.kind==='link')setNeed(v);}
+}
+
+/* ================= lane changing ================= */
+function leadGap(v,L){
+  let g=999;
+  for(const u of L.vehicles)if(u!==v&&u.s>v.s){const x=u.s-u.len-v.s;if(x<g)g=x;}
+  for(const t of L.tails){const x=tailPos(t,L)-v.s;if(x<g)g=x;}
+  if(L.block&&L.block.s>v.s){const x=L.block.s-L.block.len-v.s;if(x<g)g=Math.max(0,x);}
+  return g;
+}
+function canMerge(v,T){
+  let behind=false;
+  if(T.block&&T.block.s>v.s-v.len-2&&T.block.s-T.block.len<v.s+12)return false;
+  for(const u of T.vehicles){
+    if(u.s>=v.s){if(u.s-u.len-v.s<1+Math.max(0,v.v-u.v)*1.2)return false;}
+    else{
+      behind=true;const g=v.s-v.len-u.s;
+      if(g<1.2+Math.max(0,u.v-v.v)*1.5+u.v*0.25)return false;
+      if(u.v<0.5&&u.tIn<v.tIn&&g<12)return false; // no queue jumping: a waiting truck that was on this road first keeps its place
+    }
+  }
+  for(const t of T.tails)if(tailPos(t,T)-v.s<1.5+v.v*0.5)return false;
+  for(const g of T.ghosts)if(Math.abs(g.v.s-v.s)<v.len+2)return false;
+  if(!behind){ // we would become the last truck of the lane: leave room for traffic already committed to it from the junction behind
+    const n=T.from;let cnt=T.spawnQ.length;
+    for(const a of n.active)if(a.out===T&&a.v.lane!==T)cnt++;
+    for(const x of n.internal)if(x.kind==='exit'&&x.out===T)cnt+=x.vehicles.length;
+    if(v.s-v.len<cnt*(v.len+2)+3)return false;
+  }
+  return true;
+}
+function doChange(v,L,T){
+  L.vehicles.splice(L.vehicles.indexOf(v),1);L.ghosts.push({v,t:G.time+0.9});
+  T.vehicles.push(v);T.vehicles.sort((a,b)=>b.s-a.s);
+
+  v.lane=T;const j=linkIdx(v,T);v.lc[j]=T.li;naturalFrom(v,j);
+  v.plan=planFor(v);v.pi=v.plan.indexOf(T);
+  v.lat=L.off-T.off;v.wantT=null;v.lcCool=3;v.wait=0;G.lcCount++;
+}
+function laneChanges(dt){
+  for(const LL of W.wide){
+    for(const L of LL)L.wanters.length=0;
+    for(const L of LL)for(const v of L.vehicles)if(v.wantT===LL[1-L.li])v.wantT.wanters.push(v);else v.wantT=null;
+    for(const L of LL){
+      if(L.ghosts.length)L.ghosts=L.ghosts.filter(g=>g.t>G.time&&g.v.lane&&g.v.lane.kind==='link');
+      for(const v of L.vehicles.slice()){
+        if(v.lane!==L)continue;
+        if(v.lcCool>0){v.lcCool-=dt;continue;}
+        v.lcT+=dt;if(v.lcT<0.3)continue;v.lcT=0;
+        if(v.grant){v.wantT=null;continue;}
+        if(v.tailLanes.length||v.s<v.len+4)continue;
+        const T=LL[1-L.li],D=L.len-v.s;let want=false;
+        if(v.need>=0)want=v.need!==L.li&&D>6;                 // mandatory: get into the turn lane
+        else if(D>18){const g0=leadGap(v,L);want=g0<22&&leadGap(v,T)>g0+12;} // discretionary: the other lane is clearly emptier
+        if(want&&canMerge(v,T))doChange(v,L,T);
+        else v.wantT=want&&v.need>=0?T:null; // blinker on: traffic behind in the target lane lets it in
+      }
+    }
+  }
+}
+
+/* ================= trucks & buildings ================= */
+function mkTruck(route){return {id:tid++,route,len:TRUCK_LEN,s:0,v:0,nv:0,adv:0,lane:null,pi:0,plan:[],nodes:null,lc:[],q:null,need:-1,held:0,dest:null,wantT:null,tIn:0,lcT:0,lcCool:0,lat:0,tailLanes:[],grant:null,cargo:0,stuck:0,wait:0,task:'load',t:0,brake:false};}
+function addTruck(r){const t=mkTruck(r);trucks.push(t);r.trucks++;enterBuilding(t,r.src);return t;}
+function enterBuilding(v,b){if(v.cargo&&v.tLoad&&b===v.route.dst)v.trip=G.time-v.tLoad;else v.trip=0;v.lane=null;v.q=null;v.held=0;v.nodes=null;v.grant=null;v.task=(v.cargo&&b===v.route.dst)?'unload':'load';v.t=3;b.inside.push(v);}
+// leave the building for v.dest. With dispatch control on, wait while a road on the way is jammed solid.
+function tryDepart(v,from){
+  const to=v.dest;
+  v.nodes=findPath(from.node,to.node,true);
+  if(!v.nodes){enterBuilding(v,to);return true;}
+  defLc(v);v.plan=planFor(v);
+  if(G.up.meter&&G.meterOn&&v.held<METER_MAX){
+    for(let i=1;i<v.plan.length;i++){const L=v.plan[i];if(L.kind==='link'&&L.jam>=METER_TH){v.held+=METER_RETRY;v.nodes=null;return false;}}
+  }
+  v.pi=0;v.stuck=0;v.held=0;v.q=v.plan[0];v.q.spawnQ.push(v);v.tLoad=v.cargo?G.time:0;return true;
+}
+// late deliveries pay less: full pay up to the time an uncongested trip takes (about 0.17 s per metre), then in proportion, never below 30%
+const onTime=(r,trip)=>!trip?1:Math.max(0.3,Math.min(1,(r.dist*0.17+5)/trip));
+function earn(a){G.money+=a;G.inc.push([G.time,a]);}
+const payOf=r=>r.pay*(1+0.5*G.up.cap)*(1+0.25*G.fame)*(r.boost||1);
+const moveAt=lv=>Math.round(1500*Math.pow(1.5,lv)/100)*100;
+const incOver=sec=>{let s=0;for(const e of G.inc)if(e[0]>=G.time-sec)s+=e[1];return s*60/Math.min(sec,Math.max(5,G.time));};
+const incRate=()=>incOver(60);
+// moving on needs a well-run town: the average profit over the last 3 minutes must reach this
+const moveProfit=()=>Math.round(1000*(1+0.25*G.fame)*(1+0.05*G.lv)/10)*10;
+const avgProfit=()=>incOver(180)-G.upk;
+const ONTIME_NEED=0.88;
+const onTimeRate=()=>{let a=0,c=0;for(const e of G.pfl)if(e[0]>=G.time-180){a+=e[1];c++;}return c?a/c:1;};
+const canMoveNow=()=>G.delivered>=moveAt(G.lv)&&G.time>=180&&avgProfit()>=moveProfit()&&onTimeRate()>=ONTIME_NEED;
+const routeProfit=r=>{let s=0;for(const e of r.earn)if(e[0]>=G.time-120)s+=e[1];return s*60/Math.min(120,Math.max(10,G.time))-r.trucks*truckUpk(r)*(G.fuel||1);};
+const waitingFor=r=>r.src.fac?r.src.inside.filter(v=>v.route===r&&v.task!=='unload'&&v.task!=='go').length*(r.src.stock<1?1:0):0;
+/* ---------- running costs: every truck, the traffic information service and each signal cost money every minute ---------- */
+const UPK_T=0.3, UPK_NAV=0.12, UPK_SIG=4;
+// a truck's upkeep is a share of what it would earn on an empty road (its route's pay over a free-flow round trip)
+const truckUpk=r=>UPK_T*r.pay*(1+0.25*G.fame)*60/(2*r.dist/5+10); // free-flow round trip measured at about 5 m/s incl. junction stops and loading
+function upkeep(){
+  let t=0;for(const r of W.routes)t+=r.trucks*truckUpk(r);t*=G.fuel||1;
+  const nav=G.up.nav&&G.navOn?t*UPK_NAV:0,sig=nJ('signal')*UPK_SIG*(1+0.25*G.fame);
+  return {t,nav,sig,all:t+nav+sig};
+}
+const netRate=()=>incRate()-G.upk;
+const navActive=()=>G.up.nav>=1&&G.navOn;
+// sell one truck of a route: one waiting in a building first, then one queued to leave, otherwise one on the road (its load is lost)
+function sellTruck(r){
+  if(r.trucks<=0)return 0;
+  let v=null;
+  for(const b of W.bld){const x=b.inside.find(u=>u.route===r);if(x){v=x;b.inside.splice(b.inside.indexOf(x),1);break;}}
+  if(!v)for(const L of W.links){const x=L.spawnQ.find(u=>u.route===r);if(x){v=x;L.spawnQ.splice(L.spawnQ.indexOf(x),1);break;}}
+  if(!v){v=trucks.filter(u=>u.route===r&&u.lane).sort((a,b)=>a.cargo-b.cargo)[0];if(v)detach(v);}
+  if(!v)return 0;
+  trucks.splice(trucks.indexOf(v),1);r.trucks--;
+  const refund=Math.round(truckCost(r)*0.5*(trucks.length?1:0));G.money+=refund;return refund;
+}
+// special orders: every few minutes one route gets a rush job (10% above its recent pace, 3 minutes)
+function updContract(){
+  const c=G.con,o=G.offer;
+  if(c){
+    if(c.got>=c.need){G.money+=c.reward;G.conDone++;G.con=null;G.conNext=G.time+120;notify('特別注文を達成！ +¥'+Math.round(c.reward).toLocaleString('ja-JP'));fx('win');}
+    else if(G.time>=c.tEnd){const pen=Math.round(c.reward*0.25);charge(pen);G.con=null;G.conNext=G.time+120;notify('特別注文に間に合いませんでした（違約金 ¥'+pen.toLocaleString('ja-JP')+'）');fx('fail');}
+    return;
+  }
+  if(o){if(G.time>=o.tOffer){G.offer=null;G.conNext=G.time+90;}return;}
+  if(G.time<G.conNext)return;
+  const rs=W.routes.filter(r=>UNLOCK[r.chain]<=G.delivered&&r.trucks>0);
+  if(rs.length<2||G.delivered<40){G.conNext=G.time+30;return;}
+  const r=rs[Math.floor(Math.random()*rs.length)];while(r.log.length&&r.log[0]<G.time-120)r.log.shift();
+  const need=Math.max(5,Math.ceil(r.log.length*1.5*1.1));
+  G.offer={r:r.i,need,got:0,tOffer:G.time+30,reward:need*payOf(r)*1.5};
+  notify('特別注文の依頼: '+r.src.name+'→'+r.dst.name+' を3分で'+need+'回');fx('order');
+}
+function acceptOffer(){const o=G.offer;if(!o)return;G.offer=null;o.tEnd=G.time+180;G.con=o;}
+function declineOffer(){if(!G.offer)return;G.offer=null;G.conNext=G.time+90;}
+// money that may push into debt: capped like upkeep so the game can always recover
+function charge(a){const floor=-Math.max(100,G.upk*2);G.money=Math.max(Math.min(G.money,floor),G.money-a);}
+/* ---------- events: road works, accidents, fuel prices, good harvests ---------- */
+const EV_GAP=[120,220];
+function busyEdges(){
+  const out=[];for(const e of W.edges){if(e[0].type==='lot'||e[1].type==='lot'||e.works)continue;let c=0;for(const L of W.link[e[0].id+'>'+e[1].id].concat(W.link[e[1].id+'>'+e[0].id]))c+=L.vehicles.length;if(c>0)out.push(e);}
+  return out;
+}
+function startEvent(type){
+  const pick=a=>a[Math.floor(Math.random()*a.length)];
+  if(type==='works'){
+    const es=busyEdges();if(!es.length)return false;const e=pick(es);e.works=G.time+180;
+    G.ev.push({type,e,tEnd:e.works});notify('🚧 道路工事が始まりました（3分間 徐行）');return true;
+  }
+  if(type==='crash'){
+    const ls=W.links.filter(L=>L.len>45&&!L.block&&L.from.type!=='lot'&&L.to.type!=='lot'&&L.vehicles.length);if(!ls.length)return false;
+    const L=pick(ls);
+    // place the wreck in a stretch of the lane that is clear right now
+    let bs=-1;for(let t=0;t<12;t++){const x=14+Math.random()*(L.len-24);if(!L.vehicles.some(u=>u.s>x-11&&u.s-u.len<x+2)){bs=x;break;}}
+    if(bs<0)return false;
+    L.block={s:bs,len:8};const ev={type,L,tEnd:G.time+90,cost:Math.max(80,Math.round(incRate()*0.4/10)*10)};G.ev.push(ev);
+    notify('💥 事故で車線がふさがりました（90秒）');fx('tow');return true;
+  }
+  if(type==='fuel'){if(G.fuel>1)return false;G.fuel=1.4;G.ev.push({type,tEnd:G.time+240});notify('⛽ 燃料が値上がり（4分間 トラック維持費 +40%）');fx('fail');return true;}
+  if(type==='boom'){
+    const rs=W.routes.filter(r=>r.trucks>0&&!r.boost);if(!rs.length)return false;const r=pick(rs);r.boost=1.5;
+    G.ev.push({type,r,tEnd:G.time+180});notify('🎉 '+r.dst.name+'で大口の需要（3分間 '+r.src.name+'→'+r.dst.name+' の報酬 +50%）');fx('order');return true;
+  }
+  return false;
+}
+function endEvent(ev){
+  if(ev.type==='works')ev.e.works=0;
+  else if(ev.type==='crash'){ev.L.block=null;}
+  else if(ev.type==='fuel')G.fuel=1;
+  else if(ev.type==='boom')ev.r.boost=0;
+}
+function clearCrash(ev){if(G.money<ev.cost)return false;G.money-=ev.cost;ev.tEnd=G.time;return true;}
+function updEvents(){
+  for(const ev of G.ev)if(G.time>=ev.tEnd)endEvent(ev);
+  G.ev=G.ev.filter(ev=>G.time<ev.tEnd);
+  if(G.delivered<60||G.time<G.evNext)return;
+  const r=Math.random(),type=r<0.35?'works':r<0.7?'crash':r<0.85?'fuel':'boom';
+  startEvent(type);G.evNext=G.time+EV_GAP[0]+Math.random()*(EV_GAP[1]-EV_GAP[0]);
+}
+const nJ=k=>W.nodes.filter(n=>n.type==='junction'&&n.ctrl.kind===k).length;
+const ACH=[
+ ['d50','配達を50回',()=>G.delivered>=50,100],
+ ['t10','トラックを10台に',()=>trucks.length>=10,150],
+ ['rule','交差点のルールを変える',()=>W.nodes.some(n=>n.type==='junction'&&n.ctrl.kind!=='none'),100],
+ ['i300','利益 ¥300/分',()=>netRate()>=300,300],
+ ['wide','道路に車線を追加する',()=>W.edges.some(e=>e.lanes>1),300],
+ ['d300','配達を300回',()=>G.delivered>=300,500],
+ ['sig3','信号を3か所に設置',()=>nJ('signal')>=3,400],
+ ['rnd','ラウンドアバウトを設置',()=>nJ('round')+nJ('round2')>=1,600],
+ ['ow','道路を一方通行にする',()=>W.edges.some(e=>e.ow),300],
+ ['con1','特別注文を達成する',()=>G.conDone>=1,800],
+ ['i1500','利益 ¥1,500/分',()=>netRate()>=1500,1500],
+ ['road','道路を建設する',()=>W.bought.length>=1,1500],
+ ['grow','町に新しい施設が建つ',()=>W.bld.some(b=>b.extra),500],
+ ['nav','交通情報を導入する',()=>G.up.nav>=1,800],
+ ['t50','トラックを50台に',()=>trucks.length>=50,2000],
+ ['all','全路線を解放',()=>G.delivered>=UNLOCK[UNLOCK.length-1],3000],
+ ['big','大型ラウンドアバウトを設置',()=>nJ('round2')>=1,2000],
+ ['calm','30台以上で10分間レッカーなし',()=>trucks.length>=30&&G.time-G.lastTow>=600,3000],
+ ['d2000','1つの町で配達を2,000回',()=>G.delivered>=2000,5000],
+ ['con5','特別注文を5回達成',()=>G.conDone>=5,5000],
+ ['i5000','利益 ¥5,000/分',()=>netRate()>=5000,8000],
+ ['road5','道路を5本建設',()=>W.bought.length>=5,8000],
+ ['move','次の町へ引っ越す',()=>G.fame>=1,0],
+ ['t100','トラックを100台に',()=>trucks.length>=100,10000],
+ ['i15k','利益 ¥15,000/分',()=>netRate()>=15000,20000],
+ ['move3','3つ目の町まで引っ越す',()=>G.fame>=3,0],
+ ['con20','特別注文を20回達成',()=>G.conDone>=20,30000]
+];
+function checkAch(){
+  for(const a of ACH){
+    if(G.done[a[0]]||!a[2]())continue;
+    G.done[a[0]]=1;G.money+=a[3];notify('目標達成: '+a[1]+(a[3]?' +¥'+a[3].toLocaleString('ja-JP'):''));fx('win');
+  }
+}
+function updBuilding(b,dt){
+  if(!b.inside.length)return;
+  let busy=0;const keep=[];
+  for(const v of b.inside){
+    if(v.task==='go'){ // loaded/unloaded, waiting for dispatch
+      v.t-=dt;if(v.t>0){keep.push(v);continue;}
+      if(!tryDepart(v,b)){v.t=METER_RETRY;keep.push(v);}
+      continue;
+    }
+    if(busy>=b.bays){keep.push(v);continue;}
+    if(v.t>0){busy++;v.t-=dt*(1+0.3*G.up.load);if(v.t>0){keep.push(v);continue;}}
+    const r=v.route;
+    if(v.task==='unload'){const pf=onTime(r,v.trip);v.trip=0;r.pf=(r.pf===undefined?1:r.pf)*0.85+pf*0.15;const amt=payOf(r)*pf;earn(amt);G.pfl.push([G.time,pf]);if(G.pfl.length>2000)G.pfl.shift();r.earn.push([G.time,amt]);if(r.earn.length>300)r.earn.shift();G.delivered++;r.done++;r.log.push(G.time);if(r.log.length>400)r.log.shift();if(G.con&&G.con.r===r.i)G.con.got++;fx('deliver');if(b.fac)b.stock++;v.cargo=0;v.dest=r.src;}
+    else if(b!==r.src)v.dest=r.src;
+    else{
+      if(b.fac&&b.stock<1){keep.push(v);continue;}
+      if(b.fac)b.stock--;v.cargo=1;v.dest=r.dst;
+    }
+    v.task='go';v.t=0;v.held=0;
+    if(!tryDepart(v,b)){v.t=METER_RETRY;keep.push(v);}
+  }
+  b.inside=keep;
+}
+function clearTails(v){for(const L of v.tailLanes){const x=L.tails.indexOf(v);if(x>=0)L.tails.splice(x,1);}v.tailLanes.length=0;}
+function detach(v){
+  if(v.lane){const x=v.lane.vehicles.indexOf(v);if(x>=0)v.lane.vehicles.splice(x,1);}
+  clearTails(v);v.lane=null;v.grant=null;v.v=0;v.lat=0;
+  for(const n of W.nodes){if(n.active&&n.active.length)n.active=n.active.filter(a=>a.v!==v);if(n.hold)for(let i=0;i<n.hold.length;i++)if(n.hold[i]===v)n.hold[i]=null;}
+}
+const towFee=r=>Math.round(20*[1,2,4,8,16][r.chain]*(1+0.25*G.fame));
+function tow(v){detach(v);v.cargo=0;G.tows++;G.lastTow=G.time;const f=towFee(v.route);charge(f);fx('tow');enterBuilding(v,v.route.src);notify('動けなくなったトラックをレッカーしました（¥'+f.toLocaleString('ja-JP')+'）');}
+function trimTails(v){
+  const tl=v.tailLanes;if(!tl.length)return;
+  let rem=v.len-v.s,i=tl.length-1;
+  for(;i>=0;i--){if(rem<=0.001)break;rem-=tl[i].len;}
+  if(i>=0){for(let j=0;j<=i;j++){const L=tl[j],x=L.tails.indexOf(v);if(x>=0)L.tails.splice(x,1);}tl.splice(0,i+1);}
+}
+function tailPos(t,L){let rem=t.len-t.s;const tl=t.tailLanes;for(let i=tl.length-1;i>=0;i--){if(tl[i]===L)return L.len-rem;rem-=tl[i].len;}return L.len;}
+
+/* ================= junction control ================= */
+function canSpace(n,v,out){
+  const last=out.vehicles[out.vehicles.length-1];let free=last?last.s-last.len:out.len;
+  for(const a of n.active)if(a.out===out&&a.v.lane!==out)free-=a.v.len+2;
+  return free>=v.len+2.5;
+}
+function demand(n,i,d){d=d||55;for(const L of n.nb[i].ins)for(const v of L.vehicles)if(L.len-v.s<d)return true;return false;}
+function queueN(n,i){let c=0;for(const L of n.nb[i].ins)for(const v of L.vehicles)if(L.len-v.s<70)c++;return c;}
+function isGreen(n,i){return n.sig.mode==='g'&&n.sgr[n.sig.g].indexOf(i)>=0;}
+function updJunction(n,dt){
+  if(n.active.length)n.active=n.active.filter(a=>a.v.lane===a.inL||a.v.lane===a.conn||a.v.tailLanes.indexOf(a.conn)>=0);
+  const kind=n.type==='bend'?'bend':n.ctrl.kind,s=n.sig;
+  const cands=[];
+  for(const L of n.inL){
+    const i=L.ai;
+    for(const v of L.vehicles){
+      if(v.grant===n)continue;
+      const d=L.len-v.s;
+      const cn=v.plan[v.pi+1],fast=kind==='bend'||(kind==='prio'&&n.pairs[n.ctrl.axis%n.pairs.length].indexOf(i)>=0)||(kind==='signal'&&(isGreen(n,i)||(s.mode==='a'&&!!cn&&cn.crossing&&n.sgr[s.g].indexOf(i)>=0)));
+      if(v.need>=0&&v.need!==L.li&&d>14)break; // still trying to reach its turn lane
+      if(d<=(fast?v.v*v.v/5+16:5.5)){if(!v.wait)v.wait=G.time;cands.push({v,i,d,L,conn:v.plan[v.pi+1]});}
+      break;
+    }
+  }
+  if(kind==='signal'){
+    // phases per direction pair: green -> right-turn arrow (only if someone is waiting to turn right) -> all red -> next pair
+    s.t+=dt;
+    const grp=n.sgr[s.g];
+    const rightWaiting=()=>grp.length>1&&grp.some(i=>n.nb[i].ins.some(L=>{const v=L.vehicles[0];if(!v||L.len-v.s>30)return false;const c=v.plan[v.pi+1];return !!c&&c.crossing&&c.node===n;}));
+    if(s.mode==='g'){
+      if(s.t>=SG_MIN){
+        let next=-1;
+        for(let q=1;q<n.sgr.length;q++){const gi=(s.g+q)%n.sgr.length;if(n.sgr[gi].some(i=>demand(n,i))){next=gi;break;}}
+        // gap-out: keep green only while trucks keep arriving close behind; the busier direction may hold green longer
+        const here=grp.some(i=>demand(n,i,SG_GAP)),qh=grp.reduce((a,i)=>a+queueN(n,i),0),qn=next>=0?n.sgr[next].reduce((a,i)=>a+queueN(n,i),0):0;
+        const maxG=SG_LO+(SG_HI-SG_LO)*(qh/Math.max(1,qh+qn));
+        if((next>=0&&(s.t>=maxG||!here))||(s.t>=12&&rightWaiting()&&G.time-s.lastA>20)){
+          s.next=next>=0?next:s.g;s.t=0;s.mode=rightWaiting()?'a':'c';if(s.mode==='a')s.lastA=G.time;
+          if(s.mode==='c'&&s.next===s.g){s.mode='g';}
+        }
+      }
+    }else if(s.mode==='a'){
+      if(s.t>=9||(s.t>=1.5&&!rightWaiting())){s.mode='c';s.t=0;}
+    }else if(s.t>=1.2){s.mode='g';s.t=0;s.g=s.next;}
+  }
+  if(!cands.length)return;
+  const rank=c=>kind==='prio'?((n.pairs[n.ctrl.axis%n.pairs.length].indexOf(c.i)>=0?2:0)+(c.conn.crossing?0:1)):kind==='signal'?(c.conn.crossing?0:1):0;
+  for(const c of cands)c.r=c.conn&&c.conn.node===n?rank(c):-1;
+  // fairness: a truck that has waited too long gets the junction reserved; conflicting newcomers are held back until it has gone
+  const thr=25,resv=[],resvOut=[];
+  for(const c of cands)c.st=G.time-c.v.wait>thr?1:0;
+  cands.sort((a,b)=>b.st-a.st||b.r-a.r||a.v.wait-b.v.wait);
+  for(const c of cands){
+    const conn=c.conn;if(c.r<0)continue;
+    if(resvOut.indexOf(conn.out)>=0)continue;
+    if(G.time-c.v.wait>45&&!canSpace(n,c.v,conn.out)){resvOut.push(conn.out);continue;} // exit road keeps filling up before our turn: the next free slot is ours
+    if(kind==='signal'){
+      if(s.mode==='g'){if(!isGreen(n,c.i))continue;}
+      else if(!(s.mode==='a'&&conn.crossing&&n.sgr[s.g].indexOf(c.i)>=0))continue;
+    }
+    if(kind==='none'&&(NONE_MODE===1?n.active.length>0:false))continue; // all-way stop: one truck in the junction at a time
+    if(kind==='none'&&(c.v.v>0.4||G.time-c.v.wait<STOP_T))continue;        // ...and everybody stops first
+    if(!canSpace(n,c.v,conn.out))continue;
+    let blocked=false;
+    for(const r of resv)if(r.L!==c.L&&conn.conf.has(r.conn.id)){blocked=true;break;}
+    if(blocked)continue;
+    for(const a of n.active)if(a.inL!==c.L&&conn.conf.has(a.conn.id)){blocked=true;break;}
+    if(blocked){if(c.st)resv.push(c);continue;}
+    if(c.v.need>=0&&c.v.need!==c.L.li)G.wrong++;
+    c.v.grant=n;c.v.wait=0;n.active.push({v:c.v,inL:c.L,conn,out:conn.out});
+  }
+}
+function updRound(n){
+  const k=n.nb.length,two=n.ctrl.kind==='round2',isExit=(L,i)=>!!L&&L.kind==='exit'&&L.ai===i;
+  for(let q=0;q<k*2;q++){const h=n.hold[q];if(h&&!(h.lane===n.holdL[q]||h.lane===n.holdE[q]||h.tailLanes.indexOf(n.holdE[q])>=0))n.hold[q]=null;}
+  if(two)for(let j=0;j<k;j++){ // exit gate: the two ring lanes leave side by side only when each has its own lane on the exit road
+    if(n.gate[j].length)n.gate[j]=n.gate[j].filter(h=>h.v.lane===h.from||h.v.lane===h.x||h.v.tailLanes.indexOf(h.x)>=0);
+    const pj=(j-1+k)%k;
+    const rq=[];
+    for(const R of [n.midO[pj],n.mid[pj]]){
+      const v=R.vehicles[0];if(!v||R.len-v.s>10||gateOK(n,j,v))continue;
+      if(!isExit(v.plan[v.pi+1],j))continue;
+      if(v.gwL!==R){v.gwL=R;v.gw=G.time;}
+      rq.push({v,R});
+    }
+    rq.sort((a,b)=>a.v.gw-b.v.gw); // whoever has waited longer for this exit goes first
+    for(const {v,R} of rq){
+      const x=v.plan[v.pi+1];
+      const last=x.out.vehicles[x.out.vehicles.length-1];if(last&&last.s-last.len<v.len+2.5)continue;
+      let ok=true;
+      for(const h of n.gate[j]){if(h.x.r===x.r)continue;const o=x.r===0?x:h.x,inn=x.r===0?h.x:x;if(!(o.out.li<inn.out.li)){ok=false;break;}}
+      if(ok)n.gate[j].push({v,from:R,x});
+    }
+  }
+  for(let i=0;i<k;i++)for(let r=two?0:1;r<2;r++){
+    const q=i*2+r;if(n.hold[q])continue;
+    let v=null,L=null;
+    for(const X of n.nb[i].ins){
+      const u=X.vehicles[0];if(!u||u.grant===n||X.len-u.s>6)continue;
+      const e=u.plan[u.pi+1];if(!e||e.kind!=='entry'||e.r!==r)continue;
+      if(!u.wait)u.wait=G.time;
+      if(!v||u.wait<v.wait){v=u;L=X;}
+    }
+    if(!v)continue;
+    const oq=i*2+1-r;
+    if(n.hold[oq]&&n.holdL[oq]!==L){ // both lanes entering at once: only kerb→outer beside centre→inner
+      const kk=n.nb[i].ins.length,proper=(l,rr)=>rr===0?l.li===0:l.li===kk-1;
+      if(!(proper(L,r)&&proper(n.holdL[oq],1-r)))continue;
+    }
+    const m=r?n.mid[i]:n.midO[i];
+    if(r){ // inner ring: give way to circulating traffic
+      const pi=(i-1+k)%k,pm=n.mid[pi];
+      if(n.front[i].vehicles.length)continue;
+      // gap acceptance: enter only if no circulating truck will pass this entry within RB_GAP metres,
+      // and not right behind the previous truck from this arm (follow-up time). Heavy ring flow starves side roads.
+      if(G.time-(n.lastEnt[i]||-9)<RB_FOLLOW)continue;
+      let ok=true;
+      for(const u of pm.vehicles){if(isExit(u.plan[u.pi+1],i))continue;if(pm.len-u.s<RB_GAP){ok=false;break;}}
+      if(ok&&pm.len<RB_GAP)for(const u of n.front[pi].vehicles){if(isExit(u.plan[u.pi+2],i))continue;if(n.front[pi].len-u.s+pm.len<RB_GAP){ok=false;break;}}
+      if(ok)for(const e of n.entry[pi])for(const u of e.vehicles){if(isExit(u.plan[u.pi+2],i))continue;if(e.len-u.s+pm.len<RB_GAP){ok=false;break;}}
+      if(!ok)continue;
+    }
+    const last=m.vehicles[m.vehicles.length-1];
+    if(last&&last.s-last.len<2.5)continue;
+    let tb=false;for(const t of m.tails)if(tailPos(t,m)<v.len+2.5){tb=true;break;}
+    if(tb)continue;
+    // don't enter if our exit road is already full
+    let outL=null;for(let z=v.pi+1;z<v.plan.length;z++)if(v.plan[z].kind==='link'){outL=v.plan[z];break;}
+    if(outL){const ol=outL.vehicles[outL.vehicles.length-1];if(ol&&ol.s-ol.len<v.len+3)continue;}
+    v.grant=n;v.wait=0;n.hold[q]=v;n.holdL[q]=L;n.holdE[q]=v.plan[v.pi+1];n.lastEnt[i]=G.time;
+  }
+}
+
+/* ================= vehicle dynamics ================= */
+const WORKS_V=3.5;
+const laneV=(L,eng)=>{if(L.kind!=='link')return L.vmax;const e=L.edge||(L.edge=W.edgeOf[L.from.id+'>'+L.to.id]);return e&&e.works?Math.min(WORKS_V,L.vmax):L.vmax*eng;};
+function think(v,L,idx,dt){
+  const eng=1+0.08*G.up.eng;
+  let v0=laneV(L,eng),gap=Infinity,lv=0;
+  const look=Math.max(30,v.v*v.v/5+14);
+  if(idx>0){const a=L.vehicles[idx-1];gap=a.s-a.len-v.s;lv=a.v;}
+  for(const t of L.tails){if(t===v)continue;const p=tailPos(t,L);if(p>v.s-v.len){const g=p-v.s;if(g<gap){gap=g;lv=t.v;}}}
+  if(v.wantT){ // blinker on: fall in behind the nearest truck of the target lane, unless someone is right alongside
+    let near=null,ng=1e9,over=null;
+    for(const u of v.wantT.vehicles){
+      if(u.s>v.s){const g=u.s-u.len-v.s;if(g>=0.5){if(g<ng){ng=g;near=u;}}else over=u;}
+      else if(u.s>v.s-v.len-1)over=u;
+    }
+    if(over){if(over.v>1)v0=Math.min(v0,Math.max(1.5,over.v*0.6));}
+    else if(near&&ng<gap){gap=ng;lv=near.v;}
+  }
+  if(!v.grant)for(const u of L.wanters){if(u.s>v.s+1&&u.tIn<=v.tIn){const g=u.s-u.len-v.s;if(g>=0.5&&g<gap){gap=g;lv=u.v;}}}
+  for(const gh of L.ghosts){const u=gh.v;if(u!==v&&u.s>v.s){const g=u.s-u.len-v.s;if(g<gap){gap=g;lv=u.v;}}}
+  if(L.stop&&L.stop(v)){const g=L.len-v.s-0.6;if(g<gap){gap=g;lv=0;}}
+  if(L.block&&L.block.s-L.block.len>v.s-1){const g=L.block.s-L.block.len-v.s;if(g<gap){gap=Math.max(g,0.05);lv=0;}} // wreck ahead
+  let dist=L.len-v.s;
+  for(let k=v.pi+1;k<v.plan.length&&dist<look&&dist<gap;k++){
+    const N=v.plan[k],nv=laneV(N,eng);
+    v0=Math.min(v0,Math.sqrt(nv*nv+3.2*dist));
+    const last=N.vehicles[N.vehicles.length-1];
+    if(last&&last!==v){const g=dist+last.s-last.len;if(g<gap){gap=g;lv=last.v;}}
+    for(const t of N.tails){if(t===v)continue;const g=dist+tailPos(t,N);if(g<gap){gap=g;lv=t.v;}}
+    if(N.stop&&N.stop(v)){const g=dist+N.len-0.6;if(g<gap){gap=g;lv=0;}}
+    if(N.block){const g=dist+N.block.s-N.block.len;if(g<gap){gap=g;lv=0;}}
+    dist+=N.len;
+  }
+  let acc=IDM_A*(1-Math.pow(v.v/v0,4));
+  if(gap<Infinity){
+    const ss=IDM_S0+Math.max(0,v.v*IDM_T+v.v*(v.v-lv)/(2*Math.sqrt(IDM_A*IDM_B))),g=Math.max(gap,0.05);
+    acc-=IDM_A*ss*ss/(g*g);
+  }
+  if(acc<-9)acc=-9;
+  let nv=Math.max(0,v.v+acc*dt),adv=nv*dt;
+  if(gap<Infinity){const m=Math.max(0,gap-0.5);if(adv>m){adv=m;nv=adv/dt;}}
+  v.brake=acc<-0.7;v.nv=nv;v.adv=adv;
+}
+function step(dt){
+  G.time+=dt;
+  // running costs; debt is capped at about two minutes of upkeep so a bad patch can always be recovered from
+  G.upk=upkeep().all;{const floor=-Math.max(100,G.upk*2);if(G.money>floor)G.money=Math.max(floor,G.money-G.upk*dt/60);}
+  updContract();
+  updEvents();
+  if(G.tick%30===0)growTown();
+  for(const b of W.bld)updBuilding(b,dt);
+  for(const L of W.links){
+    if(!L.spawnQ.length)continue;
+    const v=L.spawnQ[0],last=L.vehicles[L.vehicles.length-1];
+    if(last&&last.s-last.len<v.len+2)continue;
+    if(L.block&&L.block.s-L.block.len<v.len+2)continue;
+    L.spawnQ.shift();v.q=null;v.lat=0;v.lane=L;v.s=v.len;v.v=0;v.pi=Math.max(0,v.plan.indexOf(L));v.tailLanes.length=0;v.stuck=0;L.vehicles.push(v);v.tIn=G.time;setNeed(v);
+  }
+  for(const n of W.nodes){if(n.type==='lot')continue;if(isRound(n)&&n.type==='junction')updRound(n);else updJunction(n,dt);}
+  laneChanges(dt);
+  for(const L of W.lanes){const vs=L.vehicles;for(let i=0;i<vs.length;i++)think(vs[i],L,i,dt);}
+  for(const v of trucks){
+    if(!v.lane)continue;
+    v.v=v.nv;v.s+=v.adv;
+    while(v.lane&&v.s>=v.lane.len){
+      if(v.pi>=v.plan.length-1){
+        const end=v.lane.to;detach(v);enterBuilding(v,W.lotB[end.id]||v.route.src);break;
+      }
+      const old=v.lane;v.s-=old.len;
+      const x=old.vehicles.indexOf(v);if(x>=0)old.vehicles.splice(x,1);
+      old.tails.push(v);v.tailLanes.push(old);
+      v.pi++;v.lane=v.plan[v.pi];v.lane.vehicles.push(v);v.lane.dirty=true;
+      v.lat=0;v.wantT=null;if(v.lane.kind==='link'){v.grant=null;v.tIn=G.time;if(navActive()&&v.lane.to.type!=='lot')navReroute(v);setNeed(v);}
+    }
+    if(!v.lane)continue;
+    trimTails(v);
+    if(v.lat){const d=3.8*dt;v.lat=Math.abs(v.lat)<=d?0:v.lat-Math.sign(v.lat)*d;}
+    if(v.v<0.15)v.stuck+=dt;else if(v.v>0.6)v.stuck=0;
+    if(v.stuck>150)tow(v);
+  }
+  for(const L of W.lanes)if(L.dirty){L.vehicles.sort((a,b)=>b.s-a.s);L.dirty=false;}
+  if(++G.tick%15===0)for(const L of W.links){
+    let st=0;for(const v of L.vehicles)if(v.v<1.5)st++;
+    L.jam+=(Math.min(1,st*(TRUCK_LEN+1.6)/L.len)-L.jam)*0.12;
+  }
+  while(G.inc.length&&G.inc[0][0]<G.time-180)G.inc.shift();
+}
+
+/* ================= game state ================= */
+const KEY='jiwajiwa-traffic-v2';
+function truckCost(r){return Math.round(40*[1,2,4,8,16][r.chain]*Math.pow(1.25,r.trucks));}
+const buyCost=r=>trucks.length===0&&r.i===0?0:truckCost(r); // no trucks at all: the first one is free, so going broke can never lock the game
+const UPS=[
+ {k:'eng',name:'エンジン',desc:'最高速度 +8%',base:200,mul:1.8,max:6},
+ {k:'cap',name:'荷台',desc:'配達報酬 +50%',base:400,mul:2.2,max:8},
+ {k:'load',name:'荷積み場',desc:'積み降ろし +30%',base:150,mul:1.7,max:6},
+ {k:'nav',name:'交通情報',desc:'混んでいる道を避け、走行中も道を選び直す',base:1200,mul:1,max:1}
+];
+const METER_COST=800;
+const upCost=u=>Math.round(u.base*Math.pow(u.mul,G.up[u.k]));
+function newGame(seed,sv,carry){
+  trucks=[];tid=0;
+  G={money:60,delivered:0,tows:0,time:1,up:{eng:0,cap:0,load:0,meter:0,nav:0},navCount:0,meterOn:true,inc:[],speed:1,lcCount:0,wrong:0,tick:0,
+     fame:0,lv:0,done:{},upk:0,pfl:[],navOn:true,offer:null,ev:[],evNext:300,fuel:1,con:null,conNext:240,conDone:0,lastTow:0,tut:0,mute:false};
+  if(carry)Object.assign(G,carry);
+  if(sv){G.navOn=sv.navOn!==false;G.fame=sv.fame|0;G.lv=sv.lv|0;G.done=sv.done||{};G.conDone=sv.conDone|0;G.tut=sv.tut===undefined?99:sv.tut;G.mute=!!sv.mute;}
+  else G.money=60+300*G.fame;
+  genWorld(seed,G.lv);
+  if(sv){
+    G.money=sv.money;G.delivered=sv.delivered;G.tows=sv.tows||0;Object.assign(G.up,sv.up||{});G.meterOn=sv.meterOn!==false;
+    if(sv.ops)for(const o of sv.ops){
+      if(o[0]==='r'){const c=W.cand[o[1]];if(c&&!c.built)addEdgeRaw(c);}
+      else if(o[0]==='b'){const g=W.nodes[o[2]];if(g&&EXTRA[o[1]]&&!W.bld.some(b=>b.key===EXTRA[o[1]].key))addExtraRaw(o[1],g,o[3]);}
+    }
+    else for(const x of sv.bought||[]){const c=W.cand[x];if(c&&!c.built)addEdgeRaw(c);}
+    // junction rules after the replay: a bend only becomes a junction once its new road exists
+    for(const id of sv.nr||[]){const n=W.nodes[id];if(n&&n.type==='junction')n.noRight=true;}
+    for(const c of sv.ctrl||[]){const n=W.nodes[c[0]];if(n&&n.type==='junction')n.ctrl={kind:c[1],axis:c[2]};}
+    (sv.bays||[]).forEach((x,i)=>{if(W.bld[i])W.bld[i].bays=Math.max(2,Math.min(8,x|0));});
+    for(const x of sv.wide||[]){const e=W.edges[x];if(e&&e.lanes<2&&e[0].type!=='lot'&&e[1].type!=='lot')widenEdge(e);}
+    for(const x of sv.ow||[]){const e=W.edges[x[0]];if(e&&e[0].type!=='lot'&&e[1].type!=='lot'&&canOneWay(e,x[1]))applyOneWay(e,x[1]);}
+    for(const n of W.nodes)buildNode(n);
+    relane();
+    (sv.rt||[]).forEach((cnt,i)=>{for(let q=0;q<cnt;q++)addTruck(W.routes[i]);});
+    (sv.stock||[]).forEach((s,i)=>{if(W.bld[i])W.bld[i].stock=s;});
+  }else{addTruck(W.routes[0]);addTruck(W.routes[1]);}
+}
+function save(){
+  if(HEADLESS)return;
+  try{localStorage.setItem(KEY,JSON.stringify({seed:W.seed,navOn:G.navOn,fame:G.fame,lv:G.lv,done:G.done,conDone:G.conDone,tut:G.tut,mute:G.mute,money:G.money,delivered:G.delivered,tows:G.tows,up:G.up,meterOn:G.meterOn,nr:W.nodes.filter(n=>n.noRight).map(n=>n.id),rt:W.routes.map(r=>r.trucks),stock:W.bld.map(b=>b.stock),bays:W.bld.map(b=>b.bays),bought:W.bought,ops:W.ops,wide:W.edges.map((e,i)=>e.lanes>1?i:-1).filter(i=>i>=0),ow:W.edges.map((e,i)=>e.ow?[i,e.ow]:null).filter(x=>x),
+    ctrl:W.nodes.filter(n=>n.type==='junction'&&n.ctrl.kind!=='none').map(n=>[n.id,n.ctrl.kind,n.ctrl.axis])}));}catch(e){}
+}
+
+if(HEADLESS){
+  module.exports={onTimeRate,canMoveNow,moveProfit,avgProfit,routeProfit,waitingFor,ctrlCost,startEvent,acceptOffer,declineOffer,sellTruck,upkeep,truckUpk,netRate,incRate,growTown,EXTRA,checkAch,ACH,moveAt,newGame,step,addTruck,setCtrl,widen,setOneWay,canOneWay,canNoRight,buildRoad,lanePt,DT,get W(){return W},get G(){return G},get trucks(){return trucks}};
+}else{
+/* ================= rendering ================= */
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const cam={x:0,y:0,z:1};let cw=0,ch=0,sel=null,selE=null,selC=null,showJam=true;
+function resize(){const d=window.devicePixelRatio||1;cw=window.innerWidth;ch=window.innerHeight;cv.width=cw*d;cv.height=ch*d;}
+function fit(){
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const n of W.nodes){x0=Math.min(x0,n.x);y0=Math.min(y0,n.y);x1=Math.max(x1,n.x);y1=Math.max(y1,n.y);}
+  const narrow=cw<=720,aw=narrow?cw:cw-330,ah=narrow?ch*0.56:ch-70;
+  cam.z=Math.min(aw/(x1-x0+120),ah/(y1-y0+120));
+  cam.x=(x0+x1)/2+(narrow?0:165/cam.z);cam.y=(y0+y1)/2+(narrow?ch*0.16/cam.z:-25/cam.z);
+}
+const toWorld=(sx,sy)=>[(sx-cw/2)/cam.z+cam.x,(sy-ch/2)/cam.z+cam.y];
+const toScreen=(x,y)=>[(x-cam.x)*cam.z+cw/2,(y-cam.y)*cam.z+ch/2];
+function posBack(v,d){
+  if(d<=v.s)return lanePt(v.lane,v.s-d);d-=v.s;
+  for(let i=v.tailLanes.length-1;i>=0;i--){const L=v.tailLanes[i];if(d<=L.len)return lanePt(L,L.len-d);d-=L.len;}
+  return lanePt(v.lane,0);
+}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function draw(){
+  const d=window.devicePixelRatio||1;
+  ctx.setTransform(d,0,0,d,0,0);ctx.fillStyle='#b9d6a0';ctx.fillRect(0,0,cw,ch);
+  ctx.translate(cw/2,ch/2);ctx.scale(cam.z,cam.z);ctx.translate(-cam.x,-cam.y);
+  ctx.lineCap='round';ctx.lineJoin='round';
+  // roads that can still be bought
+  ctx.setLineDash([5,7]);ctx.lineWidth=2.2;ctx.strokeStyle='rgba(255,255,255,.6)';ctx.beginPath();
+  for(const c of W.cand)if(!c.built){ctx.moveTo(c.a.x,c.a.y);ctx.lineTo(c.b.x,c.b.y);}
+  ctx.stroke();ctx.setLineDash([]);
+  if(selC&&!selC.built){ctx.lineWidth=5;ctx.strokeStyle='rgba(255,255,255,.75)';ctx.beginPath();ctx.moveTo(selC.a.x,selC.a.y);ctx.lineTo(selC.b.x,selC.b.y);ctx.stroke();}
+  for(const pass of [[4.5,'#a3c389'],[0,'#59606b']]){
+    ctx.strokeStyle=pass[1];ctx.fillStyle=pass[1];
+    for(const e of W.edges){const lot=e[0].type==='lot'||e[1].type==='lot';ctx.strokeStyle=lot&&!pass[0]?'#9b9384':pass[1];ctx.lineWidth=(e.lanes>1?20.5:15.5)+pass[0];ctx.beginPath();ctx.moveTo(e[0].x,e[0].y);ctx.lineTo(e[1].x,e[1].y);ctx.stroke();}
+    ctx.strokeStyle=pass[1];
+    for(const n of W.nodes)if(n.type!=='lot'){const wide=n.nb.some(a=>a.ins.length>1);ctx.beginPath();ctx.arc(n.x,n.y,(n.type==='junction'?(n.ctrl.kind==='round2'?RING_O+5.4:n.ctrl.kind==='round'?RING_R+5.5:wide?13.5:11):(wide?10.25:7.75))+pass[0]/2,0,TAU);ctx.fill();}
+  }
+  if(selE){ctx.strokeStyle='rgba(255,255,255,.28)';ctx.lineWidth=selE.lanes>1?20.5:15.5;ctx.beginPath();ctx.moveTo(selE[0].x,selE[0].y);ctx.lineTo(selE[1].x,selE[1].y);ctx.stroke();}
+  ctx.lineCap='butt';
+  for(const e of W.edges){
+    const a=e[0],b=e[1],dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy),ux=dx/l,uy=dy/l,ta=a.type==='lot'?8:TRIM,tb=b.type==='lot'?8:TRIM;
+    const seg=o=>{ctx.moveTo(a.x+ux*ta-uy*o,a.y+uy*ta+ux*o);ctx.lineTo(b.x-ux*tb-uy*o,b.y-uy*tb+ux*o);};
+    if(a.type==='lot'||b.type==='lot'){ // driveway: kerbs in the building's colour and a striped gate at the street end
+      const bd=W.lotB[(a.type==='lot'?a:b).id];
+      ctx.setLineDash([]);ctx.lineWidth=1.4;ctx.strokeStyle=bd?bd.col:'#ccc';ctx.beginPath();seg(7);seg(-7);ctx.stroke();
+      const st=a.type==='lot'?b:a,sg=st===a?1:-1,gx=st.x+ux*sg*(TRIM+1),gy=st.y+uy*sg*(TRIM+1);
+      ctx.lineWidth=2.2;ctx.setLineDash([2.2,2.2]);ctx.strokeStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.moveTo(gx-uy*7,gy+ux*7);ctx.lineTo(gx+uy*7,gy-ux*7);ctx.stroke();ctx.setLineDash([]);
+      continue;
+    }
+    if(e.ow){
+      ctx.setLineDash([4,6]);ctx.lineWidth=0.6;ctx.strokeStyle='#dcdcdc';ctx.beginPath();seg(0);ctx.stroke();ctx.setLineDash([]);
+      const sx=e.ow*ux,sy=e.ow*uy;ctx.fillStyle='rgba(255,255,255,.9)';
+      for(let t=ta+12;t<l-tb-6;t+=26){const cx=a.x+ux*t,cy=a.y+uy*t;ctx.beginPath();ctx.moveTo(cx+sx*3.4,cy+sy*3.4);ctx.lineTo(cx-sx*2.2-sy*2.6,cy-sy*2.2+sx*2.6);ctx.lineTo(cx-sx*0.6,cy-sy*0.6);ctx.lineTo(cx-sx*2.2+sy*2.6,cy-sy*2.2-sx*2.6);ctx.closePath();ctx.fill();}
+    }else if(e.lanes>1){
+      ctx.setLineDash([]);ctx.lineWidth=0.8;ctx.strokeStyle='#ecd98f';ctx.beginPath();seg(0);ctx.stroke();
+      ctx.setLineDash([4,6]);ctx.lineWidth=0.6;ctx.strokeStyle='#dcdcdc';ctx.beginPath();seg(4.65);seg(-4.65);ctx.stroke();
+    }else{ctx.setLineDash([5,6]);ctx.lineWidth=0.7;ctx.strokeStyle='#d9d3ba';ctx.beginPath();seg(0);ctx.stroke();}
+  }
+  ctx.setLineDash([]);ctx.lineCap='round';
+  for(const n of W.nodes){
+    if(n.type!=='junction')continue;
+    const kind=n.ctrl.kind;
+    if(isRound(n)){ctx.fillStyle='#8fbf78';ctx.beginPath();ctx.arc(n.x,n.y,RING_R-4.6,0,TAU);ctx.fill();ctx.strokeStyle='#eee';ctx.lineWidth=0.6;ctx.stroke();
+      if(kind==='round2'){ctx.setLineDash([3,4]);ctx.strokeStyle='#dcdcdc';ctx.beginPath();ctx.arc(n.x,n.y,(RING_R+RING_O)/2,0,TAU);ctx.stroke();ctx.setLineDash([]);}}
+    n.nb.forEach((a,i)=>{
+      const main=kind==='prio'&&n.pairs[n.ctrl.axis%n.pairs.length].indexOf(i)>=0;
+      for(const L of a.ins){
+        const p=L.pts[1],dr=L.dir,px=-dr[1],py=dr[0];
+        if(kind==='none'||kind==='signal'){ctx.strokeStyle='#f3f3f3';ctx.lineWidth=1;ctx.lineCap='butt';ctx.beginPath();ctx.moveTo(p[0]+px*2.1,p[1]+py*2.1);ctx.lineTo(p[0]-px*2.1,p[1]-py*2.1);ctx.stroke();ctx.lineCap='round';}
+        if((kind==='prio'&&!main)||isRound(n)){ctx.fillStyle='#f3f3f3';ctx.beginPath();ctx.moveTo(p[0]+px*2-dr[0]*4,p[1]+py*2-dr[1]*4);ctx.lineTo(p[0]-px*2-dr[0]*4,p[1]-py*2-dr[1]*4);ctx.lineTo(p[0],p[1]);ctx.closePath();ctx.fill();}
+      }
+      if(kind==='signal'){
+        if(!a.ins.length)return;
+        const L=a.ins[0],p=L.pts[1],dr=L.dir,g=isGreen(n,i),mine=n.sgr[n.sig.g].indexOf(i)>=0,y=n.sig.mode==='c'&&mine,ar=n.sig.mode==='a'&&mine;
+        const lx=p[0]+dr[1]*5.6,ly=p[1]-dr[0]*5.6;
+        ctx.fillStyle='#22262c';ctx.beginPath();ctx.arc(lx,ly,2.9,0,TAU);ctx.fill();
+        ctx.fillStyle=g?'#4be07a':y?'#ffc93c':'#ff5148';ctx.beginPath();ctx.arc(lx,ly,2,0,TAU);ctx.fill();
+        if(ar){ctx.fillStyle='#22262c';ctx.beginPath();ctx.arc(lx-dr[0]*5.2,ly-dr[1]*5.2,2.9,0,TAU);ctx.fill();ctx.fillStyle='#4be07a';ctx.font='bold 4.6px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('→',lx-dr[0]*5.2,ly-dr[1]*5.2+0.2);}
+      }
+    });
+    if(n.noRight&&!isRound(n)){const sx=n.x+13,sy=n.y-13;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(sx,sy,4.6,0,TAU);ctx.fill();ctx.strokeStyle='#e0352b';ctx.lineWidth=1.3;ctx.stroke();ctx.fillStyle='#2b4f9e';ctx.font='bold 5.5px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('↱',sx,sy+0.3);ctx.strokeStyle='#e0352b';ctx.beginPath();ctx.moveTo(sx-3.2,sy-3.2);ctx.lineTo(sx+3.2,sy+3.2);ctx.stroke();}
+    if(n===sel){ctx.strokeStyle='#fff';ctx.lineWidth=1.6;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(n.x,n.y,22,0,TAU);ctx.stroke();ctx.setLineDash([]);}
+  }
+  // road works: orange stripes and cones; accidents: a wreck with a warning sign
+  for(const e of W.edges){
+    if(!e.works)continue;const a=e[0],b=e[1],dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy),ux=dx/l,uy=dy/l;
+    ctx.lineCap='butt';ctx.setLineDash([4,4]);ctx.lineWidth=2.4;ctx.strokeStyle='rgba(255,140,0,.85)';
+    ctx.beginPath();for(const o of [-8.5,8.5]){ctx.moveTo(a.x+ux*TRIM-uy*o,a.y+uy*TRIM+ux*o);ctx.lineTo(b.x-ux*TRIM-uy*o,b.y-uy*TRIM+ux*o);}ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#ff8a00';for(let t=TRIM+6;t<l-TRIM;t+=14){ctx.beginPath();ctx.arc(a.x+ux*t,a.y+uy*t,1.4,0,TAU);ctx.fill();}
+    ctx.lineCap='round';
+  }
+  if(showJam){
+    ctx.lineCap='butt';ctx.lineWidth=4.2;
+    for(const L of W.links){if(L.jam<0.12)continue;ctx.strokeStyle='rgba(255,'+Math.round(150-L.jam*130)+',40,'+(0.25+L.jam*0.5).toFixed(2)+')';ctx.beginPath();ctx.moveTo(L.pts[0][0],L.pts[0][1]);ctx.lineTo(L.pts[1][0],L.pts[1][1]);ctx.stroke();}
+    ctx.lineCap='round';
+  }
+  // trucks
+  for(const v of trucks){
+    if(!v.lane)continue;
+    const f=posBack(v,0),r=posBack(v,v.len);
+    if(v.lat&&v.lane.kind==='link'){const dr=v.lane.dir;f[0]+=dr[1]*v.lat*0.6;f[1]-=dr[0]*v.lat*0.6;r[0]+=dr[1]*v.lat;r[1]-=dr[0]*v.lat;}
+    const a=Math.atan2(f[1]-r[1],f[0]-r[0]);
+    ctx.save();ctx.translate((f[0]+r[0])/2,(f[1]+r[1])/2);ctx.rotate(a);
+    ctx.fillStyle='rgba(0,0,0,.22)';rr(-v.len/2+.5,-1.4,v.len,3.9,0.9);ctx.fill();
+    ctx.fillStyle=v.route.color;rr(-v.len/2,-1.95,v.len,3.9,0.9);ctx.fill();
+    ctx.fillStyle='#2b2f36';rr(v.len/2-2.3,-1.95,2.3,3.9,0.8);ctx.fill();
+    if(v.cargo){ctx.fillStyle='rgba(255,255,255,.85)';ctx.fillRect(-v.len/2+0.8,-1.25,4.6,2.5);}
+    if(v.brake||v.v<0.2){ctx.fillStyle='#ff3b30';ctx.fillRect(-v.len/2-0.1,-1.8,0.6,3.6);}
+    if((Math.abs(v.lat)>0.3||v.wantT)&&(G.time*3%1)<0.6){const sg=v.lat?Math.sign(v.lat):(v.wantT.li<v.lane.li?-1:1);ctx.fillStyle='#ffb020';ctx.fillRect(v.len/2-1.1,sg*1.95-0.45,1.1,0.9);ctx.fillRect(-v.len/2,sg*1.95-0.45,1.1,0.9);}
+    ctx.restore();
+  }
+  for(const ev of G.ev){
+    if(ev.type!=='crash')continue;const L=ev.L,bl=L.block;if(!bl)continue;
+    const f=lanePt(L,bl.s),r=lanePt(L,bl.s-bl.len),ang=Math.atan2(f[1]-r[1],f[0]-r[0]);
+    ctx.save();ctx.translate((f[0]+r[0])/2,(f[1]+r[1])/2);ctx.rotate(ang+0.35);
+    ctx.fillStyle='#55585e';ctx.fillRect(-4.2,-2,8.4,4);ctx.restore();
+    const pulse=0.5+0.5*Math.sin(G.time*6);
+    ctx.fillStyle='rgba(230,50,40,'+(0.25+0.3*pulse).toFixed(2)+')';ctx.beginPath();ctx.arc((f[0]+r[0])/2,(f[1]+r[1])/2,9,0,TAU);ctx.fill();
+    ctx.fillStyle='#e63228';ctx.beginPath();ctx.arc((f[0]+r[0])/2,(f[1]+r[1])/2-9,4.2,0,TAU);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font='bold 6px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('!',(f[0]+r[0])/2,(f[1]+r[1])/2-8.8);
+  }
+  // buildings
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  for(const b of W.bld){
+    const r=W.routes.find(x=>x.src===b||x.dst===b),locked=r&&UNLOCK[r.chain]>G.delivered;
+    ctx.globalAlpha=locked?0.35:1;
+    ctx.fillStyle='rgba(0,0,0,.18)';rr(b.node.x-17,b.node.y-15,36,36,7);ctx.fill();
+    ctx.fillStyle=b.col;rr(b.node.x-18,b.node.y-18,36,36,7);ctx.fill();
+    ctx.strokeStyle='#fffdf6';ctx.lineWidth=1.6;ctx.stroke();
+    ctx.font='17px sans-serif';ctx.fillStyle='#000';ctx.fillText(b.icon,b.node.x,b.node.y-2);
+    ctx.font='bold 8px system-ui,sans-serif';ctx.fillStyle='#fff';
+    ctx.fillText(b.name+(b.fac?' 在庫'+b.stock:''),b.node.x,b.node.y+12.5);
+    if(b.inside.length){ctx.fillStyle='#2b2f36';ctx.beginPath();ctx.arc(b.node.x+17,b.node.y-17,6.5,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 7.5px system-ui';ctx.fillText(b.inside.length,b.node.x+17,b.node.y-16.6);}
+    ctx.globalAlpha=1;
+  }
+}
+
+/* ================= UI ================= */
+const $=id=>document.getElementById(id),fmt=n=>Math.floor(n).toLocaleString('ja-JP');
+let toastT=0;
+notify=toast;
+function toast(m){const t=$('toast');t.textContent=m;t.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>t.style.opacity=0,2600);}
+function buildPanel(){
+  unl=-1;$('snd').textContent=G.mute?'🔇':'🔊';
+  const rt=$('routes');rt.innerHTML='';
+  for(const r of W.routes){
+    const row=document.createElement('div');row.className='row';
+    row.innerHTML='<i class="dot" style="background:'+r.color+'"></i><div class="nm"><b>'+r.src.icon+r.src.name+' → '+r.dst.icon+r.dst.name+'</b><span></span></div><button class="sell" title="1台売る（半額で戻る）">−</button><button class="buy"></button>';
+    row.querySelector('.buy').onclick=()=>{const c=buyCost(r);if((c<=0||G.money>=c)&&UNLOCK[r.chain]<=G.delivered){G.money-=c;addTruck(r);fx('buy');refresh();}};
+    row.querySelector('.sell').onclick=()=>{const m=sellTruck(r);if(m||r.trucks>=0){fx('click');refresh();}};
+    r.el=row;rt.appendChild(row);
+  }
+  const up=$('ups');up.innerHTML='';
+  for(const u of UPS){
+    const row=document.createElement('div');row.className='row';
+    row.innerHTML='<div class="nm"><b>'+u.name+'</b><span></span></div><button class="buy"></button>';
+    row.querySelector('button').onclick=()=>{if(u.k==='nav'&&G.up.nav){G.navOn=!G.navOn;fx('click');save();refresh();return;}const c=upCost(u);if(G.money>=c&&G.up[u.k]<u.max){G.money-=c;G.up[u.k]++;if(u.k==='nav')G.navOn=true;fx('buy');refresh();}};
+    u.el=row;up.appendChild(row);
+  }
+  buildMeter();
+}
+function buildMeter(){
+  const row=document.createElement('div');row.className='row';row.id='meterRow';
+  row.innerHTML='<div class="nm"><b>出庫制御</b><span></span></div><button class="buy"></button>';
+  row.querySelector('button').onclick=()=>{if(!G.up.meter){if(G.money>=METER_COST){G.money-=METER_COST;G.up.meter=1;G.meterOn=true;}}else G.meterOn=!G.meterOn;save();refresh();};
+  $('ups').appendChild(row);
+}
+function refresh(){
+  if($('routes').children.length!==W.routes.length)buildPanel();
+$('deliv').textContent=fmt(G.delivered);$('tows').textContent=G.tows;
+  {const inc=incRate(),u=upkeep(),net=inc-u.all;
+   $('rate').textContent=(net<0?'−¥':'¥')+fmt(Math.abs(net));$('netChip').classList.toggle('red',net<0);
+   $('money').parentNode.classList.toggle('red',G.money<0);$('money').textContent=(G.money<0?'−':'')+fmt(Math.abs(G.money));
+   let h='収入 <b>¥'+fmt(inc)+'</b>/分 − 維持費 <b>¥'+fmt(u.all)+'</b>/分（トラック ¥'+fmt(u.t)+(u.nav?'・交通情報 ¥'+fmt(u.nav):'')+(u.sig?'・信号 ¥'+fmt(u.sig):'')+'）';
+   if(G.money<0)h+='<br><span class="red">赤字のため購入できません。</span>トラックを売る（−ボタン）か、交通情報や信号を止めると戻せます。';
+   else if(net<0&&G.time>90)h+='<br><span class="red">収支がマイナスです。</span>トラックが多すぎるか、渋滞で稼げていません。';
+   const fl=$('flow');if(fl._h!==h){fl._h=h;fl.innerHTML=h;}}
+  for(const r of W.routes){
+    const locked=UNLOCK[r.chain]>G.delivered,c=buyCost(r),b=r.el.querySelector('.buy'),sb=r.el.querySelector('.sell');
+    sb.disabled=r.trucks<=0;sb.style.visibility=locked?'hidden':'';
+    r.el.classList.toggle('locked',locked);
+    {let h;if(locked)h='配達 '+UNLOCK[r.chain]+' 回で解放';
+     else{const pr=routeProfit(r),wt=waitingFor(r),late=r.pf!==undefined&&r.pf<0.92;
+       h='🚚 '+r.trucks+'台 ・ ¥'+fmt(payOf(r))+'/回 ・ 利益 '+(r.trucks?'<b style="color:'+(pr<0?'#c0392b':'#2f6f4f')+'">'+(pr<0?'−':'')+'¥'+fmt(Math.abs(pr))+'/分</b>':'—');
+       if(late)h+=' ・ <span style="color:#c0392b">遅れで −'+Math.round((1-r.pf)*100)+'%</span>';
+       if(wt)h+=' ・ <span style="color:#c0392b">⚠ 荷待ち '+wt+'台</span>';}
+     const sp=r.el.querySelector('span');if(sp._h!==h){sp._h=h;sp.innerHTML=h;}}
+    b.textContent=c<=0?'+1台 無料':'+1台 ¥'+fmt(c);b.disabled=locked||(c>0&&G.money<c);
+  }
+  for(const u of UPS){
+    const lv=G.up[u.k],b=u.el.querySelector('button'),c=upCost(u);
+    if(u.k==='nav'){
+      const fee=upkeep().t*UPK_NAV;
+      u.el.querySelector('span').textContent=lv?(G.navOn?'利用中 ・ 利用料 ¥'+fmt(fee)+'/分（トラック維持費の12%）':'停止中 ・ 再開すると ¥'+fmt(fee)+'/分'):u.desc+' ・ 利用料はトラック維持費の12%';
+      b.textContent=lv?(G.navOn?'ON':'OFF'):'¥'+fmt(c);b.disabled=!lv&&G.money<c;b.style.background=lv&&!G.navOn?'#9aa39a':'';continue;
+    }
+    u.el.querySelector('span').textContent=u.desc+' ・ Lv'+lv+'/'+u.max;
+    b.textContent=lv>=u.max?'最大':'¥'+fmt(c);b.disabled=lv>=u.max||G.money<c;
+  }
+  {const mr=$('meterRow'),b=mr.querySelector('button');let held=0;for(const bd of W.bld)for(const v of bd.inside)if(v.task==='go'&&v.held>0)held++;
+   mr.querySelector('span').textContent=G.up.meter?(G.meterOn?'行き先の道が詰まっている間は出発を待つ ・ 待機 '+held+'台':'オフ'):'行き先の道が詰まっている間は出発を待つ';
+   b.textContent=G.up.meter?(G.meterOn?'ON':'OFF'):'¥'+fmt(METER_COST);b.disabled=!G.up.meter&&G.money<METER_COST;b.style.background=G.up.meter&&!G.meterOn?'#9aa39a':'';}
+  checkAch();
+  const setH=(el,h)=>{if(el._h!==h){el._h=h;el.innerHTML=h;}};
+  const nx=UNLOCK.find(x=>x>G.delivered),g=$('goal'),mv=$('move');
+  let canMove=false;
+  if(nx){const prev=UNLOCK[UNLOCK.indexOf(nx)-1],r=W.routes.find(x=>UNLOCK[x.chain]===nx);
+    setH(g,'次の解放: <b>'+r.src.name+'と'+r.dst.name+'</b> — 配達 '+G.delivered+' / '+nx+'<div id="bar"><i style="width:'+Math.min(100,(G.delivered-prev)/(nx-prev)*100)+'%"></i></div>');}
+  else{
+    const need=moveAt(G.lv),pv=UNLOCK[UNLOCK.length-1],tg=moveProfit(),ap=avgProfit();canMove=canMoveNow();
+    if(canMove)setH(g,'この町はうまく回っています。<b>次の町</b>はもっと広く、報酬が25%上がります。');
+    else if(G.delivered<need)setH(g,'全路線を解放。<b>次の町へ引っ越す</b>には ① 配達 '+fmt(G.delivered)+' / '+fmt(need)+'　② 3分平均の利益 ¥'+fmt(tg)+'/分<div id="bar"><i style="width:'+Math.min(100,(G.delivered-pv)/(need-pv)*100)+'%"></i></div>');
+    else{const ot=onTimeRate(),okP=ap>=tg,okT=ot>=ONTIME_NEED;
+      setH(g,'<b>次の町へ引っ越す</b>条件（直近3分）<br>'+(okP?'✅':'⬜')+' 利益 ¥'+fmt(Math.max(0,ap))+' / ¥'+fmt(tg)+'/分<br>'+(okT?'✅':'⬜')+' 定時率 '+Math.round(ot*100)+'% / '+Math.round(ONTIME_NEED*100)+'%'+(okT?'':'（渋滞で遅れすぎ。台数を減らすか道を良くする）')+'<div id="bar"><i style="width:'+Math.max(0,Math.min(100,Math.min(ap/tg,ot/ONTIME_NEED)*100))+'%"></i></div>');}
+  }
+  mv.style.display=canMove?'block':'none';
+  if(canMove&&Date.now()-moveArm>4000)mv.textContent='次の町へ引っ越す（名声 ★+1）';
+  $('lv').textContent=G.lv+1;$('fame').textContent=G.fame?'★'+G.fame:'';
+  const cn=$('con'),c=G.con,o=G.offer,tm=x=>Math.floor(x/60)+':'+String(Math.floor(x%60)).padStart(2,'0');
+  if(c){const r=W.routes[c.r],left=Math.max(0,c.tEnd-G.time);cn.style.display='block';
+    setH(cn,'⏱ <b>特別注文</b> '+r.src.name+'→'+r.dst.name+'　'+c.got+' / '+c.need+' 回　残り '+tm(left)+'　報酬 ¥'+fmt(c.reward)+'<i><b style="width:'+Math.min(100,c.got/c.need*100)+'%"></b></i>');}
+  else if(o){const r=W.routes[o.r];cn.style.display='block';
+    setH(cn,'📨 <b>特別注文の依頼</b>（あと'+Math.ceil(o.tOffer-G.time)+'秒）<br>'+r.src.name+'→'+r.dst.name+' を3分で'+o.need+'回　報酬 ¥'+fmt(o.reward)+'<br>失敗すると違約金 ¥'+fmt(o.reward*0.25)+'<div style="margin-top:6px;display:flex;gap:6px"><button data-o="yes">受ける</button><button data-o="no" class="no">断る</button></div>');}
+  else cn.style.display='none';
+  const IC={works:'🚧',crash:'💥',fuel:'⛽',boom:'🎉'};
+  setH($('evs'),G.ev.map((ev,i)=>{
+    const left=tm(Math.max(0,ev.tEnd-G.time));
+    if(ev.type==='works')return '<div class="ev bad">'+IC.works+'<span>道路工事中（徐行） 残り '+left+'</span></div>';
+    if(ev.type==='crash')return '<div class="ev bad">'+IC.crash+'<span>事故で車線ふさがり 残り '+left+'</span><button data-ev="'+i+'"'+(G.money<ev.cost?' disabled':'')+'>すぐ片付ける ¥'+fmt(ev.cost)+'</button></div>';
+    if(ev.type==='fuel')return '<div class="ev bad">'+IC.fuel+'<span>燃料高騰 維持費+40% 残り '+left+'</span></div>';
+    return '<div class="ev good">'+IC.boom+'<span>'+ev.r.src.name+'→'+ev.r.dst.name+' 報酬+50% 残り '+left+'</span></div>';
+  }).join(''));
+  const todo=ACH.filter(a=>!G.done[a[0]]);
+  $('achN').textContent='（'+(ACH.length-todo.length)+' / '+ACH.length+'）';
+  setH($('ach'),todo.length?todo.slice(0,3).map(a=>'<div class="ach">'+a[1]+(a[3]?'<span>+¥'+fmt(a[3])+'</span>':'<span>★</span>')+'</div>').join(''):'<div class="ach">すべての目標を達成しました。</div>');
+  const u=UNLOCK.filter(x=>x<=G.delivered).length;if(unl>=0&&u>unl){toast('新しい路線を解放しました');fx('win');}unl=u;
+  // tutorial
+  while(G.tut<TUT.length&&TUT[G.tut][1]())G.tut++;
+  const tu=$('tut');
+  if(G.tut<TUT.length){tu.style.display='block';setH(tu,TUT[G.tut][0]+'<div><span>ヒント '+(G.tut+1)+' / '+TUT.length+'</span><span><button data-t="next">'+(G.tut===TUT.length-1?'OK':'次へ')+'</button> <button data-t="skip">閉じる</button></span></div>');}
+  else tu.style.display='none';
+}
+let unl=-1,moveArm=0;
+$('con').addEventListener('click',e=>{const k=e.target.dataset.o;if(!k)return;if(k==='yes'){acceptOffer();fx('buy');}else{declineOffer();fx('click');}refresh();});
+$('evs').addEventListener('click',e=>{const i=e.target.dataset.ev;if(i===undefined)return;const ev=G.ev[+i];if(ev&&ev.type==='crash'&&clearCrash(ev)){fx('build');notify('事故を片付けました');refresh();}});
+const TUT=[
+ ['まずはトラックを増やしましょう。「路線とトラック」の<b>「+1台」</b>を押します。',()=>trucks.length>=4],
+ ['台数が増えると交差点が詰まります。<b>交差点をクリック</b>して「優先道路」や「信号」に変えてみましょう。',()=>W.nodes.some(n=>n.type==='junction'&&n.ctrl.kind!=='none')],
+ ['<b>赤く光る車線</b>は渋滞です。<b>道路をクリック</b>すると、車線の追加や一方通行にできます。',()=>W.edges.some(e=>e.lanes>1||e.ow)],
+ ['<b>白い点線</b>は買い足せる道です。お金が貯まったらクリックして建設できます。',()=>W.bought.length>0],
+ ['ときどき<b>工事・事故・燃料高騰</b>などの出来事が起きます。事故はお金を払えばすぐ片付けられます。',()=>false],
+ ['トラックや信号には<b>維持費</b>がかかります。増やしすぎて詰まると赤字に。<b>−ボタン</b>で売れます。',()=>false],
+ ['渋滞で<b>遅れた配達は報酬が減ります</b>。次の町へ行くには<b>定時率</b>も必要です。路線ごとの「利益」を見て、稼げていない路線は台数を減らしましょう。',()=>false],
+ ['「目標」を達成するとボーナスが入ります。ときどき届く<b>特別注文</b>は時間内に運べば高報酬。全路線を解放して配達を重ねると、<b>次の町</b>へ引っ越せます。',()=>false]
+];
+$('tut').addEventListener('click',e=>{const t=e.target.dataset.t;if(!t)return;G.tut=t==='skip'?TUT.length:G.tut+1;fx('click');save();refresh();});
+$('move').onclick=()=>{
+  if(Date.now()-moveArm<4000){moveArm=0;newGame((Math.random()*1e9)|0,null,{fame:G.fame+1,lv:G.lv+1,done:G.done,conDone:G.conDone,tut:G.tut,mute:G.mute});buildPanel();fit();refresh();save();fx('win');toast('新しい町に着きました。報酬 +25%');for(const b of $('speed').children)b.classList.toggle('on',b.dataset.s==='1');}
+  else{moveArm=Date.now();$('move').textContent='本当に引っ越す？ この町は手放します（もう一度押す）';}
+};
+/* ---------- sound (synthesised, no audio files) ---------- */
+let AC=null,lastDing=0;
+function tone(f,d,type,vol,f2,delay){
+  if(G.mute||!AC)return;
+  try{const t=AC.currentTime+(delay||0),o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);
+    g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d+0.03);}catch(e){}
+}
+fx=k=>{
+  if(k==='deliver'){const n=performance.now();if(n-lastDing<150)return;lastDing=n;tone(1250,0.05,'sine',0.018);}
+  else if(k==='buy')tone(620,0.08,'square',0.03,930);
+  else if(k==='build')tone(150,0.16,'triangle',0.09,70);
+  else if(k==='click')tone(520,0.03,'sine',0.03);
+  else if(k==='tow')tone(170,0.3,'sawtooth',0.045,80);
+  else if(k==='fail')tone(330,0.28,'triangle',0.05,190);
+  else if(k==='order'){tone(784,0.1,'triangle',0.05);tone(988,0.16,'triangle',0.05,0,0.1);}
+  else if(k==='win'){tone(523,0.12,'triangle',0.06);tone(659,0.12,'triangle',0.06,0,0.1);tone(784,0.22,'triangle',0.06,0,0.2);}
+};
+const wake=()=>{try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();else if(AC.state==='suspended')AC.resume();}catch(e){}};
+window.addEventListener('pointerdown',wake,true);window.addEventListener('touchstart',wake,true);window.addEventListener('keydown',wake,true);
+const axisName=(n,p)=>{const c=Math.abs(Math.cos(n.nb[p[0]].ang));return c>0.8?'東西':c<0.6?'南北':'斜め';};
+function hideMenu(){$('menu').style.display='none';sel=null;selE=null;selC=null;}
+function openBuildMenu(c,sx,sy){
+  selC=c;const m=$('menu'),cost=roadCost();m.innerHTML='<h3>建設予定地</h3>';
+  const b=document.createElement('button');b.innerHTML='道路を建設 — ¥'+fmt(cost)+'<small>ここに新しい道を通す。買うたびに次の道は高くなる</small>';
+  b.disabled=G.money<cost;b.onclick=()=>{G.money-=cost;buildRoad(c);fx('build');save();refresh();hideMenu();};
+  m.appendChild(b);m.style.display='block';
+  m.style.left=Math.max(8,Math.min(cw-238,sx+14))+'px';m.style.top=Math.max(8,Math.min(ch-m.offsetHeight-8,sy-20))+'px';
+}
+function openRoadMenu(e,sx,sy){
+  selE=e;const m=$('menu'),cost=laneCost(e);m.innerHTML='<h3>道路</h3>';
+  const add=(html,o)=>{const b=document.createElement('button');b.innerHTML=html;if(o.cur)b.className='cur';b.disabled=!!o.off;b.onclick=o.fn||hideMenu;m.appendChild(b);};
+  if(e.ow)add('車線を追加<small>一方通行のあいだは拡幅できません</small>',{off:1});
+  else if(e.lanes>1)add('片側2車線（拡幅済み）<small>右折は中央、左折は外側へ車線変更します</small>',{cur:1});
+  else add('車線を追加 — ¥'+cost+'<small>片側2車線に。右折待ちが直進をふさがなくなる</small>',{off:G.money<cost,fn:()=>{G.money-=cost;widen(e);fx('build');save();refresh();hideMenu();}});
+  const AR=['→','↘','↓','↙','←','↖','↑','↗'],base=Math.atan2(e[1].y-e[0].y,e[1].x-e[0].x);
+  for(const d of [1,-1]){
+    const ar=AR[((Math.round((base+(d<0?Math.PI:0))/(Math.PI/4))%8)+8)%8];
+    if(e.ow===d){add('一方通行 '+ar+'（現在）<small>道幅いっぱいを同じ向きの2車線に使用中</small>',{cur:1});continue;}
+    const ok=canOneWay(e,d),c2=e.ow?0:OW_COST;
+    add('一方通行 '+ar+(c2?' — ¥'+c2:'')+'<small>'+(ok?'この向きの2車線になる。逆向きは通れない':'届かなくなる施設があるため不可')+'</small>',{off:!ok||(c2>0&&G.money<c2),fn:()=>{G.money-=c2;setOneWay(e,d);fx('build');save();refresh();hideMenu();}});
+  }
+  if(e.ow)add('対面通行に戻す<small>無料</small>',{fn:()=>{setOneWay(e,0);save();refresh();hideMenu();}});
+  m.style.display='block';
+  m.style.left=Math.max(8,Math.min(cw-238,sx+14))+'px';m.style.top=Math.max(8,Math.min(ch-m.offsetHeight-8,sy-20))+'px';
+}
+function openMenu(n){
+  sel=n;const m=$('menu');m.innerHTML='<h3>交差点のルール</h3>';
+  const opt=(label,sub,kind,axis)=>{
+    const cur=n.ctrl.kind===kind&&(kind!=='prio'||n.ctrl.axis===axis),cost=ctrlCost(n,kind),rb=(kind==='round'||kind==='round2')&&!isRound(n);
+    const b=document.createElement('button');b.innerHTML=label+(cost?' — ¥'+fmt(cost):'')+'<small>'+sub+(rb?'（'+(nRound(n)+1)+'基目。置くたびに次は3割高くなる）':'')+'</small>';
+    if(cur)b.className='cur';b.disabled=!cur&&cost>0&&G.money<cost;
+    b.onclick=()=>{if(cur){hideMenu();return;}G.money-=cost;setCtrl(n,kind,axis);fx('build');save();refresh();hideMenu();};
+    m.appendChild(b);
+  };
+  opt('標識なし','全方向一時停止。1台ずつしか入れない','none',0);
+  n.pairs.forEach((p,ai)=>opt('優先道路（'+axisName(n,p)+'）','この方向は止まらず通過、他は譲る','prio',ai));
+  opt('信号','感応式。右折は矢印で出る。電気代 ¥'+Math.round(UPK_SIG*(1+0.25*G.fame))+'/分','signal',0);
+  opt('ラウンドアバウト','環道優先。止まらずに流せる','round',0);
+  opt('大型ラウンドアバウト','2車線。次の出口へ行く車は外側を素通り','round2',0);
+  m.style.display='block';
+  const p=toScreen(n.x,n.y);
+  m.style.left=Math.max(8,Math.min(cw-238,p[0]+18))+'px';m.style.top=Math.max(8,Math.min(ch-m.offsetHeight-8,p[1]-40))+'px';
+}
+const ptrs=new Map();let moved=0,pinch0=0;
+const pdist=()=>{const a=[...ptrs.values()];return Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])||1;};
+const clampZ=z=>Math.max(0.3,Math.min(8,z));
+function pDown(id,x,y){ptrs.set(id,[x,y]);moved=0;hideMenu();if(ptrs.size===2)pinch0=pdist();cv.style.cursor='grabbing';}
+function pMove(id,x,y){
+  const p=ptrs.get(id);if(!p)return;const dx=x-p[0],dy=y-p[1];ptrs.set(id,[x,y]);
+  if(ptrs.size===1){cam.x-=dx/cam.z;cam.y-=dy/cam.z;moved+=Math.abs(dx)+Math.abs(dy);}
+  else if(ptrs.size===2){const d=pdist();cam.z=clampZ(cam.z*d/pinch0);pinch0=d;moved=99;}
+}
+function pUp(id,x,y,cancel){
+  if(!ptrs.has(id))return;
+  if(!cancel&&ptrs.size===1&&moved<6){
+    const w=toWorld(x,y);let best=null,bd=26;
+    for(const n of W.nodes){if(n.type!=='junction')continue;const d=Math.hypot(n.x-w[0],n.y-w[1]);if(d<bd){bd=d;best=n;}}
+    if(best)openMenu(best);
+    else{
+      let be=null,ed=12;
+      for(const e2 of W.edges){
+        const a=e2[0],b=e2[1];if(a.type==='lot'||b.type==='lot')continue;
+        const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((w[0]-a.x)*dx+(w[1]-a.y)*dy)/(dx*dx+dy*dy))),d=Math.hypot(a.x+dx*t-w[0],a.y+dy*t-w[1]);
+        if(d<ed){ed=d;be=e2;}
+      }
+      if(be)openRoadMenu(be,x,y);
+      else{
+        let bc=null,cd=12;
+        for(const c of W.cand){
+          if(c.built)continue;const a=c.a,b=c.b,dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((w[0]-a.x)*dx+(w[1]-a.y)*dy)/(dx*dx+dy*dy))),d=Math.hypot(a.x+dx*t-w[0],a.y+dy*t-w[1]);
+          if(d<cd){cd=d;bc=c;}
+        }
+        if(bc)openBuildMenu(bc,x,y);
+      }
+    }
+  }
+  ptrs.delete(id);if(!ptrs.size)cv.style.cursor='grab';
+}
+// mouse / pen: move and release are tracked on the window so a drag keeps working outside the canvas and without pointer capture
+if(window.PointerEvent){
+  cv.addEventListener('pointerdown',e=>{if(e.pointerType==='touch')return;e.preventDefault();pDown(e.pointerId,e.clientX,e.clientY);});
+  window.addEventListener('pointermove',e=>{if(e.pointerType!=='touch')pMove(e.pointerId,e.clientX,e.clientY);});
+  window.addEventListener('pointerup',e=>{if(e.pointerType!=='touch')pUp(e.pointerId,e.clientX,e.clientY,false);});
+  window.addEventListener('pointercancel',e=>{if(e.pointerType!=='touch')pUp(e.pointerId,0,0,true);});
+}else{
+  cv.addEventListener('mousedown',e=>{e.preventDefault();pDown('m',e.clientX,e.clientY);});
+  window.addEventListener('mousemove',e=>pMove('m',e.clientX,e.clientY));
+  window.addEventListener('mouseup',e=>pUp('m',e.clientX,e.clientY,false));
+}
+// touch: handled with touch events, which embedded web views deliver more reliably
+cv.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches)pDown('t'+t.identifier,t.clientX,t.clientY);},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)pMove('t'+t.identifier,t.clientX,t.clientY);},{passive:false});
+cv.addEventListener('touchend',e=>{e.preventDefault();for(const t of e.changedTouches)pUp('t'+t.identifier,t.clientX,t.clientY,false);},{passive:false});
+cv.addEventListener('touchcancel',e=>{for(const t of e.changedTouches)pUp('t'+t.identifier,0,0,true);});
+window.addEventListener('blur',()=>{ptrs.clear();});
+window.addEventListener('keydown',e=>{
+  const k=e.key,st=70/cam.z;
+  if(k==='Escape'){hideMenu();return;}
+  if(k==='ArrowLeft'||k==='a')cam.x-=st;else if(k==='ArrowRight'||k==='d')cam.x+=st;else if(k==='ArrowUp'||k==='w')cam.y-=st;else if(k==='ArrowDown'||k==='s')cam.y+=st;
+  else if(k==='+'||k===';'||k==='=')cam.z=clampZ(cam.z*1.25);else if(k==='-')cam.z=clampZ(cam.z/1.25);else if(k==='0')fit();else return;
+  e.preventDefault();hideMenu();
+});
+$('view').addEventListener('click',e=>{const v=e.target.dataset.v;if(!v)return;if(v==='jam'){showJam=!showJam;e.target.classList.toggle('on',showJam);return;}
+  if(v==='snd'){G.mute=!G.mute;e.target.textContent=G.mute?'🔇':'🔊';save();fx('click');return;}
+  if(v==='in')cam.z=clampZ(cam.z*1.3);else if(v==='out')cam.z=clampZ(cam.z/1.3);else fit();hideMenu();});
+cv.addEventListener('wheel',e=>{e.preventDefault();const w=toWorld(e.clientX,e.clientY),z=Math.max(0.3,Math.min(8,cam.z*Math.exp(-e.deltaY*0.0015)));cam.z=z;cam.x=w[0]-(e.clientX-cw/2)/z;cam.y=w[1]-(e.clientY-ch/2)/z;hideMenu();},{passive:false});
+$('speed').addEventListener('click',e=>{const s=e.target.dataset.s;if(s===undefined)return;G.speed=+s;for(const b of $('speed').children)b.classList.toggle('on',b===e.target);});
+let resetArm=0;
+$('reset').onclick=()=>{
+  if(Date.now()-resetArm<4000){try{localStorage.removeItem(KEY);}catch(e){}newGame((Math.random()*1e9)|0);buildPanel();fit();refresh();$('reset').textContent='最初からやり直す';resetArm=0;for(const b of $('speed').children)b.classList.toggle('on',b.dataset.s==='1');}
+  else{resetArm=Date.now();$('reset').textContent='本当に？ 名声も目標も消えます（もう一度押す）';}
+};
+window.addEventListener('resize',()=>{resize();});
+
+/* ================= boot ================= */
+let sv=null;try{sv=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
+try{if(sv&&typeof sv.seed==='number')newGame(sv.seed,sv);else newGame((Math.random()*1e9)|0);}catch(e){newGame((Math.random()*1e9)|0);}
+resize();fit();buildPanel();refresh();
+let lastT=performance.now(),acc=0,uiT=0,saveT=0;
+function frame(t){
+  requestAnimationFrame(frame); // scheduled first so one bad frame can never stop the game
+  const real=Math.min(0.1,(t-lastT)/1000);lastT=t;acc+=real*G.speed;
+  let n=0;const t0=performance.now();while(acc>=DT&&n<12&&performance.now()-t0<30){step(DT);acc-=DT;n++;} // high speeds: as many steps as fit in the frame
+  if(acc>=DT)acc=0;
+  draw();
+  uiT+=real;if(uiT>0.25){uiT=0;refresh();}
+  saveT+=real;if(saveT>10){saveT=0;save();}
+}
+requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
