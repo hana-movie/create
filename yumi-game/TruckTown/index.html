@@ -68,7 +68,7 @@ button.sell:disabled{opacity:.4;cursor:default}
 #evs button,#con button{border:0;border-radius:8px;background:#2f6f4f;color:#fff;font:inherit;font-size:11.5px;font-weight:700;padding:5px 8px;cursor:pointer;white-space:nowrap}
 #evs button:disabled{background:#c9cfc4}
 #con button.no{background:#b8ad95}
-#goalWrap{height:112px;display:flex;flex-direction:column;gap:6px}
+#goalWrap{height:128px;display:flex;flex-direction:column;gap:6px}
 #goalWrap #move{padding:9px;flex:none}
 #goal{background:#eef4e2;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5;flex:1;overflow:hidden;font-variant-numeric:tabular-nums}
 #bar{height:6px;border-radius:3px;background:#d5dfc5;margin-top:5px;overflow:hidden}
@@ -140,7 +140,7 @@ button.sell:disabled{opacity:.4;cursor:default}
   <div id="routes"></div>
   <h2>強化</h2>
   <div id="ups"></div>
-  <div id="hint">交差点をクリックすると交通ルールを、道路をクリックすると車線の追加や一方通行化ができます。白い点線は買い足せる道です。走っているのは全部あなたのトラックなので、増やすほど渋滞します。150秒まったく動けない車はレッカーされ、積荷を失います。<br>赤く光る車線は渋滞中です（「渋滞」ボタンで切替）。<br>ドラッグか矢印キーで移動、ホイール/ピンチ/＋－ボタンで拡大縮小。</div>
+  <div id="hint">交差点をクリックすると交通ルールを、道路をクリックすると車線の追加や一方通行化が、施設をクリックすると構内待機場の設置ができます。白い点線は買い足せる道です。走っているのは全部あなたのトラックなので、増やすほど渋滞します。150秒まったく動けない車はレッカーされ、積荷を失います。<br>赤く光る車線は渋滞中です（「渋滞」ボタンで切替）。<br>ドラッグか矢印キーで移動、ホイール/ピンチ/＋－ボタンで拡大縮小。</div>
   <button id="reset">最初からやり直す</button>
 </div>
 <div id="side"><div id="con" style="display:none"></div><div id="evs"></div></div>
@@ -168,6 +168,7 @@ const METER_TH=0.7, METER_MAX=60, METER_RETRY=1.5;
 const NONE_MODE=1, STOP_T=1;
 const CTRL_COST={none:0,prio:60,signal:150,round:600,round2:1200};
 const RB_GAP=11, RB_FOLLOW=0;
+const DRV=1, SPREAD=1, HOT_ON=false; // driveway rules on; facilities kept off neighbouring junctions
 const SG_MIN=7, SG_GAP=55, SG_LO=16, SG_HI=16;
 // roundabouts get dearer with every one you own, so they go where they matter most
 const RB_GROW=1.3;
@@ -180,7 +181,7 @@ const ctrlCost=(n,kind)=>{
 };
 const isRound=n=>n.ctrl.kind==='round'||n.ctrl.kind==='round2';
 const RING_O=RING_R+4.7;
-const UNLOCK=[0,25,100,300,700];
+const UNLOCK=[0,25,100,300,700,900];
 const BDEF=[
  {key:'farm',name:'畑',icon:'🌾',col:'#e2b93b',cs:[0],rs:[0,1,2,3,4]},
  {key:'mill',name:'製粉所',icon:'🥖',col:'#c98a3a',cs:[3,4],rs:[1,2,3],fac:1},
@@ -193,10 +194,13 @@ const BDEF=[
  {key:'ranch',name:'牧場',icon:'🐄',col:'#9bbf5a',cs:[5,6],rs:[0,1,2,3,4]},
  {key:'dairy',name:'乳業',icon:'🧀',col:'#e0a84a',cs:[3,4,5],rs:[1,2,3],fac:1},
  {key:'mine',name:'鉱山',icon:'⛏️',col:'#5d6470',cs:[4,5,6],rs:[0]},
- {key:'steel',name:'製鉄所',icon:'🏭',col:'#6b5b7b',cs:[2,3,4],rs:[1,2,3],fac:1}
+ {key:'steel',name:'製鉄所',icon:'🏭',col:'#6b5b7b',cs:[2,3,4],rs:[1,2,3],fac:1},
+ {key:'bakery',name:'パン工場',icon:'🍞',col:'#d88f4a',cs:[2,3,4],rs:[1,2,3],fac:1,mix:['mill','dairy'],minLv:1}
 ];
-const RDEF=[['farm','mill',0,0,'#e8c547'],['mill','market',0,1,'#e07b39'],['forest','saw',1,0,'#4caf7a'],['saw','market',1,1,'#2f7d6b'],['quarry','mason',2,0,'#8d99ae'],['mason','market',2,1,'#b0584a'],['ranch','dairy',3,0,'#a9cf6a'],['dairy','port',3,1,'#f0b955'],['mine','steel',4,0,'#6f7684'],['steel','port',4,1,'#8a6fa8']];
-const CHAIN_MULT=[1,1.6,2.4,3.6,5.5];
+const MAT_NAME={mill:'小麦粉',dairy:'チーズ'};
+const RDEF=[['farm','mill',0,0,'#e8c547'],['mill','market',0,1,'#e07b39'],['forest','saw',1,0,'#4caf7a'],['saw','market',1,1,'#2f7d6b'],['quarry','mason',2,0,'#8d99ae'],['mason','market',2,1,'#b0584a'],['ranch','dairy',3,0,'#a9cf6a'],['dairy','port',3,1,'#f0b955'],['mine','steel',4,0,'#6f7684'],['steel','port',4,1,'#8a6fa8'],['mill','bakery',5,0,'#f2c98a'],['dairy','bakery',5,0,'#f7e08a'],['bakery','market',5,1,'#c9783a']];
+const CHAIN_MULT=[1,1.6,2.4,3.6,5.5,6];
+const CHAIN_COST=[1,2,4,8,16,12];
 
 /* ================= lanes ================= */
 let laneSeq=0;
@@ -248,12 +252,29 @@ function genWorld(seed,lv){
     if(connected(es)){edges=es;rem--;cand.push(e);}
   }
   // buildings on lots
-  const used=new Set(),bld=[];
+  const used=new Set(),bld=[],gidOf={};
+  // from town Lv2 on, some facility pairs are put on neighbouring junctions on purpose: a crowded corner to sort out
+  // (never two ends of the same route: that would just be a very short, very lucrative trip)
+  // Measured: clustering shortened routes and made towns easier, not harder, so it is off (HOT_ON) for now.
+  const HOT=HOT_ON?[['mill','dairy'],['mason','steel'],['market','port']].slice(0,Math.min(3,lv)):[];
   for(const d of BDEF){
-    let gid=-1;const cs=[...new Set(d.cs.map(c=>Math.round(c*(COLS-1)/6)))],rs=[...new Set(d.rs.map(r=>Math.round(r*(ROWS-1)/4)))];
+    if(d.minLv&&lv<d.minLv)continue;
+    let gid=-1;const hp=HOT.findIndex(h=>h[1]===d.key);
+    if(hp>=0&&gidOf[HOT[hp][0]]!==undefined){
+      const a=gidOf[HOT[hp][0]],farOthers=k=>{const c=k%COLS,r=(k/COLS)|0;for(const u of used){if(u===a)continue;if(Math.abs(u%COLS-c)+Math.abs(((u/COLS)|0)-r)<=1)return false;}return true;};
+      const nbs=edges.filter(e=>e[0]===a||e[1]===a).map(e=>e[0]===a?e[1]:e[0]).filter(k=>!used.has(k)&&farOthers(k));
+      if(nbs.length)gid=nbs[Math.floor(rnd()*nbs.length)];
+    }const cs=[...new Set(d.cs.map(c=>Math.round(c*(COLS-1)/6)))],rs=[...new Set(d.rs.map(r=>Math.round(r*(ROWS-1)/4)))];
+    // keep facilities off neighbouring junctions: two driveways a block apart leave queues nowhere to go
+    const near=k=>{const c=k%COLS,r=(k/COLS)|0;for(const u of used){const dc=Math.abs(u%COLS-c),dr=Math.abs(((u/COLS)|0)-r);if(dc+dr<=1)return true;}return false;};
+    if(SPREAD)for(let t=0;t<120&&gid<0;t++){const k=nid(cs[Math.floor(rnd()*cs.length)],rs[Math.floor(rnd()*rs.length)]);if(!used.has(k)&&!near(k))gid=k;}
+    if(SPREAD&&gid<0){ // widen the allowed area by one column/row before giving up on spacing
+      const cw=[...new Set(cs.flatMap(c=>[c-1,c,c+1]).filter(c=>c>=0&&c<COLS))],rw=[...new Set(rs.flatMap(r=>[r-1,r,r+1]).filter(r=>r>=0&&r<ROWS))];
+      for(let t=0;t<160&&gid<0;t++){const k=nid(cw[Math.floor(rnd()*cw.length)],rw[Math.floor(rnd()*rw.length)]);if(!used.has(k)&&!near(k))gid=k;}
+    }
     for(let t=0;t<80&&gid<0;t++){const k=nid(cs[Math.floor(rnd()*cs.length)],rs[Math.floor(rnd()*rs.length)]);if(!used.has(k))gid=k;}
     if(gid<0)for(let k=0;k<COLS*ROWS;k++)if(!used.has(k)){gid=k;break;}
-    used.add(gid);
+    used.add(gid);gidOf[d.key]=gid;
     const g=nodes[gid];
     const angs=edges.filter(e=>e[0]===g.id||e[1]===g.id).map(e=>{const o=nodes[e[0]===g.id?e[1]:e[0]];return Math.atan2(o.y-g.y,o.x-g.x);});
     let best=0,bs=-99;
@@ -266,10 +287,11 @@ function genWorld(seed,lv){
     }
     const lot={id:nodes.length,x:g.x+Math.cos(best)*64,y:g.y+Math.sin(best)*64,type:'lot',ctrl:{kind:'none',axis:0},nb:[]};
     nodes.push(lot);edges.push([g.id,lot.id]);
-    bld.push({key:d.key,name:d.name,icon:d.icon,col:d.col,fac:!!d.fac,node:lot,grid:g,stock:0,inside:[],bays:2});
+    bld.push({key:d.key,name:d.name,icon:d.icon,col:d.col,fac:!!d.fac,mix:d.mix||null,mat:d.mix?Object.fromEntries(d.mix.map(k=>[k,0])):null,node:lot,grid:g,stock:0,inside:[],bays:2,yard:false,hot:-1});
   }
   const w={seed,ops:[],nodes,cand:cand.map(e=>({a:nodes[e[0]],b:nodes[e[1]],built:false})),bought:[],edges:edges.map(e=>{const x=[nodes[e[0]],nodes[e[1]]];x.lanes=1;x.ow=0;return x;}),bld,link:{},links:[],lanes:[],lotB:{}};
   for(const b of bld)w.lotB[b.node.id]=b;
+  w.hot=[];HOT.forEach((h,i)=>{const A=bld.find(b=>b.key===h[0]),B=bld.find(b=>b.key===h[1]);if(A&&B&&edges.some(e=>(e[0]===A.grid.id&&e[1]===B.grid.id)||(e[1]===A.grid.id&&e[0]===B.grid.id))){A.hot=B.hot=i;w.hot.push([A,B]);}});
   w.edgeOf={};for(const e of w.edges){w.edgeOf[e[0].id+'>'+e[1].id]=e;w.edgeOf[e[1].id+'>'+e[0].id]=e;}
   for(const [a,b] of w.edges){
     a.nb.push({to:b,ang:Math.atan2(b.y-a.y,b.x-a.x)});
@@ -284,7 +306,7 @@ function genWorld(seed,lv){
   relane();
   // routes
   const B=k=>bld.find(b=>b.key===k);
-  w.routes=RDEF.map((d,i)=>routeInfo({i,src:B(d[0]),dst:B(d[1]),chain:d[2],prod:d[3],color:d[4],trucks:0,done:0,log:[],earn:[]}));
+  w.routes=RDEF.filter(d=>B(d[0])&&B(d[1])).map((d,i)=>routeInfo({i,src:B(d[0]),dst:B(d[1]),chain:d[2],prod:d[3],color:d[4],trucks:0,done:0,log:[],earn:[]}));
   return w;
 }
 function laneGeom(L,off){
@@ -662,9 +684,11 @@ function enterBuilding(v,b){if(v.cargo&&v.tLoad&&b===v.route.dst)v.trip=G.time-v
 // leave the building for v.dest. With dispatch control on, wait while a road on the way is jammed solid.
 function tryDepart(v,from){
   const to=v.dest;
+
   v.nodes=findPath(from.node,to.node,true);
   if(!v.nodes){enterBuilding(v,to);return true;}
   defLc(v);v.plan=planFor(v);
+  if(from.yard&&v.held<YARD_MAX&&!yardClear(from,v)){v.held+=METER_RETRY;v.nodes=null;return false;}
   if(G.up.meter&&G.meterOn&&v.held<METER_MAX){
     for(let i=1;i<v.plan.length;i++){const L=v.plan[i];if(L.kind==='link'&&L.jam>=METER_TH){v.held+=METER_RETRY;v.nodes=null;return false;}}
   }
@@ -680,11 +704,15 @@ const incRate=()=>incOver(60);
 // moving on needs a well-run town: the average profit over the last 3 minutes must reach this
 const moveProfit=()=>Math.round(1000*(1+0.25*G.fame)*(1+0.05*G.lv)/10)*10;
 const avgProfit=()=>incOver(180)-G.upk;
-const ONTIME_NEED=0.88;
+const ONTIME_NEED=0.88, BREAD_NEED=1;
 const onTimeRate=()=>{let a=0,c=0;for(const e of G.pfl)if(e[0]>=G.time-180){a+=e[1];c++;}return c?a/c:1;};
-const canMoveNow=()=>G.delivered>=moveAt(G.lv)&&G.time>=180&&avgProfit()>=moveProfit()&&onTimeRate()>=ONTIME_NEED;
+const hasBread=()=>W.bld.some(b=>b.mix);
+const breadNeed=()=>BREAD_NEED+0.5*Math.max(0,G.lv-1);
+const breadRate=()=>{let c=0;for(const t of G.made)if(t>=G.time-180)c++;return c/3;};
+const canMoveNow=()=>G.delivered>=moveAt(G.lv)&&G.time>=180&&avgProfit()>=moveProfit()&&onTimeRate()>=ONTIME_NEED&&(!hasBread()||breadRate()>=breadNeed());
 const routeProfit=r=>{let s=0;for(const e of r.earn)if(e[0]>=G.time-120)s+=e[1];return s*60/Math.min(120,Math.max(10,G.time))-r.trucks*truckUpk(r)*(G.fuel||1);};
-const waitingFor=r=>r.src.fac?r.src.inside.filter(v=>v.route===r&&v.task!=='unload'&&v.task!=='go').length*(r.src.stock<1?1:0):0;
+const srcEmpty=b=>b.mix?b.mix.some(k=>b.mat[k]<1):b.stock<1;
+const waitingFor=r=>r.src.fac?r.src.inside.filter(v=>v.route===r&&v.task!=='unload'&&v.task!=='go').length*(srcEmpty(r.src)?1:0):0;
 /* ---------- running costs: every truck, the traffic information service and each signal cost money every minute ---------- */
 const UPK_T=0.3, UPK_NAV=0.12, UPK_SIG=4;
 // a truck's upkeep is a share of what it would earn on an empty road (its route's pay over a free-flow round trip)
@@ -777,6 +805,7 @@ function clearResult(){
   const stars=1+(G.tows<=5?1:0)+(rb<=3&&G.tows<=1?1:0);
   return {seed:W.seed,run:G.runSeed,lv:G.lv,fame:G.fame,time:Math.round(G.clearT),score,stars,rb,tows:G.tows,nav:!!G.navUsed,trucks:trucks.length,date:new Date().toISOString().slice(0,10)};
 }
+const ULIST=()=>[...new Set(W.routes.filter(r=>!r.extra).map(r=>UNLOCK[r.chain]))].sort((a,b)=>a-b);
 const nJ=k=>W.nodes.filter(n=>n.type==='junction'&&n.ctrl.kind===k).length;
 const ACH=[
  ['d50','配達を50回',()=>G.delivered>=50,100],
@@ -792,9 +821,11 @@ const ACH=[
  ['i1500','利益 ¥1,500/分',()=>netRate()>=1500,1500],
  ['road','道路を建設する',()=>W.bought.length>=1,1500],
  ['grow','町に新しい施設が建つ',()=>W.bld.some(b=>b.extra),500],
+ ['yard','構内待機場を作る',()=>W.bld.some(b=>b.yard),800],
  ['nav','交通情報を導入する',()=>G.up.nav>=1,800],
  ['t50','トラックを50台に',()=>trucks.length>=50,2000],
- ['all','全路線を解放',()=>G.delivered>=UNLOCK[UNLOCK.length-1],3000],
+ ['all','全路線を解放',()=>G.delivered>=ULIST()[ULIST().length-1],3000],
+ ['bread','パン工場を動かす',()=>G.made.length>0,1500],
  ['big','大型ラウンドアバウトを設置',()=>nJ('round2')>=1,2000],
  ['calm','30台以上で10分間レッカーなし',()=>trucks.length>=30&&G.time-G.lastTow>=600,3000],
  ['d2000','1つの町で配達を2,000回',()=>G.delivered>=2000,5000],
@@ -813,6 +844,16 @@ function checkAch(){
     G.done[a[0]]=1;G.money+=a[3];notify('目標達成: '+a[1]+(a[3]?' +¥'+a[3].toLocaleString('ja-JP'):''));fx('win');
   }
 }
+const YARD_MAX=90;
+// room on the driveway out, and the street this truck will turn onto has space for two trucks
+function yardClear(b,v){
+  const drv=v.plan[0];if(drv.spawnQ.length)return false;
+  const last=drv.vehicles[drv.vehicles.length-1];if(last&&last.s-last.len<v.len+4)return false;
+  let st=null;for(let k=1;k<v.plan.length;k++)if(v.plan[k].kind==='link'){st=v.plan[k];break;}
+  if(st){const l=st.vehicles[st.vehicles.length-1];if(l&&l.s-l.len<2*(v.len+2.5))return false;}
+  return true;
+}
+const yardCost=()=>Math.round(800*(1+0.25*G.fame)/10)*10;
 function updBuilding(b,dt){
   if(!b.inside.length)return;
   let busy=0;const keep=[];
@@ -825,11 +866,11 @@ function updBuilding(b,dt){
     if(busy>=b.bays){keep.push(v);continue;}
     if(v.t>0){busy++;v.t-=dt*(1+0.3*G.up.load);if(v.t>0){keep.push(v);continue;}}
     const r=v.route;
-    if(v.task==='unload'){const pf=onTime(r,v.trip);v.trip=0;r.pf=(r.pf===undefined?1:r.pf)*0.85+pf*0.15;const amt=payOf(r)*pf;earn(amt);G.pfl.push([G.time,pf]);if(G.pfl.length>2000)G.pfl.shift();r.earn.push([G.time,amt]);if(r.earn.length>300)r.earn.shift();G.delivered++;r.done++;r.log.push(G.time);if(r.log.length>400)r.log.shift();if(G.con&&G.con.r===r.i)G.con.got++;fx('deliver');if(b.fac)b.stock++;v.cargo=0;v.dest=r.src;}
+    if(v.task==='unload'){const pf=onTime(r,v.trip);v.trip=0;r.pf=(r.pf===undefined?1:r.pf)*0.85+pf*0.15;const amt=payOf(r)*pf;earn(amt);G.pfl.push([G.time,pf]);if(G.pfl.length>2000)G.pfl.shift();r.earn.push([G.time,amt]);if(r.earn.length>300)r.earn.shift();G.delivered++;r.done++;r.log.push(G.time);if(r.log.length>400)r.log.shift();if(G.con&&G.con.r===r.i)G.con.got++;fx('deliver');if(b.mix){b.mat[r.src.key]=Math.min(99,(b.mat[r.src.key]||0)+1);}else if(b.fac)b.stock++;if(r.src.mix)G.made.push(G.time);v.cargo=0;v.dest=r.src;}
     else if(b!==r.src)v.dest=r.src;
     else{
-      if(b.fac&&b.stock<1){keep.push(v);continue;}
-      if(b.fac)b.stock--;v.cargo=1;v.dest=r.dst;
+      if(b.mix){if(b.mix.some(k=>b.mat[k]<1)){keep.push(v);continue;}for(const k of b.mix)b.mat[k]--;}
+      else{if(b.fac&&b.stock<1){keep.push(v);continue;}if(b.fac)b.stock--;}v.cargo=1;v.dest=r.dst;
     }
     v.task='go';v.t=0;v.held=0;
     if(!tryDepart(v,b)){v.t=METER_RETRY;keep.push(v);}
@@ -842,7 +883,7 @@ function detach(v){
   clearTails(v);v.lane=null;v.grant=null;v.v=0;v.lat=0;
   for(const n of W.nodes){if(n.active&&n.active.length)n.active=n.active.filter(a=>a.v!==v);if(n.hold)for(let i=0;i<n.hold.length;i++)if(n.hold[i]===v)n.hold[i]=null;}
 }
-const towFee=r=>Math.round(20*[1,2,4,8,16][r.chain]*(1+0.25*G.fame));
+const towFee=r=>Math.round(20*CHAIN_COST[r.chain]*(1+0.25*G.fame));
 function tow(v){detach(v);v.cargo=0;G.tows++;G.lastTow=G.time;const f=towFee(v.route);charge(f);fx('tow');enterBuilding(v,v.route.src);notify('動けなくなったトラックをレッカーしました（¥'+f.toLocaleString('ja-JP')+'）');}
 function trimTails(v){
   const tl=v.tailLanes;if(!tl.length)return;
@@ -870,7 +911,7 @@ function updJunction(n,dt){
     for(const v of L.vehicles){
       if(v.grant===n)continue;
       const d=L.len-v.s;
-      const cn=v.plan[v.pi+1],fast=kind==='bend'||(kind==='prio'&&n.pairs[n.ctrl.axis%n.pairs.length].indexOf(i)>=0)||(kind==='signal'&&(isGreen(n,i)||(s.mode==='a'&&!!cn&&cn.crossing&&n.sgr[s.g].indexOf(i)>=0)));
+      const cn=v.plan[v.pi+1],intoLot=DRV&&!!cn&&!!cn.out&&cn.out.to.type==='lot'&&(kind==='none'||kind==='prio'),fast=intoLot||kind==='bend'||(kind==='prio'&&n.pairs[n.ctrl.axis%n.pairs.length].indexOf(i)>=0)||(kind==='signal'&&(isGreen(n,i)||(s.mode==='a'&&!!cn&&cn.crossing&&n.sgr[s.g].indexOf(i)>=0)));
       if(v.need>=0&&v.need!==L.li&&d>14)break; // still trying to reach its turn lane
       if(d<=(fast?v.v*v.v/5+16:5.5)){if(!v.wait)v.wait=G.time;cands.push({v,i,d,L,conn:v.plan[v.pi+1]});}
       break;
@@ -899,21 +940,25 @@ function updJunction(n,dt){
   }
   if(!cands.length)return;
   const rank=c=>kind==='prio'?((n.pairs[n.ctrl.axis%n.pairs.length].indexOf(c.i)>=0?2:0)+(c.conn.crossing?0:1)):kind==='signal'?(c.conn.crossing?0:1):0;
-  for(const c of cands)c.r=c.conn&&c.conn.node===n?rank(c):-1;
+  for(const c of cands){c.r=c.conn&&c.conn.node===n?rank(c):-1;c.out=DRV&&c.L.from.type==='lot';c.in=DRV&&!!c.conn&&!!c.conn.out&&c.conn.out.to.type==='lot';if(c.out&&c.r>=0&&kind==='prio')c.r=-0.5;}
+  // trucks leaving a facility yield to street traffic, like a car pulling out of a driveway (unless they have waited very long)
+  const streetComing=c=>{for(const L of n.inL){if(L.from.type==='lot')continue;const u=L.vehicles[0];if(!u||u.grant===n)continue;const d=L.len-u.s;if(d>Math.max(8,u.v*2.2+6))continue;const k=u.plan[u.pi+1];if(k&&k.conf&&k.conf.has(c.conn.id))return true;}return false;};
   // fairness: a truck that has waited too long gets the junction reserved; conflicting newcomers are held back until it has gone
   const thr=25,resv=[],resvOut=[];
   for(const c of cands)c.st=G.time-c.v.wait>thr?1:0;
   cands.sort((a,b)=>b.st-a.st||b.r-a.r||a.v.wait-b.v.wait);
   for(const c of cands){
-    const conn=c.conn;if(c.r<0)continue;
+    const conn=c.conn;if(c.r<0&&!c.out)continue;
+    if(c.out&&kind==='prio'&&G.time-c.v.wait<30&&streetComing(c))continue;
+    if(c.out&&kind==='none'&&W.lotB[c.L.from.id]&&W.lotB[c.L.from.id].yard&&G.time-c.v.wait<40&&cands.some(x=>!x.out&&x.v!==c.v))continue; // yard: street trucks first
     if(resvOut.indexOf(conn.out)>=0)continue;
     if(G.time-c.v.wait>45&&!canSpace(n,c.v,conn.out)){resvOut.push(conn.out);continue;} // exit road keeps filling up before our turn: the next free slot is ours
     if(kind==='signal'){
       if(s.mode==='g'){if(!isGreen(n,c.i))continue;}
       else if(!(s.mode==='a'&&conn.crossing&&n.sgr[s.g].indexOf(c.i)>=0))continue;
     }
-    if(kind==='none'&&(NONE_MODE===1?n.active.length>0:false))continue; // all-way stop: one truck in the junction at a time
-    if(kind==='none'&&(c.v.v>0.4||G.time-c.v.wait<STOP_T))continue;        // ...and everybody stops first
+    if(kind==='none'&&!c.in&&(NONE_MODE===1?n.active.length>0:false)){if(c.st)break;continue;} // all-way stop: one truck in the junction at a time; a truck that has waited too long goes next
+    if(kind==='none'&&!c.in&&(c.v.v>0.4||G.time-c.v.wait<STOP_T))continue;        // ...and everybody stops first (turning into a facility needs no stop)
     if(!canSpace(n,c.v,conn.out))continue;
     let blocked=false;
     for(const r of resv)if(r.L!==c.L&&conn.conf.has(r.conn.id)){blocked=true;break;}
@@ -1076,7 +1121,7 @@ function step(dt){
 
 /* ================= game state ================= */
 const KEY='jiwajiwa-traffic-v2';
-function truckCost(r){return Math.round(40*[1,2,4,8,16][r.chain]*Math.pow(1.25,r.trucks));}
+function truckCost(r){return Math.round(40*CHAIN_COST[r.chain]*Math.pow(1.25,r.trucks));}
 const buyCost=r=>trucks.length===0&&r.i===0?0:truckCost(r); // no trucks at all: the first one is free, so going broke can never lock the game
 const UPS=[
  {k:'eng',name:'エンジン',desc:'最高速度 +8%',base:200,mul:1.8,max:6},
@@ -1089,7 +1134,7 @@ const upCost=u=>Math.round(u.base*Math.pow(u.mul,G.up[u.k]));
 function newGame(seed,sv,carry){
   trucks=[];tid=0;
   G={money:60,delivered:0,tows:0,time:1,up:{eng:0,cap:0,load:0,meter:0,nav:0},navCount:0,meterOn:true,inc:[],speed:1,lcCount:0,wrong:0,tick:0,
-     runSeed:seed,fame:0,lv:0,done:{},upk:0,pfl:[],rbMax:0,navUsed:false,cleared:false,clearT:0,navOn:true,offer:null,ev:[],evNext:300,fuel:1,con:null,conNext:240,conDone:0,lastTow:0,tut:0,mute:false};
+     runSeed:seed,fame:0,lv:0,done:{},upk:0,pfl:[],made:[],rbMax:0,navUsed:false,cleared:false,clearT:0,navOn:true,offer:null,ev:[],evNext:300,fuel:1,con:null,conNext:240,conDone:0,lastTow:0,tut:0,mute:false};
   if(carry)Object.assign(G,carry);
   if(sv){G.runSeed=typeof sv.runSeed==='number'?sv.runSeed:(sv.lv?null:sv.seed);G.time=Math.max(1,+sv.time||1);G.rbMax=sv.rbMax|0;G.navUsed=!!sv.navUsed;G.cleared=!!sv.cleared;G.clearT=+sv.clearT||0;G.tows=sv.tows|0;G.navOn=sv.navOn!==false;G.fame=sv.fame|0;G.lv=sv.lv|0;G.done=sv.done||{};G.conDone=sv.conDone|0;G.tut=sv.tut===undefined?99:sv.tut;G.mute=!!sv.mute;}
   else G.money=60+300*G.fame;
@@ -1105,6 +1150,7 @@ function newGame(seed,sv,carry){
     // junction rules after the replay: a bend only becomes a junction once its new road exists
     for(const id of sv.nr||[]){const n=W.nodes[id];if(n&&n.type==='junction')n.noRight=true;}
     for(const c of sv.ctrl||[]){const n=W.nodes[c[0]];if(n&&n.type==='junction')n.ctrl={kind:c[1],axis:c[2]};}
+    (sv.yard||[]).forEach(i=>{if(W.bld[i])W.bld[i].yard=true;});
     (sv.bays||[]).forEach((x,i)=>{if(W.bld[i])W.bld[i].bays=Math.max(2,Math.min(8,x|0));});
     for(const x of sv.wide||[]){const e=W.edges[x];if(e&&e.lanes<2&&e[0].type!=='lot'&&e[1].type!=='lot')widenEdge(e);}
     for(const x of sv.ow||[]){const e=W.edges[x[0]];if(e&&e[0].type!=='lot'&&e[1].type!=='lot'&&canOneWay(e,x[1]))applyOneWay(e,x[1]);}
@@ -1112,16 +1158,17 @@ function newGame(seed,sv,carry){
     relane();
     (sv.rt||[]).forEach((cnt,i)=>{for(let q=0;q<cnt;q++)addTruck(W.routes[i]);});
     (sv.stock||[]).forEach((s,i)=>{if(W.bld[i])W.bld[i].stock=s;});
+    (sv.mat||[]).forEach((m,i)=>{if(W.bld[i]&&W.bld[i].mix&&m)Object.assign(W.bld[i].mat,m);});
   }else{addTruck(W.routes[0]);addTruck(W.routes[1]);}
 }
 function save(){
   if(HEADLESS)return;
-  try{localStorage.setItem(KEY,JSON.stringify({seed:W.seed,runSeed:G.runSeed,rs:G.rs,time:Math.round(G.time),rbMax:G.rbMax,navUsed:G.navUsed,cleared:G.cleared,clearT:G.clearT,navOn:G.navOn,fame:G.fame,lv:G.lv,done:G.done,conDone:G.conDone,tut:G.tut,mute:G.mute,money:G.money,delivered:G.delivered,tows:G.tows,up:G.up,meterOn:G.meterOn,nr:W.nodes.filter(n=>n.noRight).map(n=>n.id),rt:W.routes.map(r=>r.trucks),stock:W.bld.map(b=>b.stock),bays:W.bld.map(b=>b.bays),bought:W.bought,ops:W.ops,wide:W.edges.map((e,i)=>e.lanes>1?i:-1).filter(i=>i>=0),ow:W.edges.map((e,i)=>e.ow?[i,e.ow]:null).filter(x=>x),
+  try{localStorage.setItem(KEY,JSON.stringify({seed:W.seed,runSeed:G.runSeed,rs:G.rs,time:Math.round(G.time),rbMax:G.rbMax,navUsed:G.navUsed,cleared:G.cleared,clearT:G.clearT,navOn:G.navOn,fame:G.fame,lv:G.lv,done:G.done,conDone:G.conDone,tut:G.tut,mute:G.mute,money:G.money,delivered:G.delivered,tows:G.tows,up:G.up,meterOn:G.meterOn,nr:W.nodes.filter(n=>n.noRight).map(n=>n.id),rt:W.routes.map(r=>r.trucks),stock:W.bld.map(b=>b.stock),mat:W.bld.map(b=>b.mat),bays:W.bld.map(b=>b.bays),yard:W.bld.map((b,i)=>b.yard?i:-1).filter(i=>i>=0),bought:W.bought,ops:W.ops,wide:W.edges.map((e,i)=>e.lanes>1?i:-1).filter(i=>i>=0),ow:W.edges.map((e,i)=>e.ow?[i,e.ow]:null).filter(x=>x),
     ctrl:W.nodes.filter(n=>n.type==='junction'&&n.ctrl.kind!=='none').map(n=>[n.id,n.ctrl.kind,n.ctrl.axis])}));}catch(e){}
 }
 
 if(HEADLESS){
-  module.exports={nextSeed,grand,clearResult,onTimeRate,canMoveNow,moveProfit,avgProfit,routeProfit,waitingFor,ctrlCost,startEvent,acceptOffer,declineOffer,sellTruck,upkeep,truckUpk,netRate,incRate,growTown,EXTRA,checkAch,ACH,moveAt,newGame,step,addTruck,setCtrl,widen,setOneWay,canOneWay,canNoRight,buildRoad,lanePt,DT,get W(){return W},get G(){return G},get trucks(){return trucks}};
+  module.exports={breadRate,breadNeed,hasBread,yardClear,nextSeed,grand,clearResult,onTimeRate,canMoveNow,moveProfit,avgProfit,routeProfit,waitingFor,ctrlCost,startEvent,acceptOffer,declineOffer,sellTruck,upkeep,truckUpk,netRate,incRate,growTown,EXTRA,checkAch,ACH,moveAt,newGame,step,addTruck,setCtrl,widen,setOneWay,canOneWay,canNoRight,buildRoad,lanePt,DT,get W(){return W},get G(){return G},get trucks(){return trucks}};
 }else{
 /* ================= rendering ================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
@@ -1241,6 +1288,14 @@ function draw(){
     ctx.fillStyle='#e63228';ctx.beginPath();ctx.arc((f[0]+r[0])/2,(f[1]+r[1])/2-9,4.2,0,TAU);ctx.fill();
     ctx.fillStyle='#fff';ctx.font='bold 6px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('!',(f[0]+r[0])/2,(f[1]+r[1])/2-8.8);
   }
+  // crowded corners (deliberate from town Lv2)
+  for(const [A,B] of W.hot||[]){
+    const xs=[A.node.x,B.node.x,A.grid.x,B.grid.x],ys=[A.node.y,B.node.y,A.grid.y,B.grid.y];
+    const cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2,rx=(Math.max(...xs)-Math.min(...xs))/2+34,ry=(Math.max(...ys)-Math.min(...ys))/2+34;
+    ctx.setLineDash([6,5]);ctx.lineWidth=2;ctx.strokeStyle='rgba(230,120,20,.8)';ctx.fillStyle='rgba(255,170,60,.10)';
+    ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,TAU);ctx.fill();ctx.stroke();ctx.setLineDash([]);
+    ctx.font='bold 9px system-ui,sans-serif';ctx.fillStyle='rgba(190,90,10,.95)';ctx.textAlign='center';ctx.fillText('⚠ 密集地帯',cx,cy-ry-5);
+  }
   // buildings
   ctx.textAlign='center';ctx.textBaseline='middle';
   for(const b of W.bld){
@@ -1248,10 +1303,12 @@ function draw(){
     ctx.globalAlpha=locked?0.35:1;
     ctx.fillStyle='rgba(0,0,0,.18)';rr(b.node.x-17,b.node.y-15,36,36,7);ctx.fill();
     ctx.fillStyle=b.col;rr(b.node.x-18,b.node.y-18,36,36,7);ctx.fill();
-    ctx.strokeStyle='#fffdf6';ctx.lineWidth=1.6;ctx.stroke();
+    ctx.strokeStyle=b.yard?'#2f6f4f':'#fffdf6';ctx.lineWidth=b.yard?2.6:1.6;ctx.stroke();
+    if(b.yard){ctx.fillStyle='#2f6f4f';ctx.beginPath();ctx.arc(b.node.x-17,b.node.y-17,6,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 7px system-ui';ctx.fillText('P',b.node.x-17,b.node.y-16.6);}
     ctx.font='17px sans-serif';ctx.fillStyle='#000';ctx.fillText(b.icon,b.node.x,b.node.y-2);
     ctx.font='bold 8px system-ui,sans-serif';ctx.fillStyle='#fff';
-    ctx.fillText(b.name+(b.fac?' 在庫'+b.stock:''),b.node.x,b.node.y+12.5);
+    ctx.fillText(b.mix?b.name:b.name+(b.fac?' 在庫'+b.stock:''),b.node.x,b.node.y+12.5);
+    if(b.mix){const t=b.mix.map(k=>MAT_NAME[k]+b.mat[k]).join(' ');ctx.fillStyle='rgba(43,47,54,.85)';const w=ctx.measureText(t).width+8;rr(b.node.x-w/2,b.node.y+19,w,11,4);ctx.fill();ctx.fillStyle=b.mix.some(k=>b.mat[k]<1)?'#ffb4a8':'#fff';ctx.fillText(t,b.node.x,b.node.y+24.8);}
     if(b.inside.length){ctx.fillStyle='#2b2f36';ctx.beginPath();ctx.arc(b.node.x+17,b.node.y-17,6.5,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 7.5px system-ui';ctx.fillText(b.inside.length,b.node.x+17,b.node.y-16.6);}
     ctx.globalAlpha=1;
   }
@@ -1325,16 +1382,17 @@ $('deliv').textContent=fmt(G.delivered);
    b.textContent=G.up.meter?(G.meterOn?'ON':'OFF'):'¥'+fmt(METER_COST);b.disabled=!G.up.meter&&G.money<METER_COST;b.style.background=G.up.meter&&!G.meterOn?'#9aa39a':'';}
   checkAch();
   const setH=(el,h)=>{if(el._h!==h){el._h=h;el.innerHTML=h;}};
-  const nx=UNLOCK.find(x=>x>G.delivered),g=$('goal'),mv=$('move');
+  const UL=ULIST(),nx=UL.find(x=>x>G.delivered),g=$('goal'),mv=$('move');
   let canMove=false;
-  if(nx){const prev=UNLOCK[UNLOCK.indexOf(nx)-1],r=W.routes.find(x=>UNLOCK[x.chain]===nx);
+  if(nx){const prev=UL[UL.indexOf(nx)-1],r=W.routes.find(x=>UNLOCK[x.chain]===nx);
     setH(g,'次の解放: <b>'+r.src.name+'と'+r.dst.name+'</b> — 配達 '+G.delivered+' / '+nx+'<div id="bar"><i style="width:'+Math.min(100,(G.delivered-prev)/(nx-prev)*100)+'%"></i></div>');}
   else{
-    const need=moveAt(G.lv),pv=UNLOCK[UNLOCK.length-1],tg=moveProfit(),ap=avgProfit();canMove=canMoveNow();
+    const need=moveAt(G.lv),pv=UL[UL.length-1],tg=moveProfit(),ap=avgProfit();canMove=canMoveNow();
     if(canMove)setH(g,'この町はうまく回っています。<b>次の町</b>はもっと広く、報酬が25%上がります。');
-    else if(G.delivered<need)setH(g,'<b>次の町へ引っ越す</b>には<br>① 配達 '+fmt(G.delivered)+' / '+fmt(need)+'<br>② 利益 ¥'+fmt(tg)+'/分と定時率 '+Math.round(ONTIME_NEED*100)+'%<div id="bar"><i style="width:'+Math.min(100,(G.delivered-pv)/(need-pv)*100)+'%"></i></div>');
+    else if(G.delivered<need)setH(g,'<b>次の町へ引っ越す</b>には<br>① 配達 '+fmt(G.delivered)+' / '+fmt(need)+'<br>② 利益 ¥'+fmt(tg)+'/分・定時率 '+Math.round(ONTIME_NEED*100)+'%'+(hasBread()?'・パン '+breadNeed()+'個/分':'')+'<div id="bar"><i style="width:'+Math.min(100,(G.delivered-pv)/(need-pv)*100)+'%"></i></div>');
     else{const ot=onTimeRate(),okP=ap>=tg,okT=ot>=ONTIME_NEED;
-      setH(g,'<b>次の町へ引っ越す</b>条件（直近3分）<br>'+(okP?'✅':'⬜')+' 利益 ¥'+fmt(Math.max(0,ap))+' / ¥'+fmt(tg)+'/分<br>'+(okT?'✅':'⬜')+' 定時率 '+Math.round(ot*100)+'% / '+Math.round(ONTIME_NEED*100)+'%'+(okT?'':' ・ 遅れすぎ')+'<div id="bar"><i style="width:'+Math.max(0,Math.min(100,Math.min(ap/tg,ot/ONTIME_NEED)*100))+'%"></i></div>');}
+      const hb=hasBread(),br=breadRate(),bn=breadNeed(),okB=!hb||br>=bn;
+      setH(g,'<b>次の町へ引っ越す</b>条件（直近3分）<br>'+(okP?'✅':'⬜')+' 利益 ¥'+fmt(Math.max(0,ap))+' / ¥'+fmt(tg)+'/分<br>'+(okT?'✅':'⬜')+' 定時率 '+Math.round(ot*100)+'% / '+Math.round(ONTIME_NEED*100)+'%'+(okT?'':' ・ 遅れすぎ')+(hb?'<br>'+(okB?'✅':'⬜')+' 🍞 パン '+br.toFixed(1)+' / '+bn+' 個/分':'')+'<div id="bar"><i style="width:'+Math.max(0,Math.min(100,Math.min(ap/tg,ot/ONTIME_NEED)*100))+'%"></i></div>');}
   }
   mv.style.display=canMove?'block':'none';
   if(canMove&&Date.now()-moveArm>4000)mv.textContent='次の町へ引っ越す（名声 ★+1）';
@@ -1356,7 +1414,7 @@ $('deliv').textContent=fmt(G.delivered);
   const todo=ACH.filter(a=>!G.done[a[0]]);
   $('achN').textContent='（'+(ACH.length-todo.length)+' / '+ACH.length+'）';
   setH($('ach'),todo.length?todo.slice(0,3).map(a=>'<div class="ach">'+a[1]+(a[3]?'<span>+¥'+fmt(a[3])+'</span>':'<span>★</span>')+'</div>').join(''):'<div class="ach">すべての目標を達成しました。</div>');
-  const u=UNLOCK.filter(x=>x<=G.delivered).length;if(unl>=0&&u>unl){toast('新しい路線を解放しました');fx('win');}unl=u;
+  const u=UL.filter(x=>x<=G.delivered).length;if(unl>=0&&u>unl){toast('新しい路線を解放しました');fx('win');}unl=u;
   // tutorial
   while(G.tut<TUT.length&&TUT[G.tut][1]())G.tut++;
   const tu=$('tut');
@@ -1436,11 +1494,12 @@ const TUT=[
  ['ときどき<b>工事・事故・燃料高騰</b>などの出来事が起きます。事故はお金を払えばすぐ片付けられます。',()=>false],
  ['トラックや信号には<b>維持費</b>がかかります。増やしすぎて詰まると赤字に。<b>−ボタン</b>で売れます。',()=>false],
  ['渋滞で<b>遅れた配達は報酬が減ります</b>。次の町へ行くには<b>定時率</b>も必要です。路線ごとの「利益」を見て、稼げていない路線は台数を減らしましょう。',()=>false],
+ ['町Lv2からは<b>パン工場</b>が登場します。小麦粉とチーズの<b>両方</b>が届かないとパンが作れません。引っ越すにはパンの出荷も必要です。',()=>!hasBread()],
  ['「目標」を達成するとボーナスが入ります。ときどき届く<b>特別注文</b>は時間内に運べば高報酬。全路線を解放して配達を重ねると、<b>次の町</b>へ引っ越せます。',()=>false]
 ];
 $('tut').addEventListener('click',e=>{const t=e.target.dataset.t;if(!t)return;G.tut=t==='skip'?TUT.length:G.tut+1;fx('click');save();refresh();});
 $('move').onclick=()=>{
-  if(Date.now()-moveArm<4000){moveArm=0;newGame(nextSeed(W.seed,G.lv),null,{runSeed:G.runSeed,fame:G.fame+1,lv:G.lv+1,done:G.done,conDone:G.conDone,tut:G.tut,mute:G.mute});buildPanel();fit();refresh();save();fx('win');toast('新しい町に着きました。報酬 +25%');speedUI();}
+  if(Date.now()-moveArm<4000){moveArm=0;newGame(nextSeed(W.seed,G.lv),null,{runSeed:G.runSeed,fame:G.fame+1,lv:G.lv+1,done:G.done,conDone:G.conDone,tut:G.tut,mute:G.mute});buildPanel();fit();refresh();save();fx('win');toast(hasBread()&&G.lv===1?'新しい町に着きました。🍞 パン工場は小麦粉とチーズの両方が必要です':'新しい町に着きました。報酬 +25%');speedUI();}
   else{moveArm=Date.now();$('move').textContent='本当に引っ越す？ この町は手放します（もう一度押す）';}
 };
 /* ---------- sound (synthesised, no audio files) ---------- */
@@ -1463,7 +1522,17 @@ fx=k=>{
 const wake=()=>{try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();else if(AC.state==='suspended')AC.resume();}catch(e){}};
 window.addEventListener('pointerdown',wake,true);window.addEventListener('touchstart',wake,true);window.addEventListener('keydown',wake,true);
 const axisName=(n,p)=>{const c=Math.abs(Math.cos(n.nb[p[0]].ang));return c>0.8?'東西':c<0.6?'南北':'斜め';};
-function hideMenu(){$('menu').style.display='none';sel=null;selE=null;selC=null;}
+function hideMenu(){$('menu').style.display='none';sel=null;selE=null;selC=null;selB=null;}
+let selB=null;
+function openBldMenu(b,sx,sy){
+  selB=b;const m=$('menu'),inside=b.inside.length,rs=W.routes.filter(r=>r.src===b||r.dst===b);
+  m.innerHTML='<h3>'+b.icon+' '+b.name+(b.hot>=0?'（密集地帯）':'')+'</h3><div style="font-size:12px;color:#6b7280;padding:0 8px 6px">'+(b.mix?b.mix.map(k=>MAT_NAME[k]+' '+b.mat[k]).join(' ・ ')+'（両方そろうと1個できる） ・ ':b.fac?'在庫 '+b.stock+' ・ ':'')+'中のトラック '+inside+'台 ・ 関わる路線 '+rs.length+'本</div>';
+  const bt=document.createElement('button'),c=yardCost();
+  if(b.yard){bt.innerHTML='構内待機場（設置済み）<small>出口と前の道が空くまで中で待つ。道路の車を優先して入れる</small>';bt.className='cur';bt.onclick=hideMenu;}
+  else{bt.innerHTML='構内待機場を作る — ¥'+fmt(c)+'<small>出口と前の道が空くまで中で待つ。道路の車を優先して入れる</small>';bt.disabled=G.money<c;bt.onclick=()=>{G.money-=c;b.yard=true;fx('build');save();refresh();hideMenu();};}
+  m.appendChild(bt);m.style.display='block';
+  m.style.left=Math.max(8,Math.min(cw-238,sx+14))+'px';m.style.top=Math.max(8,Math.min(ch-m.offsetHeight-8,sy-20))+'px';
+}
 function openBuildMenu(c,sx,sy){
   selC=c;const m=$('menu'),cost=roadCost();m.innerHTML='<h3>建設予定地</h3>';
   const b=document.createElement('button');b.innerHTML='道路を建設 — ¥'+fmt(cost)+'<small>ここに新しい道を通す。買うたびに次の道は高くなる</small>';
@@ -1519,6 +1588,8 @@ function pUp(id,x,y,cancel){
   if(!ptrs.has(id))return;
   if(!cancel&&ptrs.size===1&&moved<6){
     const w=toWorld(x,y);let best=null,bd=26;
+    const hb=W.bld.find(b=>Math.abs(b.node.x-w[0])<19&&Math.abs(b.node.y-w[1])<19);
+    if(hb){openBldMenu(hb,x,y);ptrs.delete(id);if(!ptrs.size)cv.style.cursor='grab';return;}
     for(const n of W.nodes){if(n.type!=='junction')continue;const d=Math.hypot(n.x-w[0],n.y-w[1]);if(d<bd){bd=d;best=n;}}
     if(best)openMenu(best);
     else{
