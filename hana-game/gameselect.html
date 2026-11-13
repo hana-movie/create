@@ -73,6 +73,7 @@
   .g12 { --c: #8fa6f0; --d: #3a4d8f; --bg: #eef2ff; }
   .g13 { --c: #ffb98a; --d: #d9773a; --bg: #fff6e0; }
   .g14 { --c: #8fd9d0; --d: #2f9e93; --bg: #eefbf8; }
+  .g15 { --c: #ffa8d0; --d: #e0569a; --bg: #ffe9f2; }
 </style>
 </head>
 <body>
@@ -190,6 +191,14 @@
       <div class="body">
         <div class="name">お医者さん<wbr>ゲーム</div>
         <div class="desc">どうぶつの かんじゃさんを なおして あげよう！</div>
+        <div class="stars">★☆☆</div>
+      </div>
+    </a>
+    <a class="game g15" href="okigae/index.html">
+      <canvas class="thumb" id="th15"></canvas>
+      <div class="body">
+        <div class="name">おしゃれ<wbr>きせかえ</div>
+        <div class="desc">ふくや かみがたを えらんで おしゃれしよう！</div>
         <div class="stars">★☆☆</div>
       </div>
     </a>
@@ -808,6 +817,46 @@
     c.fillStyle = '#ffffff'; rr(c, 300, 180, 76, 18, 9); c.fill();
     const g = c.createLinearGradient(304, 0, 372, 0); g.addColorStop(0, '#ffd23f'); g.addColorStop(1, '#5ccf7a');
     c.fillStyle = g; rr(c, 304, 184, 50, 10, 5); c.fill();
+  }
+
+  // 15. おしゃれ きせかえ
+  {
+    const c = setup('th15');
+    const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#ffe3ef'); bg.addColorStop(1, '#ffd0e4');
+    c.fillStyle = bg; c.fillRect(0, 0, W, H);
+    const heart = (x, y, r, col) => { c.fillStyle = col; c.beginPath(); c.moveTo(x, y + r * .7); c.bezierCurveTo(x - r * 1.5, y - r * .2, x - r * .6, y - r * 1.3, x, y - r * .4); c.bezierCurveTo(x + r * .6, y - r * 1.3, x + r * 1.5, y - r * .2, x, y + r * .7); c.fill(); };
+    for (let x = 20; x < W; x += 56) for (let y = 30; y < 230; y += 56) heart(x + ((y / 56 | 0) % 2) * 28, y, 6, 'rgba(255,255,255,.6)');
+    c.fillStyle = '#f5c58f'; c.fillRect(0, 222, W, 78); c.fillStyle = '#fff'; c.fillRect(0, 216, W, 6);
+    // ハンガーの ふく
+    const hang = (x, y, col, kind) => {
+      c.strokeStyle = '#b9a8c2'; c.lineWidth = 2.5; c.beginPath(); c.arc(x, y - 16, 5, Math.PI * .9, Math.PI * 2.2); c.moveTo(x, y - 11); c.lineTo(x - 22, y); c.lineTo(x + 22, y); c.closePath(); c.stroke();
+      c.fillStyle = col;
+      if (kind === 'dress') { c.beginPath(); c.moveTo(x - 20, y); c.lineTo(x + 20, y); c.lineTo(x + 14, y + 26); c.lineTo(x + 30, y + 74); c.lineTo(x - 30, y + 74); c.lineTo(x - 14, y + 26); c.closePath(); c.fill(); }
+      else { c.beginPath(); c.moveTo(x - 30, y + 4); c.lineTo(x - 14, y); c.lineTo(x + 14, y); c.lineTo(x + 30, y + 4); c.lineTo(x + 26, y + 20); c.lineTo(x + 18, y + 16); c.lineTo(x + 18, y + 52); c.lineTo(x - 18, y + 52); c.lineTo(x - 18, y + 16); c.lineTo(x - 26, y + 20); c.closePath(); c.fill(); }
+      c.fillStyle = 'rgba(255,255,255,.85)'; for (const [dx, dy] of [[-8, 22], [8, 34], [-4, 44]]) { c.beginPath(); c.arc(x + dx, y + dy, 3.2, 0, Math.PI * 2); c.fill(); }
+    };
+    c.strokeStyle = '#d9a8c0'; c.lineWidth = 4; c.beginPath(); c.moveTo(20, 72); c.lineTo(132, 72); c.moveTo(268, 72); c.lineTo(380, 72); c.stroke();
+    hang(52, 96, '#5aa9ff', 'tee'); hang(108, 96, '#ffd54a', 'dress'); hang(296, 96, '#9b7bff', 'dress'); hang(350, 96, '#8fd96b', 'tee');
+    // おんなのこ
+    const X = 200, sk = '#ffe3cf', hair = '#6b4226';
+    c.fillStyle = 'rgba(60,30,60,.15)'; c.beginPath(); c.ellipse(X, 246, 42, 6, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = hair; c.beginPath(); c.moveTo(X - 34, 100); c.bezierCurveTo(X - 62, 106, X - 66, 150, X - 54, 182); c.bezierCurveTo(X - 46, 170, X - 40, 140, X - 32, 118); c.fill();
+    c.beginPath(); c.moveTo(X + 34, 100); c.bezierCurveTo(X + 62, 106, X + 66, 150, X + 54, 182); c.bezierCurveTo(X + 46, 170, X + 40, 140, X + 32, 118); c.fill();
+    c.strokeStyle = sk; c.lineCap = 'round'; c.lineWidth = 11; c.beginPath(); c.moveTo(X - 9, 200); c.lineTo(X - 9, 238); c.moveTo(X + 9, 200); c.lineTo(X + 9, 238); c.stroke();
+    c.lineWidth = 9; c.beginPath(); c.moveTo(X - 20, 152); c.lineTo(X - 30, 186); c.moveTo(X + 20, 152); c.lineTo(X + 30, 186); c.stroke();
+    c.fillStyle = '#ff6f91'; rr(c, X - 19, 236, 18, 10, 5); c.fill(); rr(c, X + 1, 236, 18, 10, 5); c.fill();
+    c.fillStyle = '#ff8fd0'; c.beginPath(); c.moveTo(X - 22, 148); c.lineTo(X + 22, 148); c.lineTo(X + 16, 176); c.lineTo(X + 36, 214); c.quadraticCurveTo(X, 224, X - 36, 214); c.lineTo(X - 16, 176); c.closePath(); c.fill();
+    c.fillStyle = '#fff'; for (const [dx, dy] of [[-10, 190], [8, 200], [-2, 164], [20, 208], [-22, 208]]) { c.beginPath(); c.arc(X + dx, dy, 3, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = hair; c.beginPath(); c.ellipse(X, 104, 38, 36, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = sk; c.beginPath(); c.ellipse(X, 110, 33, 31, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = hair; c.beginPath(); c.moveTo(X - 35, 112); c.bezierCurveTo(X - 38, 80, X - 20, 68, X, 68); c.bezierCurveTo(X + 20, 68, X + 38, 80, X + 35, 112); c.bezierCurveTo(X + 28, 96, X + 14, 100, X + 8, 92); c.bezierCurveTo(X, 102, X - 12, 100, X - 16, 92); c.bezierCurveTo(X - 24, 98, X - 30, 100, X - 35, 112); c.fill();
+    for (const s of [-1, 1]) { c.fillStyle = '#2e2030'; c.beginPath(); c.ellipse(X + s * 13, 114, 5, 6.5, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#fff'; c.beginPath(); c.arc(X + s * 13 - 2, 111, 2, 0, Math.PI * 2); c.fill();
+      c.fillStyle = 'rgba(255,120,150,.45)'; c.beginPath(); c.ellipse(X + s * 21, 125, 6, 3.5, 0, 0, Math.PI * 2); c.fill(); }
+    c.strokeStyle = '#c4566f'; c.lineWidth = 2; c.beginPath(); c.moveTo(X - 5, 127); c.quadraticCurveTo(X, 132, X + 5, 127); c.stroke();
+    // リボン
+    c.fillStyle = '#ff5a7a'; c.save(); c.translate(X - 22, 76); c.rotate(-.35); c.beginPath(); c.moveTo(0, 0); c.lineTo(-17, -10); c.lineTo(-17, 10); c.closePath(); c.moveTo(0, 0); c.lineTo(17, -10); c.lineTo(17, 10); c.closePath(); c.fill(); c.beginPath(); c.arc(0, 0, 5, 0, Math.PI * 2); c.fill(); c.restore();
+    heart(150, 150, 9, '#ff6fa8'); heart(252, 132, 7, '#ff6fa8');
+    c.fillStyle = '#ffd54a'; for (const [x, y, r] of [[246, 180, 8], [150, 196, 6]]) { c.beginPath(); for (let i = 0; i < 8; i++) { const rr2 = i % 2 ? r * .4 : r, a = i * Math.PI / 4; c.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2); } c.fill(); }
   }
 })();
 </script>

@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffd6e7">
+<title>おしゃれ きせかえ</title>
+<style>
+  :root{ --ink:#5a4466; --pink:#ff8fb8; --pink-d:#e8689a; --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px); }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+  html,body{margin:0;height:100%;overflow:hidden;color:var(--ink);overscroll-behavior:none;background:#ffe9f2;
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Rounded Mplus 1c","Yu Gothic",system-ui,sans-serif}
+  .emo{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
+  button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0;background:none}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column}
+  #stageWrap{position:relative;flex:0 0 46%;min-height:0;min-width:0}
+  #stage{width:100%;height:100%;display:block}
+  #panel{flex:1 1 0;min-height:0;min-width:0;display:flex;flex-direction:column;background:#fff;border-radius:26px 26px 0 0;box-shadow:0 -6px 20px rgba(200,100,150,.2);
+    padding:8px 8px calc(6px + var(--sb));gap:6px}
+  @media (orientation:landscape) and (min-width:700px){
+    #app{flex-direction:row}
+    #stageWrap{flex:0 0 46%}
+    #panel{flex:1 1 0;border-radius:26px 0 0 26px;padding:calc(10px + var(--st)) 10px calc(8px + var(--sb))}
+  }
+  .side{position:absolute;top:calc(8px + var(--st));display:flex;flex-direction:column;gap:8px;z-index:3}
+  .side.l{left:8px} .side.r{right:8px}
+  .rb{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.92);font-size:25px;box-shadow:0 4px 0 rgba(200,100,150,.3);display:flex;align-items:center;justify-content:center;text-decoration:none;position:relative}
+  .rb:active{transform:translateY(3px)}
+  .rb small{position:absolute;bottom:-13px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;white-space:nowrap;color:var(--ink);text-shadow:0 1px 0 #fff,0 -1px 0 #fff,1px 0 0 #fff,-1px 0 0 #fff}
+  .side .rb{margin-bottom:8px}
+  #theme{position:absolute;left:50%;top:calc(10px + var(--st));transform:translateX(-50%);background:rgba(255,255,255,.95);border-radius:999px;padding:8px 16px;font-weight:800;
+    font-size:clamp(13px,3.6vw,17px);white-space:nowrap;box-shadow:0 4px 12px rgba(200,100,150,.3);display:none;z-index:2}
+  #theme.on{display:block;animation:popin .4s cubic-bezier(.3,1.6,.5,1)}
+  @keyframes popin{from{transform:translateX(-50%) scale(.4)}}
+
+  #tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 6px;flex:none;scrollbar-width:none}
+  #tabs::-webkit-scrollbar{display:none}
+  .tab{flex:none;width:58px;height:58px;border-radius:18px;background:#fbeff5;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:25px;line-height:1}
+  .tab small{font-size:10px;font-weight:800;margin-top:3px}
+  .tab.sel{background:var(--pink);color:#fff;box-shadow:0 4px 0 var(--pink-d);transform:translateY(-2px)}
+  #items{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px;align-content:start;padding:2px}
+  .it{aspect-ratio:1;border-radius:18px;background:#fdf4f8;position:relative;display:flex;align-items:center;justify-content:center;font-size:38px;overflow:hidden;border:3px solid transparent}
+  .it canvas{width:100%;height:100%;display:block}
+  .it.sel{border-color:var(--pink);background:#fff0f6}
+  .it.lock::after{content:'🎁';position:absolute;inset:0;background:rgba(255,240,246,.88);display:flex;align-items:center;justify-content:center;font-size:36px}
+  .it:active{transform:scale(.94)}
+  #colors,#pats{display:flex;gap:7px;overflow-x:auto;flex:none;padding:3px 2px;scrollbar-width:none;min-height:0}
+  #colors::-webkit-scrollbar,#pats::-webkit-scrollbar{display:none}
+  .sw{flex:none;width:40px;height:40px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08),inset 0 -3px 0 rgba(0,0,0,.1)}
+  .sw.sel{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--ink)}
+  .pt{flex:none;width:46px;height:40px;border-radius:12px;overflow:hidden;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08)}
+  .pt canvas{width:100%;height:100%;display:block}
+  .pt.sel{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--ink)}
+
+  .ov{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(90,50,90,.45)}
+  .ov.open{display:flex}
+  .card{background:#fff;border-radius:28px;padding:20px 18px;width:min(92vw,460px);max-height:92vh;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;
+    box-shadow:0 14px 40px rgba(120,50,100,.35)}
+  .card h2{margin:0;font-size:26px;color:#ff6fa8}
+  .card p{margin:0;font-size:15px;line-height:1.6}
+  .big{width:100%;min-height:58px;border-radius:999px;font-size:21px;font-weight:900;color:#fff;background:var(--pink);box-shadow:0 6px 0 var(--pink-d)}
+  .big:active{transform:translateY(4px);box-shadow:0 2px 0 var(--pink-d)}
+  .big.blue{background:#7cc8ff;box-shadow:0 6px 0 #4fa6e6}
+  .big.gray{background:#b9b2c6;box-shadow:0 6px 0 #9189a3;min-height:48px;font-size:17px}
+  #photoImg{width:min(70vw,300px);border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.25);transform:rotate(-2deg);-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto}
+  #albumGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+  #albumGrid img{width:100%;border-radius:10px;box-shadow:0 3px 8px rgba(0,0,0,.2);display:block}
+  #giftBox{font-size:90px;line-height:1;animation:gift 1s ease}
+  @keyframes gift{0%{transform:scale(0) rotate(-30deg)}60%{transform:scale(1.25) rotate(8deg)}100%{transform:scale(1)}}
+  #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:30}
+  #flash.on{animation:fl .5s}
+  @keyframes fl{0%{opacity:.95}100%{opacity:0}}
+  #toast{position:fixed;left:50%;bottom:calc(30px + var(--sb));transform:translateX(-50%);background:rgba(90,68,102,.92);color:#fff;font-weight:800;padding:10px 18px;border-radius:999px;
+    z-index:40;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;font-size:15px}
+  #toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="theme"></div>
+    <div class="side l">
+      <a class="rb emo" href="../gameselect.html" aria-label="ゲームを えらぶ">🏠</a>
+      <button class="rb emo" id="btnSound" aria-label="おと">🔊</button>
+    </div>
+    <div class="side r">
+      <button class="rb emo" id="btnRandom">🎲<small>おまかせ</small></button>
+      <button class="rb emo" id="btnTheme">💌<small>おだい</small></button>
+      <button class="rb emo" id="btnPhoto">📷<small>しゃしん</small></button>
+      <button class="rb emo" id="btnAlbum">📒<small>アルバム</small></button>
+    </div>
+  </div>
+  <div id="panel">
+    <div id="tabs"></div>
+    <div id="items"></div>
+    <div id="colors"></div>
+    <div id="pats"></div>
+  </div>
+</div>
+
+<div class="ov" id="photoOv"><div class="card">
+  <h2>📷 パシャ！</h2>
+  <img id="photoImg" alt="しゃしん">
+  <p id="photoMsg">アルバムに いれたよ！<br><small>しゃしんを ながおし すると ほぞん できるよ</small></p>
+  <button class="big" id="photoOk">つづける</button>
+</div></div>
+<div class="ov" id="giftOv"><div class="card">
+  <h2>🎁 プレゼント！</h2>
+  <div id="giftBox" class="emo">🎁</div>
+  <canvas id="giftCv" width="200" height="200" style="width:150px;height:150px;border-radius:24px;background:#fff0f6"></canvas>
+  <p id="giftName" style="font-weight:900;font-size:20px"></p>
+  <button class="big" id="giftWear">きてみる！</button>
+</div></div>
+<div class="ov" id="albumOv"><div class="card">
+  <h2>📒 アルバム</h2>
+  <p id="albumMsg"></p>
+  <div id="albumGrid"></div>
+  <button class="big gray" id="albumClear">ぜんぶ けす</button>
+  <button class="big blue" id="albumClose">とじる</button>
+</div></div>
+<div id="flash"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* =========================================================
+   おしゃれ きせかえ v0.1
+   - おんなのこ も ふく も ぜんぶ Canvas で かいているので、いろ・がら を じゆうに かえられる
+   - 外部ライブラリ・画像ファイル・外部通信なし（GitHub Pages に置くだけで動作）
+   - コーデ・アルバム・プレゼントは この たんまつの localStorage に ほぞん
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const TAU = Math.PI * 2;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[(Math.random() * a.length) | 0];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const EMO = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('kisekae_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('kisekae_' + k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+};
+
+/* ---------- いろ・がら ---------- */
+const SKIN = ['#ffe3cf', '#fbd3b0', '#e6b184', '#c08a5c', '#8f5f40'];
+const HAIRC = ['#3a2a2e', '#6b4226', '#a8672e', '#f2cf63', '#ff8fb8', '#ff9a5a', '#8fb8ff', '#b48cff', '#7fd6c0', '#f4f1f6'];
+const EYEC = ['#6b4226', '#3a2a2e', '#3d8bff', '#3fae6a', '#a66cff', '#ff6fa0', '#e8a23a'];
+const COLS = ['#ff6f91', '#ffa0c0', '#ff9a5a', '#ffd54a', '#8fd96b', '#5cc8c0', '#5aa9ff', '#9b7bff', '#d48cff', '#ffffff', '#3d3a4d', '#c9a27a', '#e04545', '#2f5aa8'];
+const PATS = ['plain', 'dot', 'stripe', 'check', 'heart', 'star', 'flower'];
+function rgb(hex) { if (typeof hex !== 'string' || hex[0] !== '#') hex = '#ff8fb8'; const n = parseInt(hex.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; }
+function shade(hex, k) {   // k<1 くらく / k>1 あかるく
+  const [r, g, b] = rgb(hex);
+  const f = v => k <= 1 ? Math.round(v * k) : Math.round(v + (255 - v) * (k - 1));
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+const isLight = hex => { const [r, g, b] = rgb(hex); return r * .3 + g * .59 + b * .11 > 205; };
+const patCache = {};
+function heartPath(c, x, y, r) { c.beginPath(); c.moveTo(x, y + r * .7); c.bezierCurveTo(x - r * 1.5, y - r * .2, x - r * .6, y - r * 1.3, x, y - r * .4); c.bezierCurveTo(x + r * .6, y - r * 1.3, x + r * 1.5, y - r * .2, x, y + r * .7); c.closePath(); }
+function starPath(c, x, y, r, n = 5) { c.beginPath(); for (let i = 0; i < n * 2; i++) { const rr = i % 2 ? r * .45 : r, a = i * Math.PI / n - Math.PI / 2; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath(); }
+function fillOf(col, pat) {
+  if (!pat || pat === 'plain') return col;
+  const key = col + pat; if (patCache[key]) return patCache[key];
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
+  c.scale(2, 2);
+  c.fillStyle = col; c.fillRect(0, 0, 32, 32);
+  const m = isLight(col) ? '#ff9ac0' : 'rgba(255,255,255,.88)';
+  c.fillStyle = m;
+  if (pat === 'dot') for (const [x, y] of [[8, 8], [24, 24]]) { c.beginPath(); c.arc(x, y, 4.2, 0, TAU); c.fill(); }
+  else if (pat === 'stripe') { c.fillRect(0, 2, 32, 7); c.fillRect(0, 18, 32, 7); }
+  else if (pat === 'check') { c.globalAlpha = .5; c.fillRect(0, 0, 32, 8); c.fillRect(0, 16, 32, 8); c.fillRect(0, 0, 8, 32); c.fillRect(16, 0, 8, 32); }
+  else if (pat === 'heart') for (const [x, y] of [[8, 9], [24, 25]]) { heartPath(c, x, y, 4.6); c.fill(); }
+  else if (pat === 'star') for (const [x, y] of [[8, 8], [24, 24]]) { starPath(c, x, y, 5.5); c.fill(); }
+  else if (pat === 'flower') for (const [x, y] of [[8, 8], [24, 24]]) { for (let i = 0; i < 5; i++) { const a = i * TAU / 5; c.beginPath(); c.arc(x + Math.cos(a) * 3.4, y + Math.sin(a) * 3.4, 2.6, 0, TAU); c.fill(); } c.fillStyle = '#ffd54a'; c.beginPath(); c.arc(x, y, 2, 0, TAU); c.fill(); c.fillStyle = m; }
+  const p = c.createPattern(cv, 'repeat');
+  if (p.setTransform) p.setTransform(new DOMMatrix().scale(.5));
+  return patCache[key] = p;
+}
+
+/* ---------- かく どうぐ ---------- */
+const E = (c, x, y, rx, ry, rot = 0) => { c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, TAU); };
+const L = (c, x1, y1, x2, y2) => { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); };
+function FS(c, f, s, lw = 2) { c.fillStyle = f; c.fill(); if (s) { c.strokeStyle = s; c.lineWidth = lw; c.lineJoin = 'round'; c.stroke(); } }
+function path(c, d) { c.beginPath(); const p = new Path2D(d); return p; }
+function PD(c, d, f, s, lw = 2) { const p = new Path2D(d); c.fillStyle = f; c.fill(p); if (s) { c.strokeStyle = s; c.lineWidth = lw; c.lineJoin = 'round'; c.stroke(p); } }
+// うで（かた → て）
+const ARM = { l: [115, 216, 94, 296], r: [185, 216, 206, 296] };
+function sleeve(c, f, t, w = 25) {
+  c.lineCap = 'round'; c.strokeStyle = f; c.lineWidth = w;
+  for (const k of ['l', 'r']) { const [x1, y1, x2, y2] = ARM[k]; L(c, x1, y1, x1 + (x2 - x1) * t, y1 + (y2 - y1) * t); c.stroke(); }
+}
+const TOP_BODY = h => `M112,209 L127,202 Q150,220 173,202 L188,209 L${184},${h} Q150,${h + 8} 116,${h} Z`;
+
+/* ---------- からだ ---------- */
+function drawBody(c, S) {
+  const sk = SKIN[S.skin], sd = shade(sk, .86);
+  c.lineCap = 'round';
+  c.strokeStyle = sk; c.lineWidth = 22; L(c, 135, 308, 134, FOOT[0][1] - 9); c.stroke(); L(c, 165, 308, 166, FOOT[1][1] - 9); c.stroke();
+  E(c, 132, FOOT[0][1], 14, 9); FS(c, sk); E(c, 168, FOOT[1][1], 14, 9); FS(c, sk);
+  c.lineWidth = 18; for (const k of ['l', 'r']) { const a = ARM[k]; L(c, a[0], a[1], a[2], a[3]); c.strokeStyle = sk; c.stroke(); E(c, a[2] + (k === 'l' ? -2 : 2), a[3] + 6, 10, 10); FS(c, sk); }
+  PD(c, 'M112,209 Q150,200 188,209 L183,255 Q181,290 185,312 Q150,322 115,312 Q119,290 117,255 Z', sk);
+  c.fillStyle = sk; c.fillRect(139, 184, 22, 26);
+  // インナー（しろ）
+  PD(c, 'M118,226 Q150,234 182,226 L181,262 Q180,290 184,312 Q168,330 152,318 L150,314 L148,318 Q132,330 116,312 Q120,290 119,262 Z', '#ffffff', '#f0e3ea', 1.5);
+  // かお
+  E(c, 92, 140, 8, 11); FS(c, sk); E(c, 208, 140, 8, 11); FS(c, sk);
+  E(c, 150, 132, 60, 56); FS(c, sk);
+  c.fillStyle = sd; c.globalAlpha = .35; E(c, 150, 190, 14, 4); c.fill(); c.globalAlpha = 1;
+}
+function drawFace(c, S, A) {
+  const closed = A.blink, happy = A.happy > 0;
+  for (const s of [-1, 1]) {
+    const x = 150 + s * 24, y = 143;
+    if (closed || happy) {
+      c.strokeStyle = '#4a3340'; c.lineWidth = 3.2; c.lineCap = 'round';
+      c.beginPath(); if (happy) c.arc(x, y + 5, 10, Math.PI * 1.12, Math.PI * 1.88); else { c.moveTo(x - 10, y); c.quadraticCurveTo(x, y + 7, x + 10, y); } c.stroke();
+    } else {
+      E(c, x, y, 11, 13.5); FS(c, '#fff');
+      E(c, x, y + 1, 9, 11.5); FS(c, S.eye);
+      E(c, x, y + 2, 5, 7); FS(c, '#2e2030');
+      E(c, x - 3.5, y - 5, 3.4, 3.8); FS(c, '#fff'); E(c, x + 3.5, y + 5, 1.8, 1.8); FS(c, '#fff');
+      c.strokeStyle = '#4a3340'; c.lineWidth = 3; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(x - 11.5, y - 5); c.quadraticCurveTo(x, y - 17, x + 11.5, y - 5); c.stroke();
+      L(c, x + s * 11, y - 6, x + s * 16, y - 6); c.lineWidth = 2.2; c.stroke();
+      c.strokeStyle = 'rgba(74,51,64,.55)'; c.lineWidth = 2.2; c.beginPath(); c.moveTo(x - 9, y - 23); c.quadraticCurveTo(x, y - 28, x + 9, y - 23); c.stroke();
+    }
+    c.fillStyle = 'rgba(255,120,150,.42)'; E(c, 150 + s * 36, 162, 10, 6); c.fill();
+  }
+  c.strokeStyle = '#c4566f'; c.lineWidth = 2.6; c.lineCap = 'round';
+  if (happy) { c.beginPath(); c.moveTo(142, 164); c.quadraticCurveTo(150, 178, 158, 164); c.closePath(); FS(c, '#e8607f', '#c4566f', 2); }
+  else { c.beginPath(); c.moveTo(143, 166); c.quadraticCurveTo(150, 172, 157, 166); c.stroke(); }
+}
+
+/* ---------- かみ ---------- */
+const CAP = 'M86,138 C80,84 110,62 150,62 C190,62 220,84 214,138 C208,120 200,112 192,107 C186,122 176,126 168,111 C160,127 144,128 136,111 C128,126 116,124 108,109 C100,114 92,122 86,138 Z';
+const HAIR = [
+  { id: 'bob', name: 'ボブ', back(c, f, s) { PD(c, 'M84,130 C76,78 110,56 150,56 C190,56 224,78 216,130 C224,162 220,190 204,198 L96,198 C80,190 76,162 84,130 Z', f, s); } },
+  { id: 'long', name: 'ロング', back(c, f, s) { PD(c, 'M84,130 C76,78 110,56 150,56 C190,56 224,78 216,130 C230,200 226,290 208,310 Q150,322 92,310 C74,290 70,200 84,130 Z', f, s); } },
+  { id: 'twin', name: 'ツイン', back(c, f, s, S) {
+      PD(c, 'M92,110 C50,116 34,200 56,270 C74,262 86,210 98,150 Z', f, s); PD(c, 'M208,110 C250,116 266,200 244,270 C226,262 214,210 202,150 Z', f, s);
+      E(c, 150, 122, 67, 62); FS(c, f, s);
+    }, front(c, f, s) { for (const x of [90, 210]) { E(c, x, 114, 8, 8); FS(c, '#ff6f91', '#d84a6c', 1.5); } } },
+  { id: 'pony', name: 'ポニー', back(c, f, s) {
+      PD(c, 'M196,76 C246,74 258,170 236,256 C222,232 214,170 198,118 Z', f, s); E(c, 150, 122, 67, 62); FS(c, f, s);
+    }, front(c, f, s) { E(c, 199, 84, 9, 9); FS(c, '#ffd54a', '#d9a21f', 1.5); } },
+  { id: 'buns', name: 'おだんご', back(c, f, s) { for (const x of [96, 204]) { E(c, x, 74, 25, 24); FS(c, f, s); } E(c, 150, 122, 67, 62); FS(c, f, s); } },
+  { id: 'braid', name: 'みつあみ', back(c, f, s) { E(c, 150, 122, 67, 62); FS(c, f, s); },
+    front(c, f, s) { for (const sx of [-1, 1]) { for (let i = 0; i < 6; i++) { E(c, 150 + sx * (58 + i * .6), 166 + i * 22, 12, 14, sx * (i % 2 ? .3 : -.3)); FS(c, f, s); } E(c, 150 + sx * 61, 294, 7, 7); FS(c, '#ff6f91', '#d84a6c', 1.5); } } },
+  { id: 'short', name: 'ショート', back(c, f, s) { PD(c, 'M84,134 C76,80 110,58 150,58 C190,58 224,80 216,134 C218,156 212,170 204,174 L96,174 C88,170 82,156 84,134 Z', f, s); } },
+  { id: 'wavy', name: 'ふわふわ', back(c, f, s) {
+      c.beginPath(); c.moveTo(84, 130); c.bezierCurveTo(76, 78, 110, 54, 150, 54); c.bezierCurveTo(190, 54, 224, 78, 216, 130);
+      for (let i = 0; i < 4; i++) c.quadraticCurveTo(240 - (i % 2) * 10, 150 + i * 36, 220, 168 + i * 36);
+      c.quadraticCurveTo(150, 300, 80, 276);
+      for (let i = 3; i >= 0; i--) c.quadraticCurveTo(60 + (i % 2) * 10, 150 + i * 36, 80, 132 + i * 36);
+      c.closePath(); FS(c, f, s);
+    } },
+];
+function hairFront(c, f, s) { PD(c, CAP, f, s); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.arc(150, 118, 46, Math.PI * 1.2, Math.PI * 1.45); c.stroke(); }
+
+/* ---------- ふく ---------- */
+const TOPS = [
+  { id: 'tee', name: 'Tシャツ', draw(c, f, s) { sleeve(c, f, .34); PD(c, TOP_BODY(298), f, s); } },
+  { id: 'long', name: 'ながそで', draw(c, f, s) { sleeve(c, f, .9); PD(c, TOP_BODY(298), f, s); } },
+  { id: 'tank', name: 'タンクトップ', draw(c, f, s) { PD(c, 'M122,206 L132,204 Q150,226 168,204 L178,206 L184,298 Q150,306 116,298 Z', f, s); } },
+  { id: 'hoodie', name: 'パーカー', draw(c, f, s, col) {
+      sleeve(c, f, .92, 27); PD(c, 'M110,209 L127,202 Q150,220 173,202 L190,209 L188,304 Q150,312 112,304 Z', f, s);
+      PD(c, 'M126,203 Q150,232 174,203 Q168,196 150,200 Q132,196 126,203 Z', shade(col, .85), s, 1.5);
+      PD(c, 'M130,268 L170,268 L176,296 L124,296 Z', shade(col, .9), s, 1.5);
+      c.strokeStyle = '#fff'; c.lineWidth = 2.5; L(c, 143, 216, 142, 240); c.stroke(); L(c, 157, 216, 158, 240); c.stroke();
+    } },
+  { id: 'sailor', name: 'セーラー', draw(c, f, s, col) {
+      sleeve(c, f, .34); PD(c, TOP_BODY(298), f, s);
+      PD(c, 'M112,209 L127,202 L150,246 L173,202 L188,209 L178,232 L150,262 L122,232 Z', '#3a5aa8', '#2a4380', 1.5);
+      c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(118, 212); c.lineTo(128, 234); c.lineTo(150, 256); c.lineTo(172, 234); c.lineTo(182, 212); c.stroke();
+      PD(c, 'M150,250 L136,266 L150,262 L164,266 Z', '#ff5a7a', '#c93a5a', 1.5);
+    } },
+  { id: 'frill', name: 'フリル', draw(c, f, s) {
+      for (const k of ['l', 'r']) { E(c, ARM[k][0] + (k === 'l' ? -4 : 4), 222, 17, 16); FS(c, f, s); }
+      PD(c, TOP_BODY(298), f, s);
+      c.fillStyle = '#fff'; c.strokeStyle = s; c.lineWidth = 1.5;
+      for (let i = 0; i < 7; i++) { E(c, 127 + i * 7.7, 208 + Math.sin(i / 6 * Math.PI) * 13, 6.5, 6.5); c.fill(); c.stroke(); }
+      for (const y of [240, 260, 280]) { E(c, 150, y, 3.2, 3.2); FS(c, '#fff', s, 1.2); }
+    } },
+];
+const BOTTOMS = [
+  { id: 'skirt', name: 'スカート', draw(c, f, s, col) { PD(c, 'M119,286 L181,286 L206,352 Q178,364 150,356 Q122,364 94,352 Z', f, s); PD(c, 'M118,282 L182,282 L182,294 L118,294 Z', shade(col, .85), s, 1.5); } },
+  { id: 'pleats', name: 'プリーツ', draw(c, f, s, col) {
+      PD(c, 'M119,286 L181,286 L204,350 L96,350 Z', f, s);
+      c.strokeStyle = s; c.lineWidth = 1.6; for (let i = 1; i < 7; i++) { L(c, 119 + i * 8.9, 294, 96 + i * 15.4, 350); c.stroke(); }
+      PD(c, 'M118,282 L182,282 L182,294 L118,294 Z', shade(col, .85), s, 1.5);
+    } },
+  { id: 'shorts', name: 'ショートパンツ', draw(c, f, s) { PD(c, 'M117,284 L183,284 L188,338 L153,338 L150,320 L147,338 L112,338 Z', f, s); } },
+  { id: 'pants', name: 'ズボン', draw(c, f, s) {
+      c.lineCap = 'butt'; c.strokeStyle = f; c.lineWidth = 31; L(c, 134, 300, 133, 424); c.stroke(); L(c, 166, 300, 167, 424); c.stroke();
+      PD(c, 'M117,284 L183,284 L184,318 L116,318 Z', f); c.strokeStyle = s; c.lineWidth = 2; L(c, 150, 318, 150, 330); c.stroke(); L(c, 117, 284, 183, 284); c.stroke();
+    } },
+  { id: 'tutu', name: 'チュチュ', draw(c, f, s) {
+      c.globalAlpha = .82;
+      for (let k = 0; k < 3; k++) { c.beginPath(); const y0 = 292 + k * 4, w = 62 + k * 10, h = 40 + k * 8; c.moveTo(150 - 30, y0);
+        for (let i = 0; i <= 8; i++) { const x = 150 - w + i * w / 4; c.quadraticCurveTo(x - w / 8, y0 + h + 8, x, y0 + h - (i % 2 ? 0 : 6)); }
+        c.lineTo(180, y0); c.closePath(); FS(c, f, s, 1.4); }
+      c.globalAlpha = 1; PD(c, 'M118,282 L182,282 L182,296 L118,296 Z', f, s, 1.5);
+    } },
+  { id: 'long', name: 'ロングスカート', draw(c, f, s, col) { PD(c, 'M119,286 L181,286 L200,420 Q150,432 100,420 Z', f, s); PD(c, 'M118,282 L182,282 L182,294 L118,294 Z', shade(col, .85), s, 1.5); } },
+];
+const DRESSES = [
+  { id: 'aline', name: 'ワンピース', draw(c, f, s, col) {
+      sleeve(c, f, .3); PD(c, 'M112,209 L127,202 Q150,220 173,202 L188,209 L181,268 L212,368 Q181,382 150,372 Q119,382 88,368 L119,268 Z', f, s);
+      PD(c, 'M127,202 Q150,222 173,202 L176,212 Q150,236 124,212 Z', '#fff', s, 1.5);
+      PD(c, 'M150,226 L138,238 L150,234 L162,238 Z', '#ff5a7a', '#c93a5a', 1.2);
+    } },
+  { id: 'sun', name: 'サマードレス', draw(c, f, s, col) {
+      PD(c, 'M124,206 L132,204 L136,224 L164,224 L168,204 L176,206 L181,268 L208,356 Q150,372 92,356 L119,268 Z', f, s);
+      c.strokeStyle = shade(col, .8); c.lineWidth = 2; c.beginPath(); c.moveTo(106, 318); c.quadraticCurveTo(150, 330, 194, 318); c.stroke();
+      c.beginPath(); c.moveTo(118, 270); c.quadraticCurveTo(150, 278, 182, 270); c.stroke();
+    } },
+  { id: 'kimono', name: 'ゆかた', draw(c, f, s, col) {
+      for (const k of [-1, 1]) PD(c, `M${150 + k * 36},206 L${150 + k * 78},292 L${150 + k * 62},330 L${150 + k * 34},260 Z`, f, s);
+      PD(c, 'M112,207 L128,200 L150,232 L172,200 L188,207 L184,300 L190,424 L110,424 L116,300 Z', f, s);
+      c.strokeStyle = '#fff'; c.lineWidth = 5; c.lineJoin = 'round'; c.beginPath(); c.moveTo(128, 201); c.lineTo(152, 240); c.lineTo(172, 201); c.stroke();
+      const ob = isLight(col) ? '#ff6f91' : '#ffd54a';
+      PD(c, 'M115,262 L185,262 L186,298 L114,298 Z', ob, shade(ob, .75));
+      PD(c, 'M140,274 h20 v12 h-20 Z', '#fff', shade(ob, .75), 1.5);
+    } },
+  { id: 'princess', name: 'プリンセス', gift: true, draw(c, f, s, col) {
+      PD(c, 'M122,270 Q58,330 52,454 Q150,474 248,454 Q242,330 178,270 Z', f, s);
+      c.globalAlpha = .45; PD(c, 'M134,276 Q110,360 116,462 Q150,468 184,462 Q190,360 166,276 Z', '#ffffff'); c.globalAlpha = 1;
+      for (const k of ['l', 'r']) { E(c, ARM[k][0] + (k === 'l' ? -5 : 5), 220, 19, 17); FS(c, f, s); }
+      PD(c, 'M116,214 Q150,236 184,214 L181,276 Q150,290 119,276 Z', f, s);
+      PD(c, 'M117,266 Q150,280 183,266 L183,278 Q150,292 117,278 Z', shade(col, .82), s, 1.5);
+      c.fillStyle = '#fff8c8'; for (const [x, y] of [[86, 400], [120, 360], [150, 420], [186, 366], [214, 404], [102, 440], [198, 440]]) { starPath(c, x, y, 6, 4); c.fill(); }
+      E(c, 150, 236, 5, 5); FS(c, '#ffd54a', '#d9a21f', 1.2);
+    } },
+  { id: 'fairy', name: 'ようせい', gift: true, draw(c, f, s, col) {
+      for (let i = 0; i < 5; i++) { const a = -.9 + i * .45; c.save(); c.translate(150, 280); c.rotate(a); PD(c, 'M-16,0 Q-22,50 0,84 Q22,50 16,0 Z', i % 2 ? shade(col, 1.25) : f, s, 1.5); c.restore(); }
+      PD(c, 'M122,206 L132,204 Q150,228 168,204 L178,206 L183,286 Q150,296 117,286 Z', f, s);
+      c.fillStyle = '#ffd54a'; for (let i = 0; i < 5; i++) { E(c, 122 + i * 14, 286, 4, 4); c.fill(); }
+    } },
+  { id: 'idol', name: 'アイドル', gift: true, draw(c, f, s, col) {
+      for (const k of ['l', 'r']) { E(c, ARM[k][0] + (k === 'l' ? -4 : 4), 220, 16, 14); FS(c, f, s); }
+      for (let k = 2; k >= 0; k--) { c.beginPath(); const y0 = 282, w = 58 + k * 10, h = 34 + k * 16; c.moveTo(120, y0);
+        for (let i = 0; i <= 8; i++) { const x = 150 - w + i * w / 4; c.quadraticCurveTo(x - w / 8, y0 + h + 9, x, y0 + h - (i % 2 ? 0 : 5)); }
+        c.lineTo(180, y0); c.closePath(); FS(c, k % 2 ? '#ffffff' : f, s, 1.5); }
+      PD(c, 'M116,212 Q150,230 184,212 L182,286 Q150,294 118,286 Z', f, s);
+      PD(c, 'M150,222 L128,208 L132,232 Z', '#fff', s, 1.3); PD(c, 'M150,222 L172,208 L168,232 Z', '#fff', s, 1.3);
+      E(c, 150, 222, 6, 6); FS(c, '#ffd54a', '#d9a21f', 1.2);
+      c.fillStyle = '#ffd54a'; starPath(c, 150, 260, 9); c.fill();
+    } },
+];
+const FOOT = [[132, 445], [168, 445]];   // あるく ときは y が うごく（あしを もちあげる）
+const lift = i => 445 - FOOT[i][1];
+const SHOES = [
+  { id: 'sneaker', name: 'スニーカー', draw(c, f, s) { for (const [x, y] of FOOT) { PD(c, `M${x - 16},${y - 12} Q${x},${y - 20} ${x + 15},${y - 8} Q${x + 20},${y + 6} ${x + 14},${y + 8} L${x - 14},${y + 8} Q${x - 19},${y} ${x - 16},${y - 12} Z`, f, s); c.fillStyle = '#fff'; c.fillRect(x - 15, y + 4, 30, 5); c.strokeStyle = '#fff'; c.lineWidth = 2; L(c, x - 5, y - 10, x + 3, y - 6); c.stroke(); L(c, x - 6, y - 5, x + 4, y - 1); c.stroke(); } } },
+  { id: 'pumps', name: 'ストラップ', draw(c, f, s) { for (const [x, y] of FOOT) { PD(c, `M${x - 15},${y - 4} Q${x},${y - 2} ${x + 15},${y - 6} Q${x + 19},${y + 8} ${x + 12},${y + 9} L${x - 12},${y + 9} Q${x - 18},${y + 6} ${x - 15},${y - 4} Z`, f, s); c.strokeStyle = f; c.lineWidth = 4; L(c, x - 11, y - 9, x + 11, y - 9); c.stroke(); E(c, x + 9, y - 9, 2.5, 2.5); FS(c, '#ffd54a'); } } },
+  { id: 'boots', name: 'ブーツ', draw(c, f, s) { for (const [x, y] of FOOT) PD(c, `M${x - 13},${y - 44} L${x + 13},${y - 44} L${x + 14},${y - 8} Q${x + 20},${y + 8} ${x + 14},${y + 9} L${x - 14},${y + 9} Q${x - 18},${y + 2} ${x - 14},${y - 8} Z`, f, s); } },
+  { id: 'sandal', name: 'サンダル', draw(c, f, s) { for (const [x, y] of FOOT) { c.fillStyle = shade('#c9a27a', .9); E(c, x, y + 7, 16, 4); c.fill(); c.strokeStyle = f; c.lineWidth = 4.5; c.lineCap = 'round'; L(c, x - 12, y - 2, x + 12, y - 2); c.stroke(); L(c, x - 9, y - 10, x + 9, y - 10); c.stroke(); } } },
+  { id: 'rain', name: 'ながぐつ', draw(c, f, s, col) { for (const [x, y] of FOOT) { PD(c, `M${x - 14},${y - 52} L${x + 14},${y - 52} L${x + 14},${y - 8} Q${x + 21},${y + 8} ${x + 14},${y + 9} L${x - 15},${y + 9} Q${x - 19},${y + 2} ${x - 14},${y - 8} Z`, f, s); PD(c, `M${x - 15},${y - 54} h30 v8 h-30 Z`, shade(col, 1.3), s, 1.5); } } },
+];
+const SOCKS = [
+  { id: 'short', name: 'ソックス', draw(c, f) { c.lineCap = 'butt'; c.strokeStyle = f; c.lineWidth = 23; L(c, 134, 418 - lift(0), 134, 438 - lift(0)); c.stroke(); L(c, 166, 418 - lift(1), 166, 438 - lift(1)); c.stroke(); for (const [x, y] of FOOT) { E(c, x, y, 14.5, 9.5); FS(c, f); } } },
+  { id: 'high', name: 'ハイソックス', draw(c, f) { c.lineCap = 'butt'; c.strokeStyle = f; c.lineWidth = 23; L(c, 134.5, 372 - lift(0), 134, 438 - lift(0)); c.stroke(); L(c, 165.5, 372 - lift(1), 166, 438 - lift(1)); c.stroke(); for (const [x, y] of FOOT) { E(c, x, y, 14.5, 9.5); FS(c, f); } } },
+  { id: 'tights', name: 'タイツ', draw(c, f) { c.lineCap = 'butt'; c.strokeStyle = f; c.lineWidth = 23; L(c, 135, 312, 134, 438 - lift(0)); c.stroke(); L(c, 165, 312, 166, 438 - lift(1)); c.stroke(); for (const [x, y] of FOOT) { E(c, x, y, 14.5, 9.5); FS(c, f); } } },
+];
+const HEADS = [
+  { id: 'ribbon', name: 'リボン', draw(c, f, s) { c.save(); c.translate(108, 82); c.rotate(-.35); PD(c, 'M0,0 L-30,-18 Q-36,0 -30,18 Z', f, s); PD(c, 'M0,0 L30,-18 Q36,0 30,18 Z', f, s); E(c, 0, 0, 8, 8); FS(c, f, s); c.restore(); } },
+  { id: 'band', name: 'カチューシャ', draw(c, f, s) { c.strokeStyle = f; c.lineWidth = 9; c.lineCap = 'round'; c.beginPath(); c.arc(150, 132, 62, Math.PI * 1.18, Math.PI * 1.82); c.stroke(); starPath(c, 186, 80, 13); FS(c, '#ffd54a', '#d9a21f', 1.5); } },
+  { id: 'cat', name: 'ねこみみ', draw(c, f, s) { for (const k of [-1, 1]) { PD(c, `M${150 + k * 58},96 L${150 + k * 52},50 L${150 + k * 22},74 Z`, f, s); PD(c, `M${150 + k * 50},86 L${150 + k * 48},62 L${150 + k * 32},76 Z`, '#ffc2d6'); } } },
+  { id: 'bunny', name: 'うさみみ', draw(c, f, s) { for (const k of [-1, 1]) { E(c, 150 + k * 26, 38, 13, 36, k * .18); FS(c, f, s); E(c, 150 + k * 26, 40, 6, 24, k * .18); FS(c, '#ffc2d6'); } } },
+  { id: 'straw', name: 'むぎわら', draw(c, f, s, col) { E(c, 150, 92, 92, 20); FS(c, f, s); PD(c, 'M96,92 Q98,40 150,40 Q202,40 204,92 Q150,104 96,92 Z', f, s); PD(c, 'M97,80 Q150,94 203,80 L204,92 Q150,104 96,92 Z', '#ff6f91', '#d84a6c', 1.5); } },
+  { id: 'beret', name: 'ベレー', draw(c, f, s) { E(c, 144, 72, 62, 26, -.12); FS(c, f, s); E(c, 150, 46, 4, 7); FS(c, f, s); } },
+  { id: 'flower', name: 'はなかんむり', draw(c, f, s) { for (let i = 0; i < 7; i++) { const a = Math.PI * (1.2 + i * .1), x = 150 + Math.cos(a) * 64, y = 132 + Math.sin(a) * 60; for (let k = 0; k < 5; k++) { E(c, x + Math.cos(k * TAU / 5) * 6.5, y + Math.sin(k * TAU / 5) * 6.5, 5.5, 5.5); FS(c, i % 2 ? '#fff' : f); } E(c, x, y, 4, 4); FS(c, '#ffd54a'); } } },
+  { id: 'tiara', name: 'ティアラ', gift: true, draw(c, f, s) { PD(c, 'M114,84 L120,56 L134,74 L150,44 L166,74 L180,56 L186,84 Q150,74 114,84 Z', '#ffd54a', '#d9a21f'); for (const [x, y, col] of [[150, 60, '#ff5a7a'], [128, 72, '#7cc8ff'], [172, 72, '#7cc8ff']]) { E(c, x, y, 4.5, 4.5); FS(c, col, '#fff', 1); } } },
+  { id: 'witch', name: 'まほうつかい', gift: true, draw(c, f, s, col) { E(c, 150, 88, 88, 17); FS(c, f, s); PD(c, 'M104,88 Q130,30 176,2 Q170,50 196,88 Q150,100 104,88 Z', f, s); PD(c, 'M106,78 Q150,92 194,78 L196,88 Q150,100 104,88 Z', '#ffd54a', '#d9a21f', 1.5); starPath(c, 150, 52, 9); FS(c, '#ffd54a'); } },
+];
+const FACES = [
+  { id: 'glasses', name: 'めがね', draw(c) { c.strokeStyle = '#d84a6c'; c.lineWidth = 3.5; for (const k of [-1, 1]) { E(c, 150 + k * 24, 144, 17, 17); c.stroke(); } L(c, 143, 144, 157, 144); c.stroke(); } },
+  { id: 'sun', name: 'サングラス', draw(c) { for (const k of [-1, 1]) { heartPath(c, 150 + k * 24, 142, 13); FS(c, 'rgba(60,40,70,.85)', '#ff6f91', 3); } c.strokeStyle = '#ff6f91'; c.lineWidth = 3; L(c, 142, 140, 158, 140); c.stroke(); } },
+  { id: 'heart', name: 'ハートほっぺ', draw(c) { for (const k of [-1, 1]) { heartPath(c, 150 + k * 37, 164, 6); FS(c, '#ff5a7a'); } } },
+  { id: 'star', name: 'ほしシール', draw(c) { starPath(c, 187, 166, 8); FS(c, '#ffd54a', '#d9a21f', 1.2); starPath(c, 176, 174, 4); FS(c, '#fff3a0'); } },
+];
+const BACKS = [
+  { id: 'butterfly', name: 'ちょうちょ', draw(c, f, s, col) { for (const k of [-1, 1]) { c.save(); c.translate(150, 250); c.scale(k, 1); PD(c, 'M10,0 C40,-90 130,-90 118,-10 C112,20 60,20 10,6 Z', f, s); PD(c, 'M10,6 C50,10 100,40 84,84 C70,110 30,70 10,14 Z', shade(col, 1.3), s); E(c, 82, -34, 12, 12); FS(c, 'rgba(255,255,255,.7)'); c.restore(); } } },
+  { id: 'cape', name: 'マント', draw(c, f, s) { PD(c, 'M112,208 Q150,196 188,208 L226,410 Q150,430 74,410 Z', f, s); } },
+  { id: 'angel', name: 'てんしの はね', gift: true, draw(c, f, s) { for (const k of [-1, 1]) { c.save(); c.translate(150, 240); c.scale(k, 1); for (let i = 0; i < 4; i++) { c.save(); c.rotate(-.5 + i * .3); PD(c, 'M14,0 Q70,-34 112,-8 Q78,18 14,10 Z', '#ffffff', '#d8dcea', 1.5); c.restore(); } c.restore(); } } },
+  { id: 'ransel', name: 'ランドセル', draw(c, f, s) { PD(c, 'M104,214 h92 v96 q0,10 -10,10 h-72 q-10,0 -10,-10 Z', f, s); } , front(c, f, s) { c.strokeStyle = f; c.lineWidth = 9; c.lineCap = 'round'; L(c, 124, 206, 121, 280); c.stroke(); L(c, 176, 206, 179, 280); c.stroke(); } },
+];
+const HANDS = [
+  { id: 'wand', name: 'ステッキ', draw(c) { c.strokeStyle = '#ff8fb8'; c.lineWidth = 5; c.lineCap = 'round'; L(c, 208, 306, 232, 236); c.stroke(); starPath(c, 235, 224, 17); FS(c, '#ffd54a', '#d9a21f', 2); } },
+  { id: 'balloon', name: 'ふうせん', draw(c) { c.strokeStyle = '#8a7898'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(208, 302); c.quadraticCurveTo(226, 240, 240, 178); c.stroke(); E(c, 242, 142, 28, 34); FS(c, '#ff6f91', '#d84a6c'); E(c, 232, 128, 7, 10, -.4); FS(c, 'rgba(255,255,255,.6)'); } },
+  { id: 'bag', name: 'バッグ', emoji: '👜', at: [90, 334, 46] },
+  { id: 'bear', name: 'ぬいぐるみ', emoji: '🧸', at: [84, 318, 54] },
+  { id: 'ice', name: 'アイス', emoji: '🍦', at: [214, 280, 50] },
+  { id: 'bouquet', name: 'はなたば', emoji: '💐', at: [214, 286, 54] },
+  { id: 'umbrella', name: 'かさ', emoji: '☂️', at: [222, 250, 78] },
+  { id: 'mic', name: 'マイク', emoji: '🎤', at: [214, 286, 46] },
+];
+const PETS = [{ id: 'dog', emoji: '🐶' }, { id: 'cat', emoji: '🐱' }, { id: 'rabbit', emoji: '🐰' }, { id: 'chick', emoji: '🐥' }, { id: 'bear', emoji: '🐻' }, { id: 'unicorn', emoji: '🦄', gift: true }];
+const BGS = [{ id: 'room', name: 'おへや' }, { id: 'park', name: 'こうえん' }, { id: 'beach', name: 'うみ' }, { id: 'snow', name: 'ゆき' }, { id: 'night', name: 'よぞら' }, { id: 'castle', name: 'おしろ', gift: true }, { id: 'stage', name: 'ステージ', gift: true }];
+
+const CATS = [
+  { id: 'body', icon: '🙂', name: 'かお' }, { id: 'hair', icon: '💇‍♀️', name: 'かみ', list: HAIR },
+  { id: 'top', icon: '👚', name: 'トップス', list: TOPS, pat: true }, { id: 'bottom', icon: '🩳', name: 'ボトムス', list: BOTTOMS, pat: true },
+  { id: 'dress', icon: '👗', name: 'ドレス', list: DRESSES, pat: true }, { id: 'shoes', icon: '👟', name: 'くつ', list: SHOES, none: true },
+  { id: 'socks', icon: '🧦', name: 'くつした', list: SOCKS, pat: true, none: true }, { id: 'head', icon: '🎀', name: 'あたま', list: HEADS, none: true },
+  { id: 'face', icon: '👓', name: 'かおかざり', list: FACES, none: true, nocolor: true }, { id: 'back', icon: '🦋', name: 'せなか', list: BACKS, none: true },
+  { id: 'hand', icon: '🪄', name: 'もちもの', list: HANDS, none: true, nocolor: true }, { id: 'pet', icon: '🐶', name: 'ペット', list: PETS, none: true, nocolor: true },
+  { id: 'bg', icon: '🖼️', name: 'はいけい', list: BGS, nocolor: true },
+];
+const byId = (list, id) => list.find(x => x.id === id);
+
+/* ---------- じょうたい ---------- */
+const DEF = { skin: 0, eye: EYEC[0], hair: { id: 'twin', col: HAIRC[1] }, top: { id: 'tee', col: '#ffa0c0', pat: 'heart' }, bottom: { id: 'skirt', col: '#5aa9ff', pat: 'plain' }, dress: null,
+  shoes: { id: 'sneaker', col: '#ff6f91' }, socks: { id: 'short', col: '#ffffff', pat: 'plain' }, head: null, face: null, back: null, hand: null, pet: null, bg: 'room' };
+let S = Object.assign(JSON.parse(JSON.stringify(DEF)), store.get('outfit', {}));
+let meta = Object.assign({ unlocked: [], sound: true }, store.get('meta', {}));
+let album = store.get('album', []);
+let cat = 'top';
+const saveS = () => store.set('outfit', S);
+const isLocked = it => it.gift && !meta.unlocked.includes(it.id);
+
+/* ---------- キャラを かく ---------- */
+function drawChar(c, St, A = {}) {
+  FOOT[0][1] = 445 - (A.lift ? A.lift[0] : 0); FOOT[1][1] = 445 - (A.lift ? A.lift[1] : 0);
+  const part = (list, o, fn = 'draw') => { if (!o) return; const it = byId(list, o.id); if (!it || !it[fn]) return; it[fn](c, fillOf(o.col, o.pat), shade(o.col, .72), o.col, St); };
+  part(BACKS, St.back);
+  const h = byId(HAIR, St.hair.id), hf = St.hair.col, hs = shade(hf, .72);
+  h.back(c, hf, hs, St);
+  drawBody(c, St);
+  part(SOCKS, St.socks);
+  if (!(St.dress && St.dress.id === 'princess')) part(SHOES, St.shoes);
+  if (St.dress) part(DRESSES, St.dress); else { part(BOTTOMS, St.bottom); part(TOPS, St.top); }
+  part(BACKS, St.back, 'front');
+  drawFace(c, St, A);
+  hairFront(c, hf, hs);
+  if (h.front) h.front(c, hf, hs, St);
+  part(HEADS, St.head);
+  if (St.face) byId(FACES, St.face.id).draw(c);
+  if (St.hand) { const it = byId(HANDS, St.hand.id); if (it.draw) it.draw(c); else { c.font = `${it.at[2]}px ${EMO}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#000'; c.fillText(it.emoji, it.at[0], it.at[1]); } }
+  FOOT[0][1] = FOOT[1][1] = 445;
+}
+
+/* ---------- はいけい ---------- */
+function drawBg(c, id, w, h, t = 0) {
+  const g = (a, b, y0 = 0, y1 = h) => { const gr = c.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, a); gr.addColorStop(1, b); return gr; };
+  const floor = h * .8;
+  if (id === 'room') {
+    c.fillStyle = g('#ffe3ef', '#ffd0e4'); c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,255,255,.5)'; for (let x = 20; x < w; x += 70) for (let y = 20; y < floor; y += 70) { heartPath(c, x + ((y / 70 | 0) % 2) * 35, y, 7); c.fill(); }
+    c.fillStyle = '#f5c58f'; c.fillRect(0, floor, w, h - floor); c.fillStyle = '#e9b278'; for (let x = 0; x < w; x += 60) c.fillRect(x, floor, 2, h - floor);
+    c.fillStyle = '#fff'; c.fillRect(0, floor - 8, w, 8);
+    const wx = w * .12, wy = h * .14, ws = Math.min(w * .26, 130);
+    c.fillStyle = '#bfe9ff'; c.fillRect(wx, wy, ws, ws); c.strokeStyle = '#fff'; c.lineWidth = 6; c.strokeRect(wx, wy, ws, ws); L(c, wx + ws / 2, wy, wx + ws / 2, wy + ws); c.stroke(); L(c, wx, wy + ws / 2, wx + ws, wy + ws / 2); c.stroke();
+  } else if (id === 'park') {
+    c.fillStyle = g('#9fdcff', '#eaf8ff'); c.fillRect(0, 0, w, h);
+    c.fillStyle = '#fff'; for (const [x, y, s] of [[.2, .16, 1], [.72, .1, .8]]) for (const [dx, dy, r] of [[0, 0, 26], [-26, 8, 20], [26, 8, 20]]) { E(c, w * x + dx * s, h * y + dy * s, r * s, r * s * .8); c.fill(); }
+    c.fillStyle = '#8fdc7a'; c.beginPath(); c.moveTo(0, floor - 30); c.quadraticCurveTo(w * .5, floor - 80, w, floor - 20); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+    c.fillStyle = '#7ccf66'; c.fillRect(0, floor, w, h - floor);
+    for (const x of [.12, .9]) { c.fillStyle = '#8a5a3c'; c.fillRect(w * x - 6, floor - 90, 12, 90); c.fillStyle = '#3fae54'; E(c, w * x, floor - 110, 42, 44); c.fill(); }
+    c.font = `22px ${EMO}`; c.textAlign = 'center'; c.fillStyle = '#000'; for (let i = 0; i < 8; i++) c.fillText(['🌷', '🌼'][i % 2], w * (.06 + i * .13), floor + 26 + (i % 3) * 14);
+  } else if (id === 'beach') {
+    c.fillStyle = g('#8fd8ff', '#dff6ff'); c.fillRect(0, 0, w, h);
+    c.fillStyle = '#ffe36e'; E(c, w * .82, h * .15, 34, 34); c.fill();
+    c.fillStyle = '#4fb8e8'; c.fillRect(0, floor - 90, w, 90); c.fillStyle = 'rgba(255,255,255,.6)'; for (let x = 0; x < w; x += 46) { c.beginPath(); c.arc(x + (t * 12 % 46), floor - 60, 12, Math.PI * 1.1, Math.PI * 1.9); c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 3; c.stroke(); }
+    c.fillStyle = '#f6dfa4'; c.beginPath(); c.moveTo(0, floor - 12); c.quadraticCurveTo(w * .5, floor - 34, w, floor - 8); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+    c.font = `30px ${EMO}`; c.textAlign = 'center'; c.fillStyle = '#000'; c.fillText('🐚', w * .14, floor + 40); c.fillText('⭐', w * .88, floor + 54); c.fillText('🌴', w * .1, floor - 30);
+  } else if (id === 'snow') {
+    c.fillStyle = g('#b9cff5', '#eef4ff'); c.fillRect(0, 0, w, h);
+    c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, floor - 20); c.quadraticCurveTo(w * .3, floor - 60, w * .6, floor - 24); c.quadraticCurveTo(w * .85, floor - 50, w, floor - 16); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+    for (let i = 0; i < 40; i++) { const x = (i * 97 + t * 14 * (1 + i % 3)) % w, y = (i * 53 + t * 40 * (1 + (i % 4) * .3)) % h; E(c, x, y, 2 + i % 3, 2 + i % 3); c.fill(); }
+    c.font = `44px ${EMO}`; c.textAlign = 'center'; c.fillStyle = '#000'; c.fillText('⛄', w * .14, floor + 6); c.fillText('🎄', w * .9, floor - 6);
+  } else if (id === 'night') {
+    c.fillStyle = g('#1b1f55', '#5b4a9a'); c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 50; i++) { c.fillStyle = `rgba(255,255,220,${.4 + .6 * Math.abs(Math.sin(t * 1.5 + i))})`; E(c, (i * 131) % w, (i * 71) % (h * .75), 1.2 + i % 3 * .7, 1.2 + i % 3 * .7); c.fill(); }
+    c.fillStyle = '#fff3b0'; E(c, w * .8, h * .16, 30, 30); c.fill(); c.fillStyle = '#2a2a6a'; E(c, w * .8 + 12, h * .16 - 8, 26, 26); c.fill();
+    c.fillStyle = '#3b3a7a'; c.fillRect(0, floor, w, h - floor);
+    const rb = ['#ff6f91', '#ffb347', '#ffe36e', '#8fd96b', '#5aa9ff', '#b48cff']; rb.forEach((col, i) => { c.strokeStyle = col; c.globalAlpha = .55; c.lineWidth = 9; c.beginPath(); c.arc(w * .5, floor + 40, w * .62 - i * 9, Math.PI, TAU); c.stroke(); }); c.globalAlpha = 1;
+  } else if (id === 'castle') {
+    c.fillStyle = g('#ffd6ec', '#fff3d6'); c.fillRect(0, 0, w, h);
+    const cx = w * .5, base = floor - 10, u = Math.min(w, h) * .11;
+    c.fillStyle = '#f3e6ff'; c.fillRect(cx - u * 2.6, base - u * 3, u * 5.2, u * 3);
+    for (const [x, hh] of [[-2.6, 4.2], [2.6, 4.2], [0, 5.6]]) { c.fillStyle = '#f8f0ff'; c.fillRect(cx + x * u - u * .6, base - hh * u, u * 1.2, hh * u); c.fillStyle = '#ff8fb8'; c.beginPath(); c.moveTo(cx + x * u - u * .8, base - hh * u); c.lineTo(cx + x * u, base - hh * u - u * 1.4); c.lineTo(cx + x * u + u * .8, base - hh * u); c.fill(); }
+    c.fillStyle = '#b48cff'; c.beginPath(); c.moveTo(cx - u * .5, base); c.lineTo(cx - u * .5, base - u); c.arc(cx, base - u, u * .5, Math.PI, 0); c.lineTo(cx + u * .5, base); c.fill();
+    c.fillStyle = '#a8e6a1'; c.fillRect(0, floor - 10, w, h - floor + 10); c.fillStyle = '#ffe9a8'; c.beginPath(); c.moveTo(cx - u * .5, floor - 10); c.lineTo(cx + u * .5, floor - 10); c.lineTo(cx + u * 2, h); c.lineTo(cx - u * 2, h); c.fill();
+  } else if (id === 'stage') {
+    c.fillStyle = g('#3b2a6b', '#7b4fa8'); c.fillRect(0, 0, w, h);
+    for (const [x, col] of [[.2, '255,170,220'], [.8, '170,210,255'], [.5, '255,240,170']]) { const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, `rgba(${col},${.3 + .15 * Math.sin(t * 3 + x * 9)})`); gr.addColorStop(1, `rgba(${col},0)`); c.fillStyle = gr; c.beginPath(); c.moveTo(w * x - 12, 0); c.lineTo(w * x + 12, 0); c.lineTo(w * .5 + (x - .5) * w * .3 + 110, h); c.lineTo(w * .5 + (x - .5) * w * .3 - 110, h); c.fill(); }
+    c.fillStyle = '#ffcfe6'; c.fillRect(0, floor, w, h - floor); c.fillStyle = '#ff6f9e';
+    for (const k of [0, 1]) { c.beginPath(); const ex = k ? w : 0, d = k ? -1 : 1; c.moveTo(ex, 0); c.lineTo(ex + d * w * .16, 0); c.quadraticCurveTo(ex + d * w * .06, h * .5, ex + d * w * .1, h); c.lineTo(ex, h); c.fill(); }
+    c.fillStyle = '#fff'; for (let i = 0; i < 16; i++) { c.globalAlpha = .3 + .6 * Math.abs(Math.sin(t * 2 + i)); starPath(c, w * .18 + (i * 83) % (w * .64), 20 + (i * 47) % (h * .5), 4, 4); c.fill(); } c.globalAlpha = 1;
+  }
+}
+
+/* ---------- ステージ ---------- */
+const stage = $('#stage'), sctx = stage.getContext('2d');
+let SW = 300, SH = 400, DPR = 1, anim = { hop: 0, happy: 0, t: 0, px: 0, tx: 0, petPx: 0, wp: 0, walking: false, dir: 0, spin: 0 }, sparks = [], stepT = 0;
+function resize() {
+  const r = stage.getBoundingClientRect(); if (!r.width) return;
+  DPR = Math.min(window.devicePixelRatio || 1, 2.5); SW = r.width; SH = r.height;
+  stage.width = Math.round(SW * DPR); stage.height = Math.round(SH * DPR);
+}
+window.addEventListener('resize', () => setTimeout(resize, 60));
+if (window.ResizeObserver) new ResizeObserver(() => resize()).observe(stage);
+function charLayout(w, h) { const k = Math.min(w / 330, h / 480); return { k, ox: (w - 300 * k) / 2, oy: h * .93 - 458 * k }; }
+function renderScene(c, w, h, t, A) {
+  drawBg(c, S.bg, w, h, t);
+  const { k, ox: ox0, oy } = charLayout(w, h);
+  const ox = ox0 + (A.px || 0) * k, wp = A.wp || 0, wk = A.walking ? 1 : 0;
+  const hop = Math.sin(clamp(A.hop, 0, 1) * Math.PI) * 26 * k + wk * Math.abs(Math.sin(wp)) * 5 * k, br = Math.sin(t * 2.2) * 1.5;
+  const spin = A.spin > 0 ? Math.cos((1 - A.spin) * TAU) : 1;   // くるりん
+  c.fillStyle = 'rgba(60,30,60,.16)'; E(c, ox + 150 * k, oy + 458 * k, (72 - hop * .5 / k) * k, 9 * k); c.fill();
+  c.save(); c.translate(ox + 150 * k, oy + 458 * k - hop);
+  c.rotate(Math.sin(t * 1.3) * .012 + Math.sin(A.hop * TAU) * .05 + wk * (Math.sin(wp) * .05 + (A.dir || 0) * .03));
+  c.scale(k * spin, k * (1 + br * .002)); c.translate(-150, -458);
+  drawChar(c, S, { blink: (t % 3.6) < .14, happy: A.happy, lift: wk ? [Math.max(0, Math.sin(wp)) * 14, Math.max(0, -Math.sin(wp)) * 14] : null });
+  c.restore();
+  if (S.pet) {
+    const e = byId(PETS, S.pet.id).emoji, pox = ox0 + (A.petPx || 0) * k, mv = Math.abs((A.petPx || 0) - (A.px || 0)) > 3 ? 2.4 : 1;
+    const py = oy + 436 * k - Math.abs(Math.sin(t * 3 * mv)) * 8 * k;
+    c.fillStyle = 'rgba(60,30,60,.14)'; E(c, pox + 266 * k, oy + 460 * k, 22 * k, 5 * k); c.fill();
+    c.font = `${46 * k}px ${EMO}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#000'; c.fillText(e, pox + 266 * k, py);
+  }
+}
+let lastT = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(.05, (now - lastT) / 1000); lastT = now; anim.t += dt;
+  if (anim.hop > 0) anim.hop = Math.max(0, anim.hop - dt * 2.2); if (anim.happy > 0) anim.happy -= dt;
+  if (anim.spin > 0) anim.spin = Math.max(0, anim.spin - dt * 1.8);
+  // あるく（タップした ところまで とことこ）
+  const lim = walkLimit(); anim.tx = clamp(anim.tx, -lim, lim); anim.px = clamp(anim.px, -lim, lim);
+  const dxw = anim.tx - anim.px;
+  if (Math.abs(dxw) > 2) {
+    anim.walking = true; anim.dir = Math.sign(dxw);
+    anim.px += anim.dir * Math.min(Math.abs(dxw), 120 * dt); anim.wp += dt * 11;
+    stepT -= dt; if (stepT <= 0) { stepT = .285; SFX.step(); }
+  } else if (anim.walking) { anim.walking = false; anim.dir = 0; anim.wp = 0; anim.happy = .5; }
+  anim.petPx += (anim.px - anim.petPx) * Math.min(1, dt * 2.2);
+  sctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  renderScene(sctx, SW, SH, anim.t, anim);
+  for (const p of sparks) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; p.rot += dt * 5; }
+  sparks = sparks.filter(p => p.life > 0);
+  for (const p of sparks) { sctx.save(); sctx.globalAlpha = clamp(p.life * 2, 0, 1); sctx.translate(p.x, p.y); sctx.rotate(p.rot); sctx.fillStyle = p.col; if (p.h) heartPath(sctx, 0, 0, p.r); else starPath(sctx, 0, 0, p.r, 4); sctx.fill(); sctx.restore(); }
+}
+function cheer(n = 16) {
+  anim.hop = 1; anim.happy = .7;
+  for (let i = 0; i < n; i++) { const a = rnd(0, TAU), sp = rnd(120, 300); sparks.push({ x: SW / 2 + rnd(-60, 60), y: SH * .5 + rnd(-80, 60), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 120, life: rnd(.6, 1.1), r: rnd(5, 10), rot: 0, col: pick(['#ffd54a', '#ff8fb8', '#fff', '#8fd3ff', '#c29bff']), h: Math.random() < .4 }); }
+}
+function walkLimit() { const { k } = charLayout(SW, SH); return Math.max(0, (SW / 2 - 95 * k) / k); }
+let tapN = 0;
+stage.addEventListener('pointerdown', e => {
+  audio();
+  const r = stage.getBoundingClientRect(), { k, ox } = charLayout(SW, SH);
+  const cx = ox + (150 + anim.px) * k, x = e.clientX - r.left;
+  if (Math.abs(x - cx) < 70 * k) {   // おんなのこを タップ → ぴょん／くるりん
+    if (tapN++ % 2) { anim.spin = 1; anim.happy = .9; SFX.magic(); } else { cheer(8); SFX.pop(); }
+    return;
+  }
+  anim.tx = (x - ox) / k - 150;       // ほかの ところ → そこまで あるく
+});
+
+/* ---------- おと ---------- */
+let AC = null;
+function audio() { try { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (e) {} }
+function tone(f, d, { type = 'sine', vol = .1, to = null, delay = 0 } = {}) {
+  if (!meta.sound || !AC) return;
+  const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + d);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g).connect(AC.destination); o.start(t); o.stop(t + d + .03);
+}
+const SFX = {
+  pop() { tone(rnd(600, 800), .09, { to: 1200, vol: .09 }); },
+  wear() { [880, 1175, 1568].forEach((f, i) => tone(f, .14, { type: 'triangle', vol: .07, delay: i * .05 })); },
+  tick() { tone(1200, .04, { vol: .05 }); },
+  nope() { tone(220, .12, { type: 'square', vol: .04 }); },
+  step() { tone(rnd(300, 360), .05, { type: 'triangle', vol: .05, to: 200 }); },
+  shutter() { tone(1800, .05, { type: 'square', vol: .06 }); tone(900, .08, { type: 'square', vol: .06, delay: .07 }); },
+  gift() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, .25, { type: 'triangle', vol: .09, delay: i * .09 })); },
+  magic() { for (let i = 0; i < 7; i++) tone(700 + i * 200, .14, { vol: .05, delay: i * .045 }); },
+};
+
+/* ---------- サムネイル ---------- */
+const VIEW = { hair: [150, 150, 250], top: [150, 252, 130], bottom: [150, 330, 170], dress: [150, 330, 300], shoes: [150, 428, 96], socks: [150, 400, 150], head: [150, 84, 210], face: [150, 148, 110], back: [150, 290, 300], hand: [222, 240, 160] };
+function thumb(cv, catId, it) {
+  const c = cv.getContext('2d'), n = cv.width; c.clearRect(0, 0, n, n);
+  if (catId === 'bg') { drawBg(c, it.id, n, n, 0); return; }
+  const v = VIEW[catId]; if (!v) return;
+  const k = n / v[2]; c.save(); c.translate(n / 2, n / 2); c.scale(k, k); c.translate(-v[0], -v[1]);
+  const cur = S[catId] && S[catId].id === it.id ? S[catId] : null;
+  // いろを もたない アイテム（かおかざり・もちもの）でも こわれないように、かならず いろを きめる
+  const col = (cur && cur.col) || (catId === 'hair' ? S.hair.col : (DEFCOL[it.id] || '#ff8fb8')), pat = cur ? cur.pat : null;
+  const f = fillOf(col, pat), s = shade(col, .72);
+  if (catId === 'hair') { it.back(c, f, s, S); E(c, 150, 132, 60, 56); FS(c, SKIN[S.skin]); hairFront(c, f, s); if (it.front) it.front(c, f, s, S); }
+  else if (catId === 'head') { E(c, 150, 132, 60, 56); FS(c, '#f1e6ee'); it.draw(c, f, s, col, S); }
+  else if (catId === 'face') { it.draw(c); }
+  else if (catId === 'back') { it.draw(c, f, s, col, S); if (it.front) it.front(c, f, s); }
+  else it.draw(c, f, s, col, S);
+  c.restore();
+}
+const DEFCOL = { tee: '#ffa0c0', long: '#5cc8c0', tank: '#ffd54a', hoodie: '#9b7bff', sailor: '#ffffff', frill: '#ff8fd0', skirt: '#5aa9ff', pleats: '#e04545', shorts: '#5aa9ff', pants: '#2f5aa8', tutu: '#ffa0c0', aline: '#ff6f91',
+  sun: '#ffd54a', kimono: '#ff8fd0', princess: '#ffa0c0', fairy: '#8fd96b', idol: '#d48cff', sneaker: '#ff6f91', pumps: '#e04545', boots: '#c9a27a', sandal: '#ff9a5a', rain: '#ffd54a', short: '#ffffff', high: '#ffffff', tights: '#3d3a4d',
+  ribbon: '#ff6f91', band: '#ff8fd0', cat: '#3d3a4d', bunny: '#ffffff', straw: '#f2d28a', beret: '#e04545', flower: '#ff8fb8', tiara: '#ffd54a', witch: '#9b7bff', butterfly: '#d48cff', cape: '#e04545', angel: '#ffffff', ransel: '#e04545' };
+DEFCOL.long = '#5cc8c0';
+
+/* ---------- パネル ---------- */
+function renderTabs() {
+  const box = $('#tabs'); box.innerHTML = '';
+  for (const ct of CATS) {
+    const b = document.createElement('button'); b.className = 'tab' + (ct.id === cat ? ' sel' : '');
+    b.innerHTML = `<span class="emo">${ct.icon}</span><small>${ct.name}</small>`;
+    b.addEventListener('click', () => { audio(); cat = ct.id; SFX.tick(); renderTabs(); renderItems(); renderColors(); });
+    box.appendChild(b);
+  }
+}
+function renderItems() {
+  const box = $('#items'); box.innerHTML = ''; box.scrollTop = 0;
+  const ct = byId(CATS, cat);
+  const add = (cls, inner, on) => { const b = document.createElement('button'); b.className = 'it ' + cls; if (typeof inner === 'string') b.innerHTML = inner; else b.appendChild(inner); b.addEventListener('click', on); box.appendChild(b); return b; };
+  if (cat === 'body') {
+    SKIN.forEach((col, i) => { const cv = document.createElement('canvas'); cv.width = cv.height = 144; const c = cv.getContext('2d'); c.scale(144 / 170, 144 / 170); c.translate(-65, -52);
+      E(c, 150, 132, 60, 56); FS(c, col); drawFace(c, S, {});
+      add(S.skin === i ? 'sel' : '', cv, () => { audio(); S.skin = i; changed(); }); });
+    return;
+  }
+  if (ct.none) add(!S[cat] ? 'sel' : '', '<span class="emo" style="font-size:30px;opacity:.6">🚫</span>', () => { audio(); S[cat] = null; SFX.tick(); changed(false); });
+  for (const it of ct.list) {
+    const selected = cat === 'bg' ? S.bg === it.id : cat === 'dress' ? (S.dress && S.dress.id === it.id) : (cat === 'top' || cat === 'bottom') ? (!S.dress && S[cat].id === it.id) : (S[cat] && S[cat].id === it.id);
+    let inner;
+    if (it.emoji) inner = `<span class="emo">${it.emoji}</span>`;
+    else { inner = document.createElement('canvas'); inner.width = inner.height = 144; thumb(inner, cat, it); }
+    add((selected ? 'sel' : '') + (isLocked(it) ? ' lock' : ''), inner, () => { audio(); choose(it); });
+  }
+}
+function choose(it) {
+  if (isLocked(it)) { SFX.nope(); toast('📷 しゃしんを とると プレゼントが もらえるよ'); return; }
+  if (cat === 'bg') S.bg = it.id;
+  else if (cat === 'hair') S.hair.id = it.id;
+  else if (cat === 'hand' || cat === 'pet' || cat === 'face') S[cat] = { id: it.id };
+  else {
+    const prev = S[cat];
+    S[cat] = { id: it.id, col: prev && prev.id === it.id ? prev.col : (DEFCOL[it.id] || '#ff8fb8'), pat: prev ? prev.pat : 'plain' };
+    if (cat === 'top' || cat === 'bottom') S.dress = null;
+  }
+  changed();
+}
+function changed(celebrate = true) { saveS(); renderItems(); renderColors(); if (celebrate) { cheer(12); SFX.wear(); } }
+function renderColors() {
+  const cb = $('#colors'), pb = $('#pats'); cb.innerHTML = ''; pb.innerHTML = '';
+  const ct = byId(CATS, cat);
+  let list = null, cur = null, set = null;
+  if (cat === 'body') { list = EYEC; cur = S.eye; set = v => S.eye = v; }
+  else if (cat === 'hair') { list = HAIRC; cur = S.hair.col; set = v => S.hair.col = v; }
+  else if (!ct.nocolor) { const o = cat === 'top' || cat === 'bottom' ? (S.dress ? null : S[cat]) : S[cat]; if (o) { list = COLS; cur = o.col; set = v => o.col = v; } }
+  if (list) for (const col of list) {
+    const b = document.createElement('button'); b.className = 'sw' + (col === cur ? ' sel' : ''); b.style.background = col;
+    b.addEventListener('click', () => { audio(); set(col); SFX.tick(); saveS(); renderItems(); renderColors(); anim.hop = Math.max(anim.hop, .5); });
+    cb.appendChild(b);
+  }
+  const o = ct.pat ? (cat === 'top' || cat === 'bottom' ? (S.dress ? null : S[cat]) : S[cat]) : null;
+  if (o) for (const p of PATS) {
+    const b = document.createElement('button'); b.className = 'pt' + ((o.pat || 'plain') === p ? ' sel' : '');
+    const cv = document.createElement('canvas'); cv.width = 92; cv.height = 80; const c = cv.getContext('2d'); c.scale(1.5, 1.5); c.fillStyle = fillOf(o.col, p); c.fillRect(0, 0, 80, 60);
+    b.appendChild(cv);
+    b.addEventListener('click', () => { audio(); o.pat = p; SFX.tick(); saveS(); renderItems(); renderColors(); anim.hop = Math.max(anim.hop, .5); });
+    pb.appendChild(b);
+  }
+}
+
+/* ---------- おまかせ・おだい ---------- */
+function avail(list) { return list.filter(it => !isLocked(it)); }
+function randomize() {
+  const rc = () => pick(COLS), rp = () => Math.random() < .5 ? 'plain' : pick(PATS);
+  S.hair = { id: pick(HAIR).id, col: pick(HAIRC) }; S.eye = pick(EYEC);
+  S.top = { id: pick(avail(TOPS)).id, col: rc(), pat: rp() }; S.bottom = { id: pick(avail(BOTTOMS)).id, col: rc(), pat: rp() };
+  S.dress = Math.random() < .4 ? { id: pick(avail(DRESSES)).id, col: rc(), pat: rp() } : null;
+  S.shoes = { id: pick(SHOES).id, col: rc() };
+  S.socks = Math.random() < .7 ? { id: pick(SOCKS).id, col: Math.random() < .5 ? '#ffffff' : rc(), pat: rp() } : null;
+  S.head = Math.random() < .6 ? (() => { const it = pick(avail(HEADS)); return { id: it.id, col: DEFCOL[it.id] && Math.random() < .5 ? DEFCOL[it.id] : rc() }; })() : null;
+  S.face = Math.random() < .25 ? { id: pick(FACES).id } : null;
+  S.back = Math.random() < .25 ? (() => { const it = pick(avail(BACKS)); return { id: it.id, col: rc() }; })() : null;
+  S.hand = Math.random() < .5 ? { id: pick(HANDS).id } : null;
+  S.pet = Math.random() < .5 ? { id: pick(avail(PETS)).id } : null;
+}
+$('#btnRandom').addEventListener('click', () => { audio(); randomize(); SFX.magic(); saveS(); renderItems(); renderColors(); cheer(24); });
+const THEMES = [['🏖️ うみに おでかけ！', 'beach'], ['🌳 こうえんで あそぼう！', 'park'], ['⛄ ゆきの ひの おしゃれ', 'snow'], ['🌙 よぞらの パーティー', 'night'], ['🏠 おうちで パジャマパーティー', 'room'],
+  ['👑 プリンセスに なろう！', 'castle'], ['🎤 アイドルに なろう！', 'stage'], ['🧚 ようせいに なろう！', 'park'], ['🎒 ようちえんに いこう！', 'park'], ['🎂 おたんじょうび パーティー', 'room']];
+$('#btnTheme').addEventListener('click', () => {
+  audio();
+  const [txt, bg] = pick(THEMES), el = $('#theme');
+  el.textContent = txt; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  const b = byId(BGS, bg); if (!isLocked(b)) S.bg = bg;
+  SFX.magic(); saveS(); if (cat === 'bg') renderItems();
+});
+
+/* ---------- しゃしん・アルバム・プレゼント ---------- */
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 2200); }
+function takePhoto() {
+  const W = 540, H = 720, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#fff'; c.fillRect(0, 0, W, H);
+  c.save(); c.beginPath(); c.rect(24, 24, W - 48, H - 120); c.clip(); c.translate(24, 24);
+  renderScene(c, W - 48, H - 120, anim.t, { hop: 0, happy: 1, px: 0, petPx: 0 });
+  c.restore();
+  const d = new Date();
+  c.fillStyle = '#ff6fa8'; c.font = `900 30px "Hiragino Maru Gothic ProN",sans-serif`; c.textAlign = 'left'; c.textBaseline = 'middle';
+  c.fillText('きょうの コーデ', 34, H - 56);
+  c.fillStyle = '#b9a8c2'; c.font = `700 20px sans-serif`; c.textAlign = 'right'; c.fillText(`${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`, W - 34, H - 54);
+  c.font = `34px ${EMO}`; c.fillStyle = '#000'; c.fillText('💖', W - 150, H - 56);
+  return cv.toDataURL('image/jpeg', .82);
+}
+$('#btnPhoto').addEventListener('click', () => {
+  audio(); SFX.shutter();
+  const f = $('#flash'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
+  const url = takePhoto();
+  album.unshift(url); if (album.length > 12) album.length = 12;
+  while (!store.set('album', album) && album.length > 1) album.pop();
+  $('#photoImg').src = url;
+  setTimeout(() => $('#photoOv').classList.add('open'), 350);
+});
+$('#photoOk').addEventListener('click', () => { $('#photoOv').classList.remove('open'); giveGift(); });
+function giveGift() {
+  const pool = []; for (const ct of CATS) if (ct.list) for (const it of ct.list) if (isLocked(it)) pool.push([ct, it]);
+  if (!pool.length) return;
+  const [ct, it] = pick(pool);
+  meta.unlocked.push(it.id); store.set('meta', meta);
+  const cv = $('#giftCv'), c = cv.getContext('2d'); c.clearRect(0, 0, 200, 200);
+  if (it.emoji) { c.font = `130px ${EMO}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#000'; c.fillText(it.emoji, 100, 108); } else thumb(cv, ct.id, it);
+  $('#giftName').textContent = `${it.name || 'ユニコーン'} を もらったよ！`;
+  $('#giftBox').style.animation = 'none'; void $('#giftBox').offsetWidth; $('#giftBox').style.animation = '';
+  $('#giftWear').onclick = () => { $('#giftOv').classList.remove('open'); cat = ct.id; renderTabs(); choose(it); };
+  SFX.gift(); $('#giftOv').classList.add('open');
+}
+function renderAlbum() {
+  const g = $('#albumGrid'); g.innerHTML = '';
+  $('#albumMsg').innerHTML = album.length ? 'しゃしんを ながおし すると ほぞん できるよ' : 'まだ しゃしんが ないよ。<br>📷 で とってみよう！';
+  for (const u of album) { const im = document.createElement('img'); im.src = u; im.style.webkitTouchCallout = 'default'; g.appendChild(im); }
+  $('#albumClear').style.display = album.length ? '' : 'none';
+}
+$('#btnAlbum').addEventListener('click', () => { audio(); renderAlbum(); $('#albumOv').classList.add('open'); });
+$('#albumClose').addEventListener('click', () => $('#albumOv').classList.remove('open'));
+$('#albumClear').addEventListener('click', () => { if (confirm('アルバムの しゃしんを ぜんぶ けしますか？')) { album = []; store.set('album', album); renderAlbum(); } });
+$('#btnSound').addEventListener('click', () => { meta.sound = !meta.sound; store.set('meta', meta); $('#btnSound').textContent = meta.sound ? '🔊' : '🔇'; audio(); SFX.tick(); });
+$('#btnSound').textContent = meta.sound ? '🔊' : '🔇';
+
+// iPad の ダブルタップ・ピンチ かくだい を とめる
+let lastTouch = 0;
+document.addEventListener('touchend', e => { const t = Date.now(); if (t - lastTouch < 350 && !e.target.closest('button,a,img')) e.preventDefault(); lastTouch = t; }, { passive: false });
+for (const ev of ['gesturestart', 'gesturechange', 'dblclick']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+
+// ほぞんデータの しゅうふく（しらない アイテムは もとに もどす）
+function sane() {
+  const ok = (list, o) => o && byId(list, o.id);
+  if (!ok(HAIR, S.hair)) S.hair = { ...DEF.hair }; if (!ok(TOPS, S.top)) S.top = { ...DEF.top }; if (!ok(BOTTOMS, S.bottom)) S.bottom = { ...DEF.bottom };
+  for (const [k, l] of [['dress', DRESSES], ['shoes', SHOES], ['socks', SOCKS], ['head', HEADS], ['face', FACES], ['back', BACKS], ['hand', HANDS], ['pet', PETS]]) if (S[k] && !ok(l, S[k])) S[k] = null;
+  if (!byId(BGS, S.bg)) S.bg = 'room';
+}
+sane(); resize(); renderTabs(); renderItems(); renderColors();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
