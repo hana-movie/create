@@ -72,6 +72,7 @@
   .g11 { --c: #ff9ac8; --d: #e0609a; --bg: #fff0f7; }
   .g12 { --c: #8fa6f0; --d: #3a4d8f; --bg: #eef2ff; }
   .g13 { --c: #ffb98a; --d: #d9773a; --bg: #fff6e0; }
+  .g14 { --c: #8fd9d0; --d: #2f9e93; --bg: #eefbf8; }
 </style>
 </head>
 <body>
@@ -181,6 +182,14 @@
       <div class="body">
         <div class="name">かいてみよう</div>
         <div class="desc">ひらがなや すうじを ゆびで なぞって かこう！</div>
+        <div class="stars">★☆☆</div>
+      </div>
+    </a>
+    <a class="game g14" href="doctor-game/index.html">
+      <canvas class="thumb" id="th14"></canvas>
+      <div class="body">
+        <div class="name">お医者さん<wbr>ゲーム</div>
+        <div class="desc">どうぶつの かんじゃさんを なおして あげよう！</div>
         <div class="stars">★☆☆</div>
       </div>
     </a>
@@ -764,6 +773,41 @@
       c.fillStyle = col; rr(c, -24, -24, 48, 48, 14); c.fill(); c.font = `800 30px ${FT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#5a3a22'; c.fillText(t, 0, 1); c.restore(); };
     chip(64, 100, 'い', '#8fd9bd', -.15); chip(70, 190, '1', '#ffe27a', .12); chip(336, 96, 'う', '#ffe27a', .15); chip(330, 190, '2', '#8fd9bd', -.1);
     c.font = `26px ${EM}`; c.textAlign = 'center'; c.fillStyle = '#000'; c.fillText('✨', 132, 70); c.fillText('⭐', 286, 224);
+  }
+
+  // 14. お医者さんゲーム
+  {
+    const c = setup('th14');
+    const EM = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#e6fbf7'); bg.addColorStop(1, '#c9efe8');
+    c.fillStyle = bg; c.fillRect(0, 0, W, H);
+    // かべの もよう
+    c.fillStyle = 'rgba(255,255,255,.7)';
+    for (let x = 20; x < W; x += 60) for (let y = 30; y < 160; y += 60) { c.fillRect(x - 3, y - 9, 6, 18); c.fillRect(x - 9, y - 3, 18, 6); }
+    // ベッド
+    c.fillStyle = '#ffffff'; rr(c, 120, 170, 200, 40, 14); c.fill();
+    c.fillStyle = '#8fd9d0'; rr(c, 120, 196, 200, 26, 10); c.fill();
+    c.fillStyle = '#ffd6e2'; rr(c, 128, 150, 70, 30, 14); c.fill();
+    // かんじゃさん（わんこ）
+    c.font = `92px ${EM}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#000';
+    c.fillText('🐶', 172, 128);
+    // ばんそうこう
+    c.save(); c.translate(140, 92); c.rotate(.5);
+    c.fillStyle = '#f6c99a'; rr(c, -18, -7, 36, 14, 7); c.fill();
+    c.fillStyle = '#e9b07a'; c.fillRect(-6, -7, 12, 14); c.restore();
+    // ねつ
+    c.fillStyle = 'rgba(255,90,110,.35)'; c.beginPath(); c.arc(150, 136, 9, 0, Math.PI * 2); c.arc(196, 136, 9, 0, Math.PI * 2); c.fill();
+    // どうぐ
+    c.font = `50px ${EM}`;
+    c.fillText('🩺', 290, 100); c.fillText('🌡️', 82, 104); c.fillText('💊', 264, 160);
+    // ハート
+    c.fillStyle = '#ff6f91';
+    const heart = (x, y, r) => { c.save(); c.translate(x, y); c.beginPath(); c.moveTo(0, r * .35); c.bezierCurveTo(-r * 1.2, -r * .4, -r * .5, -r * 1.2, 0, -r * .45); c.bezierCurveTo(r * .5, -r * 1.2, r * 1.2, -r * .4, 0, r * .35); c.fill(); c.restore(); };
+    heart(236, 70, 14); heart(258, 52, 9); heart(116, 66, 10);
+    // げんきメーター
+    c.fillStyle = '#ffffff'; rr(c, 300, 180, 76, 18, 9); c.fill();
+    const g = c.createLinearGradient(304, 0, 372, 0); g.addColorStop(0, '#ffd23f'); g.addColorStop(1, '#5ccf7a');
+    c.fillStyle = g; rr(c, 304, 184, 50, 10, 5); c.fill();
   }
 })();
 </script>
