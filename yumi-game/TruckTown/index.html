@@ -94,6 +94,20 @@ button.sell:disabled{opacity:.4;cursor:default}
 #tut b{color:#ffd66b}
 #tut div{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11.5px;color:#aab}
 #tut button{border:0;background:#4a505a;color:#fff;border-radius:8px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}
+#modal{position:fixed;inset:0;background:rgba(30,35,30,.45);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+#modal.on{display:flex}
+#modal .box{background:#fffdf6;border-radius:18px;padding:18px 20px;width:min(420px,100%);max-height:90vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.35);font-size:13.5px;line-height:1.6;font-variant-numeric:tabular-nums}
+#modal h3{margin:0 0 8px;font-size:17px}
+#modal .big{font-size:30px;font-weight:800;letter-spacing:.02em}
+#modal .stars{font-size:24px;color:#e0a100;letter-spacing:2px}
+#modal table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+#modal td,#modal th{padding:5px 4px;border-bottom:1px solid #ece7d6;text-align:left;white-space:nowrap}
+#modal th{color:#6b7280;font-weight:600}
+#modal textarea{width:100%;height:84px;font:inherit;font-size:12px;border:1px solid #ddd6c2;border-radius:10px;padding:8px;resize:none;margin-top:8px}
+#modal .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+#modal .btns button{border:0;border-radius:10px;font:inherit;font-weight:700;padding:9px 14px;cursor:pointer;background:#2f6f4f;color:#fff}
+#modal .btns button.sub{background:#e9e4d4;color:#4b4535}
+#modal .chk{color:#6b7280}#modal .chk b{color:#2b2f36}
 #reset{border:0;background:transparent;color:#9a5a4a;font:inherit;font-size:11.5px;cursor:pointer;padding:6px 0;text-decoration:underline}
 @media(max-width:720px){
  #top{left:8px;right:8px;top:8px;gap:6px}
@@ -115,7 +129,7 @@ button.sell:disabled{opacity:.4;cursor:default}
   <div class="chip dd" id="spdDD"><button class="ddb" id="spdBtn" title="速度（スペースキーで一時停止）">▶ 1×</button>
     <div class="ddm" id="speed"><button data-s="0">⏸ 一時停止</button><button data-s="1" class="on">1×</button><button data-s="2">2×</button><button data-s="4">4×</button><button data-s="8">8×</button><button data-s="16">16×</button></div></div>
   <div class="chip dd" id="viewDD"><button class="ddb" id="viewBtn" title="表示と音">☰</button>
-    <div class="ddm" id="view"><button data-v="in">＋ 拡大</button><button data-v="out">－ 縮小</button><button data-v="fit">全体を表示</button><button data-v="jam" class="on">渋滞を表示</button><button data-v="snd" id="snd">🔊 音あり</button></div></div>
+    <div class="ddm" id="view"><button data-v="in">＋ 拡大</button><button data-v="out">－ 縮小</button><button data-v="fit">全体を表示</button><button data-v="jam" class="on">渋滞を表示</button><button data-v="snd" id="snd">🔊 音あり</button><button data-v="rec">🏆 記録</button><button data-v="seed">🔢 町の番号</button></div></div>
 </div>
 <div id="panel">
   <div id="goalWrap"><div id="goal"></div><button id="move" class="buy" style="display:none"></button></div>
@@ -131,6 +145,7 @@ button.sell:disabled{opacity:.4;cursor:default}
 </div>
 <div id="side"><div id="con" style="display:none"></div><div id="evs"></div></div>
 <div id="tut"></div>
+<div id="modal"><div class="box"></div></div>
 <div id="menu"></div>
 <div id="toast"></div>
 <script>
@@ -205,7 +220,11 @@ function bez(p0,d0,p3,d3,n){
 
 /* ================= world generation ================= */
 let W=null,G=null,trucks=[],tid=0;
-let notify=()=>{},fx=()=>{}; // set by the UI (messages, sounds); the simulation core must not touch the page directly
+// in-game randomness (orders, events) comes from the town's number, so the same number plays out the same for everyone
+function grand(){let t=(G.rs=(G.rs+0x6D2B79F5)>>>0);t=Math.imul(t^t>>>15,1|t);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}
+// the next town of a run also follows from the current one, so a whole run can be replayed from its first number
+const nextSeed=(seed,lv)=>(mulberry32((seed^Math.imul(lv+1,0x9E3779B1))>>>0)()*1e9)|0;
+let notify=()=>{},fx=()=>{},onClear=()=>{}; // set by the UI (messages, sounds); the simulation core must not touch the page directly
 function genWorld(seed,lv){
   const rnd=mulberry32(seed);laneSeq=0;lv=lv|0;
   const COLS=7+Math.min(lv,3),ROWS=5+Math.min(lv>>1,2),SP=125,nodes=[]; // later towns are bigger
@@ -700,7 +719,7 @@ function updContract(){
   if(G.time<G.conNext)return;
   const rs=W.routes.filter(r=>UNLOCK[r.chain]<=G.delivered&&r.trucks>0);
   if(rs.length<2||G.delivered<40){G.conNext=G.time+30;return;}
-  const r=rs[Math.floor(Math.random()*rs.length)];while(r.log.length&&r.log[0]<G.time-120)r.log.shift();
+  const r=rs[Math.floor(grand()*rs.length)];while(r.log.length&&r.log[0]<G.time-120)r.log.shift();
   const need=Math.max(5,Math.ceil(r.log.length*1.5*1.1));
   G.offer={r:r.i,need,got:0,tOffer:G.time+30,reward:need*payOf(r)*1.5};
   notify('特別注文の依頼: '+r.src.name+'→'+r.dst.name+' を3分で'+need+'回');fx('order');
@@ -716,7 +735,7 @@ function busyEdges(){
   return out;
 }
 function startEvent(type){
-  const pick=a=>a[Math.floor(Math.random()*a.length)];
+  const pick=a=>a[Math.floor(grand()*a.length)];
   if(type==='works'){
     const es=busyEdges();if(!es.length)return false;const e=pick(es);e.works=G.time+180;
     G.ev.push({type,e,tEnd:e.works});notify('🚧 道路工事が始まりました（3分間 徐行）');return true;
@@ -725,7 +744,7 @@ function startEvent(type){
     const ls=W.links.filter(L=>L.len>45&&!L.block&&L.from.type!=='lot'&&L.to.type!=='lot'&&L.vehicles.length);if(!ls.length)return false;
     const L=pick(ls);
     // place the wreck in a stretch of the lane that is clear right now
-    let bs=-1;for(let t=0;t<12;t++){const x=14+Math.random()*(L.len-24);if(!L.vehicles.some(u=>u.s>x-11&&u.s-u.len<x+2)){bs=x;break;}}
+    let bs=-1;for(let t=0;t<12;t++){const x=14+grand()*(L.len-24);if(!L.vehicles.some(u=>u.s>x-11&&u.s-u.len<x+2)){bs=x;break;}}
     if(bs<0)return false;
     L.block={s:bs,len:8};const ev={type,L,tEnd:G.time+90,cost:Math.max(80,Math.round(incRate()*0.4/10)*10)};G.ev.push(ev);
     notify('💥 事故で車線がふさがりました（90秒）');fx('tow');return true;
@@ -748,8 +767,15 @@ function updEvents(){
   for(const ev of G.ev)if(G.time>=ev.tEnd)endEvent(ev);
   G.ev=G.ev.filter(ev=>G.time<ev.tEnd);
   if(G.delivered<60||G.time<G.evNext)return;
-  const r=Math.random(),type=r<0.35?'works':r<0.7?'crash':r<0.85?'fuel':'boom';
-  startEvent(type);G.evNext=G.time+EV_GAP[0]+Math.random()*(EV_GAP[1]-EV_GAP[0]);
+  const r=grand(),type=r<0.35?'works':r<0.7?'crash':r<0.85?'fuel':'boom';
+  startEvent(type);G.evNext=G.time+EV_GAP[0]+grand()*(EV_GAP[1]-EV_GAP[0]);
+}
+// result of a town: game time until the move-on conditions were first met, and how it was done
+function clearResult(){
+  const rb=G.rbMax,mult=1+(rb===0?0.3:rb<=3?0.15:rb<=6?0.05:0)+(G.tows===0?0.1:0)+(G.navUsed?0:0.1);
+  const score=Math.round(1e7/Math.max(60,G.clearT)*mult*(1+0.2*G.lv));
+  const stars=1+(G.tows<=5?1:0)+(rb<=3&&G.tows<=1?1:0);
+  return {seed:W.seed,run:G.runSeed,lv:G.lv,fame:G.fame,time:Math.round(G.clearT),score,stars,rb,tows:G.tows,nav:!!G.navUsed,trucks:trucks.length,date:new Date().toISOString().slice(0,10)};
 }
 const nJ=k=>W.nodes.filter(n=>n.type==='junction'&&n.ctrl.kind===k).length;
 const ACH=[
@@ -1008,7 +1034,8 @@ function step(dt){
   G.upk=upkeep().all;{const floor=-Math.max(100,G.upk*2);if(G.money>floor)G.money=Math.max(floor,G.money-G.upk*dt/60);}
   updContract();
   updEvents();
-  if(G.tick%30===0)growTown();
+  if(G.tick%30===0){growTown();G.rbMax=Math.max(G.rbMax,nRound(null));if(G.up.nav)G.navUsed=true;
+    if(!G.cleared&&canMoveNow()){G.cleared=true;G.clearT=G.time;onClear(clearResult());}}
   for(const b of W.bld)updBuilding(b,dt);
   for(const L of W.links){
     if(!L.spawnQ.length)continue;
@@ -1062,10 +1089,11 @@ const upCost=u=>Math.round(u.base*Math.pow(u.mul,G.up[u.k]));
 function newGame(seed,sv,carry){
   trucks=[];tid=0;
   G={money:60,delivered:0,tows:0,time:1,up:{eng:0,cap:0,load:0,meter:0,nav:0},navCount:0,meterOn:true,inc:[],speed:1,lcCount:0,wrong:0,tick:0,
-     fame:0,lv:0,done:{},upk:0,pfl:[],navOn:true,offer:null,ev:[],evNext:300,fuel:1,con:null,conNext:240,conDone:0,lastTow:0,tut:0,mute:false};
+     runSeed:seed,fame:0,lv:0,done:{},upk:0,pfl:[],rbMax:0,navUsed:false,cleared:false,clearT:0,navOn:true,offer:null,ev:[],evNext:300,fuel:1,con:null,conNext:240,conDone:0,lastTow:0,tut:0,mute:false};
   if(carry)Object.assign(G,carry);
-  if(sv){G.navOn=sv.navOn!==false;G.fame=sv.fame|0;G.lv=sv.lv|0;G.done=sv.done||{};G.conDone=sv.conDone|0;G.tut=sv.tut===undefined?99:sv.tut;G.mute=!!sv.mute;}
+  if(sv){G.runSeed=typeof sv.runSeed==='number'?sv.runSeed:(sv.lv?null:sv.seed);G.time=Math.max(1,+sv.time||1);G.rbMax=sv.rbMax|0;G.navUsed=!!sv.navUsed;G.cleared=!!sv.cleared;G.clearT=+sv.clearT||0;G.tows=sv.tows|0;G.navOn=sv.navOn!==false;G.fame=sv.fame|0;G.lv=sv.lv|0;G.done=sv.done||{};G.conDone=sv.conDone|0;G.tut=sv.tut===undefined?99:sv.tut;G.mute=!!sv.mute;}
   else G.money=60+300*G.fame;
+  G.rs=(seed^Math.imul(G.lv+1,0x85EBCA6B)^0x2545F491)>>>0;if(sv&&typeof sv.rs==='number')G.rs=sv.rs>>>0;
   genWorld(seed,G.lv);
   if(sv){
     G.money=sv.money;G.delivered=sv.delivered;G.tows=sv.tows||0;Object.assign(G.up,sv.up||{});G.meterOn=sv.meterOn!==false;
@@ -1088,12 +1116,12 @@ function newGame(seed,sv,carry){
 }
 function save(){
   if(HEADLESS)return;
-  try{localStorage.setItem(KEY,JSON.stringify({seed:W.seed,navOn:G.navOn,fame:G.fame,lv:G.lv,done:G.done,conDone:G.conDone,tut:G.tut,mute:G.mute,money:G.money,delivered:G.delivered,tows:G.tows,up:G.up,meterOn:G.meterOn,nr:W.nodes.filter(n=>n.noRight).map(n=>n.id),rt:W.routes.map(r=>r.trucks),stock:W.bld.map(b=>b.stock),bays:W.bld.map(b=>b.bays),bought:W.bought,ops:W.ops,wide:W.edges.map((e,i)=>e.lanes>1?i:-1).filter(i=>i>=0),ow:W.edges.map((e,i)=>e.ow?[i,e.ow]:null).filter(x=>x),
+  try{localStorage.setItem(KEY,JSON.stringify({seed:W.seed,runSeed:G.runSeed,rs:G.rs,time:Math.round(G.time),rbMax:G.rbMax,navUsed:G.navUsed,cleared:G.cleared,clearT:G.clearT,navOn:G.navOn,fame:G.fame,lv:G.lv,done:G.done,conDone:G.conDone,tut:G.tut,mute:G.mute,money:G.money,delivered:G.delivered,tows:G.tows,up:G.up,meterOn:G.meterOn,nr:W.nodes.filter(n=>n.noRight).map(n=>n.id),rt:W.routes.map(r=>r.trucks),stock:W.bld.map(b=>b.stock),bays:W.bld.map(b=>b.bays),bought:W.bought,ops:W.ops,wide:W.edges.map((e,i)=>e.lanes>1?i:-1).filter(i=>i>=0),ow:W.edges.map((e,i)=>e.ow?[i,e.ow]:null).filter(x=>x),
     ctrl:W.nodes.filter(n=>n.type==='junction'&&n.ctrl.kind!=='none').map(n=>[n.id,n.ctrl.kind,n.ctrl.axis])}));}catch(e){}
 }
 
 if(HEADLESS){
-  module.exports={onTimeRate,canMoveNow,moveProfit,avgProfit,routeProfit,waitingFor,ctrlCost,startEvent,acceptOffer,declineOffer,sellTruck,upkeep,truckUpk,netRate,incRate,growTown,EXTRA,checkAch,ACH,moveAt,newGame,step,addTruck,setCtrl,widen,setOneWay,canOneWay,canNoRight,buildRoad,lanePt,DT,get W(){return W},get G(){return G},get trucks(){return trucks}};
+  module.exports={nextSeed,grand,clearResult,onTimeRate,canMoveNow,moveProfit,avgProfit,routeProfit,waitingFor,ctrlCost,startEvent,acceptOffer,declineOffer,sellTruck,upkeep,truckUpk,netRate,incRate,growTown,EXTRA,checkAch,ACH,moveAt,newGame,step,addTruck,setCtrl,widen,setOneWay,canOneWay,canNoRight,buildRoad,lanePt,DT,get W(){return W},get G(){return G},get trucks(){return trucks}};
 }else{
 /* ================= rendering ================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
@@ -1336,6 +1364,68 @@ $('deliv').textContent=fmt(G.delivered);
   else tu.style.display='none';
 }
 let unl=-1,moveArm=0;
+/* ---------- records (this browser only) and sharing ---------- */
+const RKEY='jiwajiwa-records-v1';
+const loadRecs=()=>{try{return JSON.parse(localStorage.getItem(RKEY)||'[]');}catch(e){return [];}};
+const saveRecs=a=>{try{localStorage.setItem(RKEY,JSON.stringify(a.slice(-100)));}catch(e){}};
+const tFmt=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=Math.floor(t%60);return (h?h+'時間':'')+m+'分'+String(s).padStart(2,'0')+'秒';};
+const starStr=n=>'★'.repeat(n)+'☆'.repeat(3-n);
+const shareURL=r=>{const u=location.protocol==='file:'?'':location.origin+location.pathname;return u?u+'?town='+r.seed+'&lv='+r.lv:'';};
+function shareText(r){
+  const u=shareURL(r);
+  return 'じわじわ渋滞タウン 町Lv'+(r.lv+1)+' クリア '+starStr(r.stars)+'\n'+
+    '⏱ '+tFmt(r.time)+'（ゲーム内時間） 🏅 '+r.score.toLocaleString('ja-JP')+'点\n'+
+    '🔄 ラウンドアバウト最大'+r.rb+'基 ・ 🚨 レッカー'+r.tows+'回'+(r.nav?' ・ 📡 交通情報あり':'')+'\n🔢 町の番号 '+r.seed+(r.lv?'（Lv'+(r.lv+1)+'）':'')+(u?'\n同じ町で遊ぶ: '+u:'');
+}
+function copyText(t,btn){
+  const done=()=>{btn.textContent='コピーしました';fx('click');};
+  const fallback=()=>{const ta=$('modal').querySelector('textarea');if(ta){ta.focus();ta.select();try{document.execCommand('copy');done();}catch(e){btn.textContent='上の文を選んでコピーしてください';}}};
+  try{if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(t).then(done,fallback);else fallback();}catch(e){fallback();}
+}
+function modal(html,wire){const m=$('modal');m.querySelector('.box').innerHTML=html;m.classList.add('on');if(wire)wire(m);}
+function closeModal(){$('modal').classList.remove('on');}
+$('modal').addEventListener('click',e=>{if(e.target.id==='modal'||e.target.dataset.close!==undefined)closeModal();});
+function showResult(r,isNew){
+  const recs=loadRecs().filter(x=>x.lv===r.lv),best=recs.reduce((a,x)=>Math.max(a,x.score),0),txt=shareText(r);
+  modal('<h3>'+(isNew?'🎉 町Lv'+(r.lv+1)+' クリア！':'町Lv'+(r.lv+1)+' の記録')+'</h3>'+
+    '<div class="stars">'+starStr(r.stars)+'</div><div class="big">'+tFmt(r.time)+'</div><div>ゲーム内の時間で数えています（倍速でも同じ）</div>'+
+    '<table><tr><th>スコア</th><td><b>'+r.score.toLocaleString('ja-JP')+'点</b>'+(best&&r.score>=best?' 🏆 自己ベスト':best?'（ベスト '+best.toLocaleString('ja-JP')+'点）':'')+'</td></tr>'+
+    '<tr><th>ラウンドアバウト</th><td>最大 '+r.rb+'基'+(r.rb===0?'（+30%）':r.rb<=3?'（+15%）':r.rb<=6?'（+5%）':'')+'</td></tr>'+
+    '<tr><th>レッカー</th><td>'+r.tows+'回'+(r.tows===0?'（+10%）':'')+'</td></tr>'+
+    '<tr><th>交通情報</th><td>'+(r.nav?'使った':'使わなかった（+10%）')+'</td></tr><tr><th>トラック</th><td>'+r.trucks+'台</td></tr></table>'+
+    '<div class="chk">★2 レッカー5回以下 ・ ★3 さらにラウンドアバウト3基以下かつレッカー1回以下</div>'+
+    '<textarea readonly>'+txt.replace(/</g,'&lt;')+'</textarea>'+
+    '<div class="btns"><button data-copy>結果をコピー</button><button class="sub" data-close>続ける</button></div>',
+    m=>{m.querySelector('[data-copy]').onclick=e=>copyText(txt,e.target);});
+}
+// start a new run on a given town number (same as a fresh start: goals and their bonuses begin again, records are kept)
+function startRun(seed,lv){newGame(seed,null,{runSeed:lv?null:seed,fame:lv,lv,tut:G.tut,mute:G.mute});buildPanel();fit();refresh();save();speedUI();}
+function showSeed(){
+  const r={seed:W.seed,lv:G.lv},u=shareURL(r);
+  modal('<h3>🔢 町の番号</h3><div>この町の番号は <b style="font-size:20px">'+W.seed+'</b>'+(G.lv?'（町Lv'+(G.lv+1)+'）':'')+'</div>'+
+    '<div class="chk">同じ番号なら、町の形も、特別注文や出来事の起こり方も同じになります。引っ越し先の町も番号から決まるので、最初の番号が同じなら全員が同じ町を順にたどります。'+(G.runSeed!==null&&G.runSeed!==undefined&&G.lv?'<br>この挑戦の最初の番号：<b>'+G.runSeed+'</b>':'')+'</div>'+
+    (u?'<textarea readonly style="height:44px">'+u+'</textarea>':'')+
+    '<div class="btns">'+(u?'<button data-copyu>リンクをコピー</button>':'')+'</div>'+
+    '<h3 style="margin-top:14px">番号を指定して始める</h3><div style="display:flex;gap:8px"><input id="seedIn" inputmode="numeric" placeholder="例: 12345" style="flex:1;font:inherit;padding:8px 10px;border:1px solid #ddd6c2;border-radius:10px"><button id="seedGo" style="border:0;border-radius:10px;background:#2f6f4f;color:#fff;font:inherit;font-weight:700;padding:0 14px;cursor:pointer">町Lv1から始める</button></div>'+
+    '<div class="chk" id="seedMsg">今の町の進行は消えます。名声と目標はリセットされ、記録は残ります。</div>'+
+    '<div class="btns"><button class="sub" data-close>閉じる</button></div>',
+    m=>{const cu=m.querySelector('[data-copyu]');if(cu)cu.onclick=e=>copyText(u,e.target);
+        let arm=0;m.querySelector('#seedGo').onclick=e=>{const v=m.querySelector('#seedIn').value.trim();
+          if(!/^\d{1,9}$/.test(v)){m.querySelector('#seedMsg').textContent='1〜9桁の数字を入れてください。';return;}
+          if(Date.now()-arm>4000){arm=Date.now();e.target.textContent='本当に始める？';return;}
+          startRun(+v,0);closeModal();toast('町 '+v+' で始めました');};});
+}
+onClear=r=>{const a=loadRecs();a.push(r);saveRecs(a);save();fx('win');showResult(r,true);};
+function showRecords(){
+  const a=loadRecs();
+  const rows=a.slice().reverse().map((r,i)=>'<tr><td>'+r.date.slice(5)+'</td><td>Lv'+(r.lv+1)+'</td><td>'+starStr(r.stars)+'</td><td>'+tFmt(r.time)+'</td><td><b>'+r.score.toLocaleString('ja-JP')+'</b></td><td><button data-i="'+(a.length-1-i)+'" style="border:0;background:#e9e4d4;border-radius:8px;padding:3px 8px;cursor:pointer">共有</button></td></tr>').join('');
+  const bestBy={};for(const r of a)if(!bestBy[r.lv]||r.score>bestBy[r.lv].score)bestBy[r.lv]=r;
+  const best=Object.keys(bestBy).sort((x,y)=>x-y).map(lv=>'Lv'+(+lv+1)+' '+bestBy[lv].score.toLocaleString('ja-JP')+'点 '+starStr(bestBy[lv].stars)).join('　');
+  modal('<h3>🏆 記録</h3>'+(a.length?'<div class="chk">町ごとの自己ベスト：<b>'+best+'</b></div><table><tr><th>日付</th><th>町</th><th>評価</th><th>時間</th><th>スコア</th><th></th></tr>'+rows+'</table>':'<div>まだ記録がありません。引っ越しの条件を初めて満たした時点で記録されます。</div>')+
+    (G.cleared?'':'<div class="chk" style="margin-top:8px">この町：'+tFmt(G.time)+' 経過・まだ条件未達成</div>')+
+    '<div class="btns"><button class="sub" data-close>閉じる</button></div>',
+    m=>{for(const b of m.querySelectorAll('[data-i]'))b.onclick=()=>showResult(a[+b.dataset.i],false);});
+}
 $('con').addEventListener('click',e=>{const k=e.target.dataset.o;if(!k)return;if(k==='yes'){acceptOffer();fx('buy');}else{declineOffer();fx('click');}refresh();});
 $('evs').addEventListener('click',e=>{const i=e.target.dataset.ev;if(i===undefined)return;const ev=G.ev[+i];if(ev&&ev.type==='crash'&&clearCrash(ev)){fx('build');notify('事故を片付けました');refresh();}});
 const TUT=[
@@ -1350,7 +1440,7 @@ const TUT=[
 ];
 $('tut').addEventListener('click',e=>{const t=e.target.dataset.t;if(!t)return;G.tut=t==='skip'?TUT.length:G.tut+1;fx('click');save();refresh();});
 $('move').onclick=()=>{
-  if(Date.now()-moveArm<4000){moveArm=0;newGame((Math.random()*1e9)|0,null,{fame:G.fame+1,lv:G.lv+1,done:G.done,conDone:G.conDone,tut:G.tut,mute:G.mute});buildPanel();fit();refresh();save();fx('win');toast('新しい町に着きました。報酬 +25%');speedUI();}
+  if(Date.now()-moveArm<4000){moveArm=0;newGame(nextSeed(W.seed,G.lv),null,{runSeed:G.runSeed,fame:G.fame+1,lv:G.lv+1,done:G.done,conDone:G.conDone,tut:G.tut,mute:G.mute});buildPanel();fit();refresh();save();fx('win');toast('新しい町に着きました。報酬 +25%');speedUI();}
   else{moveArm=Date.now();$('move').textContent='本当に引っ越す？ この町は手放します（もう一度押す）';}
 };
 /* ---------- sound (synthesised, no audio files) ---------- */
@@ -1478,6 +1568,8 @@ window.addEventListener('keydown',e=>{
 });
 $('view').addEventListener('click',e=>{const v=e.target.dataset.v;if(!v)return;if(v==='jam'){showJam=!showJam;e.target.classList.toggle('on',showJam);return;}
   if(v==='snd'){G.mute=!G.mute;e.target.textContent=G.mute?'🔇 音なし':'🔊 音あり';save();fx('click');return;}
+  if(v==='rec'){$('viewDD').classList.remove('open');showRecords();return;}
+  if(v==='seed'){$('viewDD').classList.remove('open');showSeed();return;}
   if(v==='in')cam.z=clampZ(cam.z*1.3);else if(v==='out')cam.z=clampZ(cam.z/1.3);else fit();hideMenu();});
 cv.addEventListener('wheel',e=>{e.preventDefault();const w=toWorld(e.clientX,e.clientY),z=Math.max(0.3,Math.min(8,cam.z*Math.exp(-e.deltaY*0.0015)));cam.z=z;cam.x=w[0]-(e.clientX-cw/2)/z;cam.y=w[1]-(e.clientY-ch/2)/z;hideMenu();},{passive:false});
 function speedUI(){for(const b of $('speed').children)b.classList.toggle('on',+b.dataset.s===G.speed);$('spdBtn').textContent=G.speed?'▶ '+G.speed+'×':'⏸ 停止中';$('spdBtn').parentNode.classList.toggle('red',!G.speed);}
@@ -1495,8 +1587,16 @@ window.addEventListener('resize',()=>{resize();});
 
 /* ================= boot ================= */
 let sv=null;try{sv=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
+const QS=new URLSearchParams(location.search),qTown=QS.get('town'),qLv=Math.max(0,Math.min(9,parseInt(QS.get('lv')||'0',10)||0));
 try{if(sv&&typeof sv.seed==='number')newGame(sv.seed,sv);else newGame((Math.random()*1e9)|0);}catch(e){newGame((Math.random()*1e9)|0);}
 resize();fit();buildPanel();refresh();
+if(qTown!==null&&/^\d{1,10}$/.test(qTown)){
+  const seed=+qTown,clean=()=>{try{history.replaceState(null,'',location.pathname);}catch(e){}};
+  if(sv&&sv.seed===seed&&(sv.lv|0)===qLv)clean();
+  else modal('<h3>共有された町で遊びますか？</h3><div>町Lv'+(qLv+1)+'（番号 '+seed+'）を最初から始めます。'+(sv?'<br><b>今遊んでいる町の進行は消えます。</b>名声と目標はリセットされ、記録は残ります。':'')+'</div><div class="btns"><button data-go>この町で遊ぶ</button><button class="sub" data-close>今の町を続ける</button></div>',
+    m=>{m.querySelector('[data-go]').onclick=()=>{startRun(seed,qLv);closeModal();clean();};
+        m.querySelector('[data-close]').addEventListener('click',clean);});
+}
 let lastT=performance.now(),acc=0,uiT=0,saveT=0;
 function frame(t){
   requestAnimationFrame(frame); // scheduled first so one bad frame can never stop the game
