@@ -228,7 +228,7 @@ let W=null,G=null,trucks=[],tid=0;
 function grand(){let t=(G.rs=(G.rs+0x6D2B79F5)>>>0);t=Math.imul(t^t>>>15,1|t);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}
 // the next town of a run also follows from the current one, so a whole run can be replayed from its first number
 const nextSeed=(seed,lv)=>(mulberry32((seed^Math.imul(lv+1,0x9E3779B1))>>>0)()*1e9)|0;
-let notify=()=>{},fx=()=>{},onClear=()=>{}; // set by the UI (messages, sounds); the simulation core must not touch the page directly
+let notify=()=>{},fx=()=>{},onClear=()=>{},onPay=()=>{}; // set by the UI (messages, sounds); the simulation core must not touch the page directly
 function genWorld(seed,lv){
   const rnd=mulberry32(seed);laneSeq=0;lv=lv|0;
   const COLS=7+Math.min(lv,3),ROWS=5+Math.min(lv>>1,2),SP=125,nodes=[]; // later towns are bigger
@@ -866,7 +866,7 @@ function updBuilding(b,dt){
     if(busy>=b.bays){keep.push(v);continue;}
     if(v.t>0){busy++;v.t-=dt*(1+0.3*G.up.load);if(v.t>0){keep.push(v);continue;}}
     const r=v.route;
-    if(v.task==='unload'){const pf=onTime(r,v.trip);v.trip=0;r.pf=(r.pf===undefined?1:r.pf)*0.85+pf*0.15;const amt=payOf(r)*pf;earn(amt);G.pfl.push([G.time,pf]);if(G.pfl.length>2000)G.pfl.shift();r.earn.push([G.time,amt]);if(r.earn.length>300)r.earn.shift();G.delivered++;r.done++;r.log.push(G.time);if(r.log.length>400)r.log.shift();if(G.con&&G.con.r===r.i)G.con.got++;fx('deliver');if(b.mix){b.mat[r.src.key]=Math.min(99,(b.mat[r.src.key]||0)+1);}else if(b.fac)b.stock++;if(r.src.mix)G.made.push(G.time);v.cargo=0;v.dest=r.src;}
+    if(v.task==='unload'){const pf=onTime(r,v.trip);v.trip=0;r.pf=(r.pf===undefined?1:r.pf)*0.85+pf*0.15;const amt=payOf(r)*pf;earn(amt);onPay(b,amt);G.pfl.push([G.time,pf]);if(G.pfl.length>2000)G.pfl.shift();r.earn.push([G.time,amt]);if(r.earn.length>300)r.earn.shift();G.delivered++;r.done++;r.log.push(G.time);if(r.log.length>400)r.log.shift();if(G.con&&G.con.r===r.i)G.con.got++;fx('deliver');if(b.mix){b.mat[r.src.key]=Math.min(99,(b.mat[r.src.key]||0)+1);}else if(b.fac)b.stock++;if(r.src.mix)G.made.push(G.time);v.cargo=0;v.dest=r.src;}
     else if(b!==r.src)v.dest=r.src;
     else{
       if(b.mix){if(b.mix.some(k=>b.mat[k]<1)){keep.push(v);continue;}for(const k of b.mix)b.mat[k]--;}
@@ -1172,7 +1172,7 @@ if(HEADLESS){
 }else{
 /* ================= rendering ================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
-const cam={x:0,y:0,z:1};let cw=0,ch=0,sel=null,selE=null,selC=null,showJam=true;
+const cam={x:0,y:0,z:1};let cw=0,ch=0,sel=null,selE=null,selC=null,showJam=true,pops=[];
 function resize(){const d=window.devicePixelRatio||1;cw=window.innerWidth;ch=window.innerHeight;cv.width=cw*d;cv.height=ch*d;}
 function fit(){
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const n of W.nodes){x0=Math.min(x0,n.x);y0=Math.min(y0,n.y);x1=Math.max(x1,n.x);y1=Math.max(y1,n.y);}
@@ -1296,28 +1296,64 @@ function draw(){
     ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,TAU);ctx.fill();ctx.stroke();ctx.setLineDash([]);
     ctx.font='bold 9px system-ui,sans-serif';ctx.fillStyle='rgba(190,90,10,.95)';ctx.textAlign='center';ctx.fillText('⚠ 密集地帯',cx,cy-ry-5);
   }
-  // buildings
+  // facilities: a yard with parking bays (trucks inside) and the goods in stock, like a depot seen from above
   ctx.textAlign='center';ctx.textBaseline='middle';
+  const MATC={mill:'#f1dfae',dairy:'#f5cf3a'};
   for(const b of W.bld){
     const r=W.routes.find(x=>x.src===b||x.dst===b),locked=r&&UNLOCK[r.chain]>G.delivered;
     ctx.globalAlpha=locked?0.35:1;
-    ctx.fillStyle='rgba(0,0,0,.18)';rr(b.node.x-17,b.node.y-15,36,36,7);ctx.fill();
-    ctx.fillStyle=b.col;rr(b.node.x-18,b.node.y-18,36,36,7);ctx.fill();
-    ctx.strokeStyle=b.yard?'#2f6f4f':'#fffdf6';ctx.lineWidth=b.yard?2.6:1.6;ctx.stroke();
-    if(b.yard){ctx.fillStyle='#2f6f4f';ctx.beginPath();ctx.arc(b.node.x-17,b.node.y-17,6,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 7px system-ui';ctx.fillText('P',b.node.x-17,b.node.y-16.6);}
-    ctx.font='17px sans-serif';ctx.fillStyle='#000';ctx.fillText(b.icon,b.node.x,b.node.y-2);
-    ctx.font='bold 8px system-ui,sans-serif';ctx.fillStyle='#fff';
-    ctx.fillText(b.mix?b.name:b.name+(b.fac?' 在庫'+b.stock:''),b.node.x,b.node.y+12.5);
-    if(b.mix){const t=b.mix.map(k=>MAT_NAME[k]+b.mat[k]).join(' ');ctx.fillStyle='rgba(43,47,54,.85)';const w=ctx.measureText(t).width+8;rr(b.node.x-w/2,b.node.y+19,w,11,4);ctx.fill();ctx.fillStyle=b.mix.some(k=>b.mat[k]<1)?'#ffb4a8':'#fff';ctx.fillText(t,b.node.x,b.node.y+24.8);}
-    if(b.inside.length){ctx.fillStyle='#2b2f36';ctx.beginPath();ctx.arc(b.node.x+17,b.node.y-17,6.5,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 7.5px system-ui';ctx.fillText(b.inside.length,b.node.x+17,b.node.y-16.6);}
+    const a=Math.atan2(b.node.y-b.grid.y,b.node.x-b.grid.x),ca=Math.cos(a),sa=Math.sin(a);
+    const P=(x,y)=>[b.node.x+x*ca-y*sa,b.node.y+x*sa+y*ca];
+    ctx.save();ctx.translate(b.node.x,b.node.y);ctx.rotate(a);
+    // pad
+    ctx.fillStyle='rgba(0,0,0,.16)';rr(-19,-21,51,45,6);ctx.fill();
+    ctx.fillStyle='#ece6d6';rr(-20,-22,50,44,6);ctx.fill();
+    ctx.strokeStyle=b.yard?'#2f6f4f':b.col;ctx.lineWidth=b.yard?2.4:1.4;ctx.stroke();
+    // parking bays (2 rows x 3) near the gate, then the building and the stock area further in
+    ctx.strokeStyle='rgba(255,255,255,.95)';ctx.lineWidth=0.8;
+    for(let row=0;row<2;row++)for(let k=0;k<3;k++)ctx.strokeRect(-18.5+row*13,-18.5+k*13,12,11);
+    ctx.strokeStyle='rgba(0,0,0,.12)';ctx.lineWidth=0.6;ctx.strokeRect(9,1.5,19,19); // goods area
+    b.inside.slice(0,6).forEach((v,q)=>{const row=(q/3)|0,k=q%3,x=-12.5+row*13,y=-13+k*13;
+      ctx.fillStyle=v.route.color;rr(x-4.2,y-1.9,8.4,3.8,0.9);ctx.fill();ctx.fillStyle='#2b2f36';rr(x+2,y-1.9,2.2,3.8,0.7);ctx.fill();
+      if(v.cargo){ctx.fillStyle='rgba(255,255,255,.85)';ctx.fillRect(x-3.6,y-1.2,4.4,2.4);}});
+    ctx.fillStyle=b.col;rr(9,-20,19,19,4);ctx.fill();
+    // goods: factories show what is in stock, the bakery its two materials, producers a full stack
+    const crate=(x,y,c)=>{ctx.fillStyle=c;ctx.fillRect(x,y,3.6,3.6);ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=0.4;ctx.strokeRect(x,y,3.6,3.6);};
+    if(b.mix){
+      b.mix.forEach((k,h)=>{const n=Math.min(8,b.mat[k]),x0=9.5+h*10;
+        for(let q=0;q<n;q++)crate(x0+(q%2)*4.3,19-((q/2)|0)*4.3-3.6,MATC[k]||'#ddd');
+        if(b.mat[k]<1){ctx.setLineDash([1.5,1.5]);ctx.strokeStyle='#d0392b';ctx.lineWidth=0.8;ctx.strokeRect(x0-0.5,2,9.6,17.5);ctx.setLineDash([]);}});
+    }else{
+      const isSrc=W.routes.some(x=>x.src===b),n=b.fac?Math.min(16,b.stock):isSrc?10:0;
+      for(let q=0;q<n;q++)crate(9.5+(q%4)*4.6,18.5-((q/4)|0)*4.6-3.6,b.col);
+    }
+    ctx.restore();
+    // upright parts: icon, labels, badges
+    const ic=P(18.5,-10.5);ctx.font='13px sans-serif';ctx.fillStyle='#000';ctx.fillText(b.icon,ic[0],ic[1]+0.5);
+    if(b.inside.length>6){const q=P(-6,22);ctx.fillStyle='#2b2f36';ctx.beginPath();ctx.arc(q[0],q[1],6.5,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 6.5px system-ui';ctx.fillText('+'+(b.inside.length-6),q[0],q[1]+0.3);}
+    if(b.fac&&!b.mix&&b.stock>16){const q=P(30,18);ctx.fillStyle='#2b2f36';ctx.font='bold 6.5px system-ui';ctx.fillText(b.stock,q[0],q[1]);}
+    if(b.yard){const q=P(-20,-22);ctx.fillStyle='#2f6f4f';ctx.beginPath();ctx.arc(q[0],q[1],5.5,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 7px system-ui';ctx.fillText('P',q[0],q[1]+0.3);}
+    const c=P(5,0),lab0=b.name+(b.mix?' '+b.mix.map(k=>MAT_NAME[k].slice(0,2)+b.mat[k]).join(' '):b.fac?' 在庫'+b.stock:'');
+    // label on the far side of the yard, away from the street
+    const lab=lab0;ctx.font='bold 7.5px system-ui,sans-serif';const tw=ctx.measureText(lab).width+8,lp=P(36,0),hz=Math.abs(ca)>Math.abs(sa),lx=lp[0]+(hz?Math.sign(ca)*(tw/2-6):0),ly=lp[1]+(hz?0:Math.sign(sa)*2);
+    ctx.fillStyle='rgba(43,47,54,.82)';rr(lx-tw/2,ly-5.5,tw,11,4);ctx.fill();
+    ctx.fillStyle=b.mix&&b.mix.some(k=>b.mat[k]<1)?'#ffb4a8':'#fff';ctx.fillText(lab,lx,ly+0.3);
     ctx.globalAlpha=1;
   }
+  // money popping up where deliveries are paid
+  const now=performance.now();pops=pops.filter(p=>now-p.t<1300);
+  ctx.font='bold 9px system-ui,sans-serif';
+  for(const p of pops){const k=(now-p.t)/1300;ctx.globalAlpha=1-k*k;const y=p.y-26-k*20,t='+¥'+fmt(p.a);
+    ctx.lineWidth=3;ctx.strokeStyle='rgba(255,255,255,.95)';ctx.strokeText(t,p.x,y);ctx.fillStyle='#2f8a3e';ctx.fillText(t,p.x,y);}
+  ctx.globalAlpha=1;
 }
 
 /* ================= UI ================= */
 const $=id=>document.getElementById(id),fmt=n=>Math.floor(n).toLocaleString('ja-JP');
 let toastT=0;
 notify=toast;
+// one popup per facility at a time: deliveries arriving together (or at high speed) add up instead of piling up
+onPay=(b,a)=>{const now=performance.now(),p=pops.find(q=>q.b===b&&now-q.t<450);if(p)p.a+=a;else{if(pops.length>40)return;const c=[b.node.x,b.node.y];pops.push({b,x:c[0],y:c[1],a,t:now});}};
 function toast(m){const t=$('toast');t.textContent=m;t.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>t.style.opacity=0,2600);}
 function buildPanel(){
   unl=-1;$('snd').textContent=G.mute?'🔇 音なし':'🔊 音あり';speedUI();
@@ -1588,7 +1624,7 @@ function pUp(id,x,y,cancel){
   if(!ptrs.has(id))return;
   if(!cancel&&ptrs.size===1&&moved<6){
     const w=toWorld(x,y);let best=null,bd=26;
-    const hb=W.bld.find(b=>Math.abs(b.node.x-w[0])<19&&Math.abs(b.node.y-w[1])<19);
+    const hb=W.bld.find(b=>Math.hypot(b.node.x-w[0],b.node.y-w[1])<24);
     if(hb){openBldMenu(hb,x,y);ptrs.delete(id);if(!ptrs.size)cv.style.cursor='grab';return;}
     for(const n of W.nodes){if(n.type!=='junction')continue;const d=Math.hypot(n.x-w[0],n.y-w[1]);if(d<bd){bd=d;best=n;}}
     if(best)openMenu(best);
