@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>どこで遊ぼうゲーム</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+:root{--bg:#dff3ff;--ink:#2a4a63;--card:#ffffffd9;--accent:#ff6b5e;--line:#b9dff5;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17283a;--ink:#e6f3ff;--card:#223a52e6;--line:#35597a}}
+:root[data-theme="dark"]{--bg:#17283a;--ink:#e6f3ff;--card:#223a52e6;--line:#35597a}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;display:flex;flex-direction:column;align-items:center;user-select:none;-webkit-user-select:none;overflow:hidden}
+header{width:100%;max-width:1100px;display:flex;align-items:center;justify-content:flex-start;gap:12px;padding:10px 14px 4px}
+#home{flex:none;width:46px;height:46px;border-radius:50%;background:#fff;border:2px solid var(--line);display:grid;place-items:center;font-size:24px;text-decoration:none;box-shadow:0 3px 0 #0002;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
+#home:active{transform:translateY(2px);box-shadow:0 1px 0 #0002}
+body,canvas,button,a{touch-action:manipulation;-webkit-touch-callout:none}
+h1{font-size:clamp(18px,3.4vw,28px);margin:0;font-weight:900;letter-spacing:.04em}
+main{flex:1;width:100%;max-width:1280px;gap:10px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 10px}
+#wrap{position:relative;flex:none}
+canvas{width:100%;height:100%;display:block;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}
+footer{width:100%;max-width:1100px;padding:6px 14px 14px;min-height:64px;display:flex;align-items:center;justify-content:center}
+#msg{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:10px 18px;font-weight:700;font-size:clamp(14px,2.6vw,18px);text-align:center}
+button{font:inherit;font-weight:700;border:0;border-radius:14px;background:var(--accent);color:#fff;padding:10px 20px;margin-top:12px;cursor:pointer}
+#tray{display:none;flex:none;width:200px;max-height:100%;overflow:auto;flex-direction:column;align-items:center;gap:8px;background:var(--card);border:2px solid var(--line);border-radius:20px;padding:12px 8px;font-weight:700;text-align:center}
+#tray.show{display:flex}
+#items{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.it{touch-action:none;cursor:grab;background:#fff;color:#2a4a63;border:2px solid var(--line);border-radius:16px;padding:6px;display:flex;flex-direction:column;align-items:center;font-size:13px}
+.it .ic{font-size:44px;line-height:1.1;height:50px;display:grid;place-items:center}
+.it .ic img{height:50px;max-width:72px;object-fit:contain}
+#tray small{font-size:12px;opacity:.85}
+#tray button{margin-top:0;padding:6px 12px;font-size:13px}
+#ghost{position:fixed;pointer-events:none;z-index:9;transform:translate(-50%,-50%);font-size:64px}
+#ghost img{height:72px;display:block}
+@media (max-aspect-ratio:1/1){main{flex-direction:column}#tray.show{width:auto;flex-direction:row;flex-wrap:wrap;justify-content:center}#items{display:flex;flex-wrap:wrap;justify-content:center;width:auto}}
+#back{position:absolute;top:10px;left:10px;display:none;z-index:2;box-shadow:0 3px 0 #0002}
+#back.show{display:block}
+#claw{position:fixed;inset:0;z-index:6;display:none;flex-direction:column;align-items:center;background:linear-gradient(#ffe6f3,#d9efff);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+#claw.show{display:flex;animation:cfade .35s}
+@keyframes cfade{from{opacity:0}to{opacity:1}}
+#chud{width:100%;max-width:700px;display:flex;justify-content:space-between;align-items:center;padding:0 12px;height:54px;flex:none}
+#chud button{margin:0}
+#cscore{font-weight:900;font-size:20px;color:#2a4a63;background:#fffd;border:2px solid var(--line);border-radius:14px;padding:4px 14px}
+#cc{touch-action:none;display:block;cursor:pointer}
+button:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+</style>
+</head>
+<body>
+<header><a id="home" href="../gameselect.html" aria-label="ゲームを えらぶ">🏠</a><h1>どこで遊ぼうゲーム</h1></header>
+<main><div id="wrap"><canvas id="c" width="1536" height="1024"></canvas><button id="back">← 地図にもどる</button></div><aside id="tray"><span>もちもの</span><div id="items"></div><small>シートにドラッグ。かごに入れると片づくよ</small></aside></main>
+<div id="claw"><div id="chud"><button id="cback">← 地図にもどる</button><span id="cscore">ゲット 0</span></div><canvas id="cc" width="1024" height="1536"></canvas></div>
+<footer><div id="msg">地図をタップすると、ロボくんがそこまで歩くよ！</div></footer>
+<script src="app.js"></script>
+<script>
+// iPad の ダブルタップ・ピンチ かくだい を とめる
+(function () {
+  let last = 0;
+  document.addEventListener('touchend', function (e) { const t = Date.now(); if (t - last < 350 && !e.target.closest('a,button')) e.preventDefault(); last = t; }, { passive: false });
+  ['gesturestart', 'gesturechange', 'dblclick'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
+})();
+</script>
+</body>
+</html>
