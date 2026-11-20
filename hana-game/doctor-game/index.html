@@ -77,6 +77,12 @@ body.cold #titleView{display:none}
 @keyframes flash{0%{opacity:.95}100%{opacity:0}}
 .clone.wind{animation:pop .3s,wind .45s ease-in-out .3s infinite}
 @keyframes wind{0%,100%{translate:-16px 0;rotate:-10deg}50%{translate:16px 0;rotate:10deg}}
+@media (orientation:portrait){
+#stage.bone{flex-direction:column;align-items:center}
+#stage.bone #dogWrap{width:100%}
+#stage.bone #boneItems{flex-direction:row;align-self:auto;justify-content:center;--sw:calc((min(100vw,820px) - 70px)/5);width:100%;flex:none}
+#stage.bone #boneItems .slot{flex:none;width:var(--sw)}
+}
 </style></head>
 <body class="title"><div id="titleView"><img id="banner" alt="どこがいたいの？どうしたの？">
 <div id="cards">
@@ -271,7 +277,7 @@ async function snap(el,b,tc){
 }
 const MX=Math.max(...BONES.map(b=>Math.max(b.W,b.H/FAR)));
 BONES.forEach(b=>{const s=document.createElement('div');s.className='slot';const i=new Image();i.src=b.src;i.className='bitem';i.style.width=i.style.height=(Math.max(b.W,b.H/FAR)/MX*100*(b.id===3?1.35:1))+'%';i.draggable=false;s.appendChild(i);bi.appendChild(s);attach(i,b)});
-function go(m,keep){document.body.className=m==='title'?'title':'cold';if(m==='title')return;mode=m;const bn=m==='bone';$('items').style.display=bn?'none':'';bi.style.display=bn?'flex':'none';ratio=bn?FAR:m==='panda'?PAR:m==='monkey'?MAR:.945;if(m==='panda'&&!keep){px.x=false;px.b=false}if(bn){$('ttl').textContent='🦴 骨折の患者さん ②ほねをなおそう'}else setItems(m);resetGame();fit()}
+function go(m,keep){document.body.className=m==='title'?'title':'cold';if(m==='title')return;mode=m;const bn=m==='bone';$('items').style.display=bn?'none':'';$('stage').classList.toggle('bone',bn);bi.style.display=bn?'flex':'none';ratio=bn?FAR:m==='panda'?PAR:m==='monkey'?MAR:.945;if(m==='panda'&&!keep){px.x=false;px.b=false}if(bn){$('ttl').textContent='🦴 骨折の患者さん ②ほねをなおそう'}else setItems(m);resetGame();fit()}
 $('cardCold').onclick=()=>go('cold');
 $('cardWound').onclick=()=>go('wound');
 $('cardBone').onclick=()=>go('panda');
