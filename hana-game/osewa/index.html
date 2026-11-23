@@ -86,6 +86,7 @@
 <div class="ov" id="optOv"><div class="card"><h2>⚙️ せってい</h2>
   <div class="row"><span>🗣️ よみあげ</span><button class="sw" id="swVoice"></button></div>
   <div class="row"><span>🔊 おと</span><button class="sw" id="swSound"></button></div>
+  <div class="row"><span>🕰️ そとの そらを ほんとうの じかんに</span><button class="sw" id="swTime"></button></div>
   <div class="row"><span id="optInfo" style="font-size:14px;text-align:left"></span></div>
   <button class="big gray" id="optReset">あかちゃんを えらびなおす</button>
   <button class="big" id="optClose">とじる</button></div></div>
@@ -112,7 +113,7 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem('osewa_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('osewa_' + k, JSON.stringify(v)); } catch (e) {} },
 };
-let opt = Object.assign({ sound: true, voice: true }, store.get('opt', {}));
+let opt = Object.assign({ sound: true, voice: true, realTime: false }, store.get('opt', {}));
 
 /* ---------- データ ---------- */
 const KINDS = {
@@ -159,12 +160,12 @@ const TOOLS = {
   toilet: [{ id: 'toilet', e: '🚽', n: 'すわる' }, { id: 'flush', e: '🌀', n: 'ながす' }, { id: 'paper', e: '🧻', n: 'かみ' }, PEEK],
   bath: [{ id: 'tub', e: '🛁', n: 'おふろ' }, { id: 'sponge', e: '🧽', n: 'ごしごし', drag: true }, { id: 'shower', e: '🚿', n: 'シャワー', drag: true },
     { id: 'towel', e: '', n: 'タオル', drag: true }, { id: 'duck', e: '🦆', n: 'アヒル' }, PEEK],
-  bed: [{ id: 'lie', e: '🛏️', n: 'ねかせる' }, { id: 'light', e: '💡', n: 'でんき' }, { id: 'song', e: '🎵', n: 'うた' }, { id: 'mobile', e: '⭐', n: 'メリー' }, PEEK],
+  bed: [{ id: 'lie', e: '🛏️', n: 'ねかせる' }, { id: 'light', e: '💡', n: 'でんき' }, { id: 'pat', e: '✋', n: 'トントン' }, { id: 'song', e: '🎵', n: 'うた' }, { id: 'mobile', e: '⭐', n: 'メリー' }, PEEK],
   play: [{ id: 'block', e: '🧱', n: 'つみき' }, { id: 'ball', e: '⚽', n: 'ボール' }, { id: 'feather', e: '🪶', n: 'こちょこちょ', drag: true }, { id: 'toybox', e: '🧸', n: 'おもちゃ' }, PEEK],
   garden: [{ id: 'swing', e: '🎠', n: 'ブランコ' }, { id: 'bubble', e: '🫧', n: 'シャボン' }, { id: 'puddle', e: '💦', n: 'どろんこ' }, { id: 'tree', e: '🍎', n: 'りんご' }, PEEK],
 };
 const HINTS = {
-  house: 'おへやを タップしてね', kitchen: 'たべものを くちへ もっていってね', toilet: 'トイレに すわらせてね', bath: 'おふろに いれて ごしごし',
+  house: 'おへやを タップしてね', kitchen: 'たべものを くちへ もっていってね', toilet: 'トイレに すわらせてね', bath: 'ごしごし → シャワー → タオル',
   bed: 'ねかせて でんきを けして トントン', play: 'つみきを つんでみよう', garden: 'ブランコに のせてみよう',
 };
 
@@ -173,7 +174,7 @@ let SAVE = store.get('save', null);
 const N = { onaka: 80, toilet: 90, kirei: 100, genki: 85, tanoshii: 70 };
 let B = null, hearts = 0, ready = false, view = 'house', dirtT = 70;
 const W = {
-  light: true, morning: 0, poops: [], paper: 0, mobileAng: 0, mobileV: .4, song: false, leverGlow: false, flushT: 0, duck: false, duckJ: 0, showerT: 0,
+  light: true, morning: 0, poops: [], paper: 0, sheep: { list: [], clock: 0, started: false, msg: '', msgT: 0 }, mobileAng: 0, mobileV: .4, song: false, leverGlow: false, flushT: 0, duck: false, duckJ: 0, showerT: 0,
   blocks: [], flying: [], blockIdle: 0, ball: { on: false, x: 80, y: 150, vx: 0, vy: 0, r: 16, rot: 0 },
   swing: { a: 0, v: 0, heart: false, scream: 0 }, bubs: [], bubPops: 0, apples: [], treeApples: 2, appleT: 30, treeShake: 0,
   peekT: 0, fridgeT: 0, mudHeartCd: 0, peekHeartCd: 0, rollHeartCd: 0, wantSpeakT: 0,
@@ -359,6 +360,7 @@ function label(c, txt, x, y, size, col = '#5a4466') { c.font = `900 ${size}px "H
 let forcePhase = new URLSearchParams(location.search).get('sky');
 function skyPhase() {
   if (forcePhase) return forcePhase;
+  if (!opt.realTime) { if (B && B.sleep.asleep) return 'night'; if (W.morning > 3) return 'eve'; return 'day'; }
   const d = new Date(), h = d.getHours() + d.getMinutes() / 60;
   if (h >= 6.5 && h < 16.5) return 'day';
   if ((h >= 16.5 && h < 18.5) || (h >= 5.5 && h < 6.5)) return 'eve';
@@ -401,7 +403,7 @@ function curFace() {
   if (B.aan) return 'aan';
   if (B.eatT > 0) return 'eat';
   if (B.toilet && B.toilet.ph === 'strain') return 'strain';
-  if (B.pose === 'lie' && !W.light) return 'sleepy';
+  if (B.pose === 'lie' && !W.light) return B.sleep.pats >= 3 ? 'sleep' : 'sleepy';
   if (B.pose === 'swing' && Math.abs(W.swing.a) > .5) return 'laugh';
   if (B.held) return 'happy';
   const w = curWant();
@@ -625,21 +627,23 @@ function drawHall(c, t) {
   floorP(c, '#d6b08a', 'rgba(0,0,0,.06)', 200);
   c.restore();
 }
+function bedWindow(c, t) { const fp = forcePhase; if (!W.light && W.morning <= 0) forcePhase = 'night'; windowP(c, 30, 40, 100, 90, t, W.morning > 0); forcePhase = fp; }
 function drawBed(c, t, front) {
   if (front) {
     if (B && B.pose === 'lie' && B.room === 'bed' && !B.held && !B.hop) { c.fillStyle = '#ffb3cf'; c.strokeStyle = '#ff8fb8'; c.lineWidth = 3; rr(c, 194, 150, 78, 44, 14); c.fill(); c.stroke(); c.fillStyle = '#fff'; for (let i = 0; i < 4; i++) { ell(c, 210 + i * 18, 166 + (i % 2) * 12, 3, 3); c.fill(); } }
     if (!W.light) {
       c.fillStyle = 'rgba(15,10,45,.66)'; c.fillRect(0, 0, RW, RH);
       const g = c.createRadialGradient(80, 85, 10, 80, 160, 170); g.addColorStop(0, 'rgba(255,250,200,.22)'); g.addColorStop(1, 'rgba(255,250,200,0)'); c.fillStyle = g; c.fillRect(0, 0, RW, RH);
-      windowP(c, 30, 40, 100, 90, t, W.morning > 0);
+      bedWindow(c, t);
       c.fillStyle = '#ffd54a'; rr(c, 158, 112, 16, 12, 4); c.fill();
       c.fillStyle = 'rgba(255,240,150,.5)'; for (let i = 0; i < 4; i++) { const a = W.mobileAng + i * TAU / 4; starP(c, 262 + Math.cos(a) * 40, 52 + Math.sin(a) * 4, 7); c.fill(); }
     }
+    drawSheep(c, t);
     return;
   }
   c.fillStyle = '#ece4ff'; c.fillRect(0, 0, RW, RH);
   c.fillStyle = 'rgba(255,255,255,.65)'; for (let x = 20; x < RW; x += 50) for (let y = 30; y < FL - 20; y += 50) { starP(c, x + ((y / 50 | 0) % 2) * 25, y, 5); c.fill(); }
-  windowP(c, 30, 40, 100, 90, t, W.morning > 0);
+  bedWindow(c, t);
   c.fillStyle = '#ff9ac0'; c.beginPath(); c.moveTo(22, 32); c.lineTo(52, 32); c.quadraticCurveTo(36, 90, 48, 138); c.lineTo(22, 138); c.fill(); c.beginPath(); c.moveTo(138, 32); c.lineTo(108, 32); c.quadraticCurveTo(124, 90, 112, 138); c.lineTo(138, 138); c.fill();
   c.fillStyle = '#e88aae'; c.fillRect(18, 26, 124, 8);
   // スイッチ
@@ -851,7 +855,7 @@ function setPose(p) {
   if (SPOT[p]) [B.x, B.y] = SPOT[p];
   if (p === 'toilet') B.toilet = { ph: 'sit', t: 0 };
   if (p === 'tub') { B.wet = 1; SFX.splash(); fx('splash', ROOMS.bath.x + 285, ROOMS.bath.y + 166); react('happy', { say: 'ちゃぷちゃぷ♪', dur: 1.4 }); }
-  if (p === 'lie') { B.sleep.pats = 0; if (W.light && N.genki < 70) react(null, { say: 'でんき けして〜' }); }
+  if (p === 'lie') { B.sleep.pats = 0; if (W.light) { react(null, { say: 'でんき けして〜' }); if (view === 'bed') hint('でんきを けすと ひつじが くるよ 💡'); } }
   if (p === 'swing') { W.swing.v += .6; W.swing.heart = false; react('happy', { say: 'ブランコ！', dur: 1 }); }
   if (p === 'chair') { if (N.onaka < 60) react('happy', { say: 'まんま〜！', dur: 1 }); }
 }
@@ -1004,9 +1008,52 @@ function patBaby() {
     if (Z.taps.length >= 3) wakeCry('おこさないで〜');
     return;
   }
-  if (W.light) { react('sleepy', { say: 'まぶしいよ〜', dur: 1.2 }); hint('でんきを けしてね 💡'); return; }
-  Z.pats++; B.sq = .1; B.sqv = 0; const H = headTop(); fx('txt', H.x, H.y + 30, { text: 'トントン', size: 16, col: '#9b7bff' });
-  if (Z.pats >= 4) { Z.asleep = true; Z.t = 0; Z.dreamT = 3; react(null, { say: 'すやすや…' }); }
+  if (W.light) { react('sleepy', { say: 'まぶしいよ〜', dur: 1.2 }); hint('でんきを けすと ひつじが くるよ 💡'); return; }
+  B.sq = .1; B.sqv = 0; const H = headTop(), R = ROOMS.bed;
+  // さくを とんでいる ひつじに あわせて トン
+  const sh = W.sheep.list.find(q => !q.ok && Math.abs(q.age - SHEEP_T / 2) < .4);
+  if (!sh) { fx('txt', H.x, H.y + 30, { text: 'トン', size: 14, col: '#b9b2c6' }); return; }
+  sh.ok = true; Z.pats++;
+  const n = Z.pats, sy = sheepPos(sh);
+  fx('txt', H.x, H.y + 30, { text: 'トン♪', size: 18, col: '#ffd54a' });
+  fx('sparkle', R.x + sy.x, R.y + sy.y - 20);
+  osc('sine', [523, 587, 659, 784, 880][Math.min(4, n - 1)] * 2, .5, { vol: .07 });
+  W.sheep.msg = `ひつじが ${SHEEPN[Math.min(n, SHEEPN.length) - 1]}`; W.sheep.msgT = 1.6; speak(SHEEPN[Math.min(n, SHEEPN.length) - 1]);
+  if (n >= SHEEP_NEED) { setTimeout(() => { if (B.pose === 'lie' && !W.light && !Z.asleep) { Z.asleep = true; Z.t = 0; Z.dreamT = 3; react(null, { say: 'すやすや…' }); W.sheep.list = []; } }, 700); }
+}
+const SHEEP_P = 1.44, SHEEP_T = SHEEP_P * 2, SHEEP_NEED = 5;
+const SHEEPN = ['いっぴき', 'にひき', 'さんびき', 'よんひき', 'ごひき', 'ろっぴき'];
+function sheepOn() { return B && B.room === 'bed' && B.pose === 'lie' && !B.sleep.asleep && !W.light && !B.held && !B.hop; }
+function sheepPos(q) { const k = q.age / SHEEP_T, x = 8 + k * 176, d = (q.age - SHEEP_T / 2) / (SHEEP_T * .2), bump = Math.max(0, 1 - d * d); return { x, y: FL - 4 - bump * 66, bump }; }
+function updSheep(dt) {
+  const S = W.sheep;
+  if (S.msgT > 0) S.msgT -= dt;
+  if (!sheepOn()) { S.list = []; S.clock = 0; S.started = false; return; }
+  if (!S.started) { S.started = true; S.clock = SHEEP_P; if (view === 'bed') hint('ひつじが さくを とぶときに トントン ✋'); }
+  S.clock += dt;
+  if (S.clock >= SHEEP_P) { S.clock -= SHEEP_P; S.list.push({ age: 0, ok: false, ph: Math.random() * 6 }); }
+  for (const q of S.list) q.age += dt;
+  S.list = S.list.filter(q => q.age < SHEEP_T);
+}
+function drawSheep(c, t) {
+  const S = W.sheep;
+  if (!S.list.length && !(S.msgT > 0)) return;
+  // さく
+  c.strokeStyle = 'rgba(230,200,160,.95)'; c.lineWidth = 5; c.lineCap = 'round';
+  c.beginPath(); for (const x of [78, 96, 114]) { c.moveTo(x, FL); c.lineTo(x, FL - 36); } c.moveTo(70, FL - 14); c.lineTo(122, FL - 14); c.moveTo(70, FL - 28); c.lineTo(122, FL - 28); c.stroke();
+  for (const q of S.list) {
+    const P = sheepPos(q), inWin = Math.abs(q.age - SHEEP_T / 2) < .4 && !q.ok;
+    c.save(); c.translate(P.x, P.y); c.scale(1.35, 1.35);
+    if (inWin) { c.fillStyle = `rgba(255,230,120,${.35 + .25 * Math.sin(t * 20)})`; ell(c, 0, -12, 30, 24); c.fill(); }
+    if (q.ok) { c.fillStyle = 'rgba(255,215,74,.35)'; ell(c, 0, -12, 26, 20); c.fill(); }
+    c.rotate(-P.bump * .25);
+    const leg = P.bump > .1 ? 3 : Math.sin(q.age * 18) * 3;
+    c.strokeStyle = '#4a4058'; c.lineWidth = 3; c.beginPath(); c.moveTo(-8, -4); c.lineTo(-8 - leg, 4); c.moveTo(8, -4); c.lineTo(8 + leg, 4); c.stroke();
+    c.fillStyle = '#fff'; for (const [dx, dy, r] of [[-9, -12, 9], [0, -16, 10], [9, -12, 9], [-4, -6, 9], [5, -6, 9]]) { ell(c, dx, dy, r, r); c.fill(); }
+    c.fillStyle = '#4a4058'; ell(c, 15, -14, 6, 7); c.fill(); c.fillStyle = '#fff'; ell(c, 17, -15, 1.6, 1.6); c.fill();
+    c.restore();
+  }
+  if (S.msgT > 0) { c.globalAlpha = clamp(S.msgT * 2, 0, 1); c.font = '900 17px "Hiragino Maru Gothic ProN",sans-serif'; const w = c.measureText(S.msg).width + 22; c.fillStyle = 'rgba(255,255,255,.92)'; rr(c, 80 - w / 2, 6, w, 30, 15); c.fill(); label(c, S.msg, 80, 22, 17, '#7b5fe0'); c.globalAlpha = 1; }
 }
 function wakeUp() { const Z = B.sleep; Z.asleep = false; Z.pats = 0; W.morning = 6; react('happy', { say: 'ふわぁ〜 おはよう！', snd: 'happy', dur: 2.4 }); addHeart(1); }
 function wakeCry(text) { const Z = B.sleep; Z.asleep = false; Z.pats = 0; Z.taps = []; react('cry', { say: text || 'えーん！', snd: 'cry', dur: 2.6 }); const c = toWorld(0, -66); fx('tears', c.x, c.y); }
@@ -1060,15 +1107,22 @@ function scrub(wx, wy) {
   }
 }
 function showerAt(wx, wy) {
-  const R = ROOMS.bath; if (view !== 'bath') return;
-  fx('drops', wx, wy + 8, { n: 2 });
+  if (view !== 'bath') return;
+  fx('drops', wx + rnd(-14, 14), wy + 8, { n: 3 });
   if (!babyHere()) return;
   const bc = toWorld(0, -54);
-  if (Math.abs(bc.x - wx) < 40 && wy < bc.y + 20) {
+  const over = Math.abs(bc.x - wx) < 80 && wy < bc.y + 50;
+  if (over) {
     B.wet = 1;
     if (B.pose !== 'tub' && B.coldCd <= 0) { B.coldCd = 4; react('surprise', { say: 'きゃっ！ つめたい！', snd: 'surprise', dur: 1.2 }); }
+    // ちかい あわから じゅんばんに ながれる
+    for (let n = 0; n < 2 && B.soap.length; n++) {
+      let bi = 0, bd = 1e9;
+      B.soap.forEach((q, i) => { const s = toWorld(q.x, q.y), d = Math.abs(s.x - wx) + Math.abs(s.y - wy) * .3; if (d < bd) { bd = d; bi = i; } });
+      const q = B.soap.splice(bi, 1)[0], s = toWorld(q.x, q.y); fx('pop', s.x, s.y, { r: q.r * babyS() }); fx('drops', s.x, s.y, { n: 1 });
+    }
+    if (B.squeakT <= 0 && B.soap.length) { B.squeakT = .12; SFX.pop(); }
   }
-  for (let i = B.soap.length - 1; i >= 0; i--) { const q = B.soap[i], s = toWorld(q.x, q.y); if (Math.abs(s.x - wx) < 24 && s.y > wy - 10 && Math.random() < .35) { B.soap.splice(i, 1); fx('pop', s.x, s.y, { r: q.r * babyS() }); } }
   if (B.soap.length === 0 && B.washed && B.pose === 'tub' && B.hintCd <= 0) { B.hintCd = 6; setTimeout(() => react('happy', { say: 'タオルで ふいて〜', dur: 1 }), 400); }
 }
 function towelAt(wx, wy) {
@@ -1175,7 +1229,7 @@ function updWorld(dt, t) {
   }
 }
 function decay(dt) {
-  const night = skyPhase() === 'night';
+  const night = opt.realTime && skyPhase() === 'night';
   N.onaka = Math.max(0, N.onaka - dt * 100 / 360);
   N.toilet = Math.max(0, N.toilet - dt * 100 / 700);
   if (!B.sleep.asleep) N.genki = Math.max(0, N.genki - dt * 100 / 540 * (night ? 1.6 : 1));
@@ -1314,6 +1368,7 @@ function toolTap(tl) {
   if (id === 'paper') { pullPaper(); return; }
   if (id === 'duck') { W.duck = !W.duck; SFX.quack(); if (W.duck && B.pose === 'tub') react('laugh', { say: 'アヒルさん！', snd: 'giggle', dur: 1.2 }); syncToolState(); return; }
   if (id === 'light') { toggleLight(); return; }
+  if (id === 'pat') { if (B.room === 'bed' && B.pose === 'lie') patBaby(); else hint('まず ベッドに ねかせてね 🛏️'); return; }
   if (id === 'song') { W.song = !W.song; syncToolState(); return; }
   if (id === 'mobile') { spinMobile(); return; }
   if (id === 'block') { addBlock(); return; }
@@ -1408,6 +1463,7 @@ function roomTap(id, x, y) {
   } else if (id === 'bed') {
     if (x > 142 && x < 190 && y > 88 && y < 148) { toggleLight(); return; }
     if (Math.abs(x - 262) < 60 && y < 76) { spinMobile(); return; }
+    if (sheepOn() || (B.room === 'bed' && B.pose === 'lie')) { patBaby(); return; }
     if (x > 186 && y > 110) { if (B.room === 'bed') goTo('lie'); return; }
   } else if (id === 'play') {
     const b = W.ball;
@@ -1475,6 +1531,7 @@ function begin() { ready = true; updHearts(); goRoom('house'); }
 /* ---------- せってい ---------- */
 function renderOpt() {
   $('#swVoice').textContent = opt.voice ? 'ON' : 'OFF'; $('#swVoice').classList.toggle('on', opt.voice);
+  $('#swTime').textContent = opt.realTime ? 'ON' : 'OFF'; $('#swTime').classList.toggle('on', opt.realTime);
   $('#swSound').textContent = opt.sound ? 'ON' : 'OFF'; $('#swSound').classList.toggle('on', opt.sound);
   if (B) { const fav = FOODS.find(f => f.id === SAVE.fav); $('#optInfo').textContent = `${KINDS[B.kind].name}（${STAGES[B.stage].name}）・ハート ${hearts}・すきな たべもの ${fav ? fav.e : ''}`; }
   if (master) master.gain.value = opt.sound ? .9 : 0;
@@ -1482,6 +1539,7 @@ function renderOpt() {
 $('#btnOpt').addEventListener('click', () => { audio(); renderOpt(); $('#optOv').classList.add('open'); });
 $('#optClose').addEventListener('click', () => $('#optOv').classList.remove('open'));
 $('#swVoice').addEventListener('click', () => { opt.voice = !opt.voice; store.set('opt', opt); renderOpt(); });
+$('#swTime').addEventListener('click', () => { opt.realTime = !opt.realTime; store.set('opt', opt); renderOpt(); });
 $('#swSound').addEventListener('click', () => { opt.sound = !opt.sound; store.set('opt', opt); renderOpt(); });
 $('#optReset').addEventListener('click', () => {
   if (!confirm('いまの あかちゃんの きろく（ハート・せいちょう）が きえます。えらびなおしますか？')) return;
@@ -1503,8 +1561,8 @@ function loop() {
   const t = now(), dt = Math.min(.05, t - lastT); lastT = t;
   updCam(dt);
   if (ready && B) {
-    decay(dt); updBaby(dt, t); updWorld(dt, t);
-    musicTick((view === 'bed' || view === 'house') && B.room === 'bed' && (W.song || B.sleep.asleep || (B.pose === 'lie' && !W.light && B.sleep.pats > 0)) || (view === 'bed' && W.song));
+    decay(dt); updBaby(dt, t); updWorld(dt, t); updSheep(dt);
+    musicTick((view === 'bed' || view === 'house') && B.room === 'bed' && (W.song || B.sleep.asleep || sheepOn()) || (view === 'bed' && W.song));
     uiT -= dt; if (uiT <= 0) { uiT = .25; updNeedsUI(); }
     saveT -= dt; if (saveT <= 0) { saveT = 4; save(); }
   }
