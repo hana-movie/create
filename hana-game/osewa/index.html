@@ -540,6 +540,7 @@ function drawKitchen(c, t, front) {
   // テーブル
   c.fillStyle = '#d99a6a'; rr(c, 326, 168, 68, 10, 4); c.fill(); c.fillRect(334, 176, 8, 56); c.fillRect(378, 176, 8, 56);
   emoji(c, '🍎', 348, 156, 22); emoji(c, '🍌', 372, 156, 22);
+  wallClock(c, 222, 50, 21);
   // ハイチェア
   c.fillStyle = '#8fd3ff'; c.strokeStyle = '#5ab0e0'; c.lineWidth = 3; rr(c, 242, 92, 56, 78, 14); c.fill(); c.stroke();
   c.lineWidth = 6; c.beginPath(); c.moveTo(250, 172); c.lineTo(234, FL); c.moveTo(290, 172); c.lineTo(306, FL); c.moveTo(240, 206); c.lineTo(300, 206); c.stroke();
@@ -621,13 +622,51 @@ function drawHall(c, t) {
   c.strokeStyle = '#a8553f'; c.lineWidth = 4; c.beginPath(); c.moveTo(34, FL - 40); c.lineTo(190, FL - 240); c.stroke();
   for (let i = 0; i < 7; i++) { c.beginPath(); c.moveTo(40 + i * 22, FL - 48 - i * 28); c.lineTo(40 + i * 22, FL - 16 - i * 26); c.stroke(); }
   // とけい
-  c.fillStyle = '#fff'; c.strokeStyle = '#c98b5a'; c.lineWidth = 4; ell(c, 46, 60, 18, 18); c.fill(); c.stroke();
-  const d = new Date(), hA = (d.getHours() % 12 + d.getMinutes() / 60) / 12 * TAU, mA = d.getMinutes() / 60 * TAU;
-  c.strokeStyle = '#5a4466'; c.lineWidth = 3; c.beginPath(); c.moveTo(46, 60); c.lineTo(46 + Math.sin(hA) * 9, 60 - Math.cos(hA) * 9); c.moveTo(46, 60); c.lineTo(46 + Math.sin(mA) * 13, 60 - Math.cos(mA) * 13); c.stroke();
+  wallClock(c, 46, 60, 20);
   floorP(c, '#d6b08a', 'rgba(0,0,0,.06)', 200);
   c.restore();
 }
 function bedWindow(c, t) { const fp = forcePhase; if (!W.light && W.morning <= 0) forcePhase = 'night'; windowP(c, 30, 40, 100, 90, t, W.morning > 0); forcePhase = fp; }
+// ほんとうの じかんの はりどけい（みじかい はり＝あか、ながい はり＝あお）
+function wallClock(c, x, y, r) {
+  const d = new Date(), h = d.getHours() % 12 + d.getMinutes() / 60, m = d.getMinutes() + d.getSeconds() / 60;
+  c.save(); c.translate(x, y);
+  c.fillStyle = '#ffb36b'; ell(c, 0, 0, r + 4, r + 4); c.fill();
+  c.fillStyle = '#fffaf0'; ell(c, 0, 0, r, r); c.fill();
+  c.font = `900 ${r * .42}px "Hiragino Maru Gothic ProN",sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#4a3a56';
+  for (const [n, a] of [[12, 0], [3, .25], [6, .5], [9, .75]]) c.fillText(n, Math.sin(a * TAU) * r * .7, -Math.cos(a * TAU) * r * .7 + 1);
+  c.fillStyle = '#c9bcc9'; for (let i = 0; i < 12; i++) if (i % 3) { const a = i / 12 * TAU; ell(c, Math.sin(a) * r * .74, -Math.cos(a) * r * .74, 1.3, 1.3); c.fill(); }
+  c.lineCap = 'round';
+  const ha = h / 12 * TAU, ma = m / 60 * TAU;
+  c.strokeStyle = '#e8506a'; c.lineWidth = r * .16; c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.sin(ha) * r * .45, -Math.cos(ha) * r * .45); c.stroke();
+  c.strokeStyle = '#2f7ff0'; c.lineWidth = r * .1; c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.sin(ma) * r * .78, -Math.cos(ma) * r * .78); c.stroke();
+  c.fillStyle = '#ffd27a'; ell(c, 0, 0, r * .12, r * .12); c.fill();
+  c.restore();
+}
+function timePhrase() {
+  const d = new Date(), H = d.getHours() % 12 || 12, M = d.getMinutes(), N = H % 12 + 1;
+  if (M < 5) return `${H}じ だよ`;
+  if (M < 25) return `${H}じ すぎ だよ`;
+  if (M < 35) return `${H}じはん だよ`;
+  if (M < 55) return `${H}じはん すぎ`;
+  return `もうすぐ ${N}じ`;
+}
+function tellTime(wx, wy) {
+  const d = new Date(), dg = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`;
+  SFX.ding(); fx('txt', wx, wy - 34, { text: dg, size: 22, col: '#2f7ff0', life: 2 });
+  const p = timePhrase();
+  if (babyHere() && !B.sleep.asleep) react('happy', { say: `いまは ${p}`, dur: 1.4 }); else fx('txt', wx, wy - 60, { text: p, size: 16, col: '#e8506a', life: 2 });
+  speak('いまは ' + p.replace(/(\d+)じ/g, (_, h) => ['', 'いちじ', 'にじ', 'さんじ', 'よじ', 'ごじ', 'ろくじ', 'しちじ', 'はちじ', 'くじ', 'じゅうじ', 'じゅういちじ', 'じゅうにじ'][+h]));
+}
+let clockMin = -1;
+function clockTick() {
+  const d = new Date(), m = d.getMinutes();
+  if (m === clockMin) return;
+  const first = clockMin < 0; clockMin = m;
+  if (first || (m !== 0 && m !== 30)) return;
+  osc('sine', 1319, .9, { vol: .08 }); osc('sine', 988, 1.1, { vol: .07, delay: .35 });
+  if (B && babyVisible() && !B.sleep.asleep) react('happy', { say: timePhrase().replace(' だよ', ' だよ！'), dur: 1.4 });
+}
 function drawBed(c, t, front) {
   if (front) {
     if (B && B.pose === 'lie' && B.room === 'bed' && !B.held && !B.hop) { c.fillStyle = '#ffb3cf'; c.strokeStyle = '#ff8fb8'; c.lineWidth = 3; rr(c, 194, 150, 78, 44, 14); c.fill(); c.stroke(); c.fillStyle = '#fff'; for (let i = 0; i < 4; i++) { ell(c, 210 + i * 18, 166 + (i % 2) * 12, 3, 3); c.fill(); } }
@@ -649,6 +688,7 @@ function drawBed(c, t, front) {
   // スイッチ
   c.fillStyle = '#fff'; c.strokeStyle = '#d6c8ea'; c.lineWidth = 2; rr(c, 154, 100, 24, 36, 6); c.fill(); c.stroke();
   c.fillStyle = W.light ? '#ffd54a' : '#9a92b8'; rr(c, 158, W.light ? 104 : 120, 16, 12, 4); c.fill();
+  wallClock(c, 346, 74, 20);
   // メリー
   c.strokeStyle = '#b8a8d8'; c.lineWidth = 2; c.beginPath(); c.moveTo(262, 0); c.lineTo(262, 30); c.stroke();
   c.strokeStyle = '#d6c8ea'; c.lineWidth = 4; c.beginPath(); c.moveTo(220, 32); c.lineTo(304, 32); c.stroke();
@@ -1447,6 +1487,7 @@ function tapBaby() {
 }
 function roomTap(id, x, y) {
   if (id === 'kitchen') {
+    if (Math.hypot(x - 222, y - 50) < 30) { tellTime(ROOMS.kitchen.x + 222, ROOMS.kitchen.y + 50); return; }
     if (x > 14 && x < 92 && y > 60) { W.fridgeT = .5; SFX.click(); fx('puff', ROOMS.kitchen.x + 60, ROOMS.kitchen.y + 130, { col: 'rgba(220,240,255,.9)' }); return; }
     if (x > 110 && x < 180 && y > 96 && y < 150) { fx('txt', ROOMS.kitchen.x + 146, ROOMS.kitchen.y + 80, { text: 'ぐつぐつ', size: 16, col: '#ff8a80' }); SFX.bubble(); return; }
     if (Math.abs(x - 270) < 50 && y > 88) { if (B.room === 'kitchen') goTo('chair'); return; }
@@ -1462,6 +1503,7 @@ function roomTap(id, x, y) {
     if (x > 176 && y > 140) { if (B.room === 'bath') goTo('tub'); return; }
   } else if (id === 'bed') {
     if (x > 142 && x < 190 && y > 88 && y < 148) { toggleLight(); return; }
+    if (Math.hypot(x - 346, y - 74) < 28) { tellTime(ROOMS.bed.x + 346, ROOMS.bed.y + 74); return; }
     if (Math.abs(x - 262) < 60 && y < 76) { spinMobile(); return; }
     if (sheepOn() || (B.room === 'bed' && B.pose === 'lie')) { patBaby(); return; }
     if (x > 186 && y > 110) { if (B.room === 'bed') goTo('lie'); return; }
@@ -1563,7 +1605,7 @@ function loop() {
   if (ready && B) {
     decay(dt); updBaby(dt, t); updWorld(dt, t); updSheep(dt);
     musicTick((view === 'bed' || view === 'house') && B.room === 'bed' && (W.song || B.sleep.asleep || sheepOn()) || (view === 'bed' && W.song));
-    uiT -= dt; if (uiT <= 0) { uiT = .25; updNeedsUI(); }
+    uiT -= dt; if (uiT <= 0) { uiT = .25; updNeedsUI(); clockTick(); }
     saveT -= dt; if (saveT <= 0) { saveT = 4; save(); }
   }
   stepParts(dt);
