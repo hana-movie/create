@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#bfe9ff">
+<title>おいたら うごく！</title>
+<style>
+  :root{ --ink:#4a4458; --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px); }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+  html,body{margin:0;height:100%;overflow:hidden;color:var(--ink);background:#bfe9ff;overscroll-behavior:none;
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Rounded Mplus 1c","Yu Gothic",system-ui,sans-serif}
+  .emo{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
+  button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0;background:none}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column}
+  #top{flex:none;display:flex;align-items:center;gap:8px;padding:calc(6px + var(--st)) 8px 6px;background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.08);z-index:2}
+  #top h1{flex:1;margin:0;font-size:clamp(17px,4.4vw,24px);font-weight:900;color:#ff6fa8;text-align:center}
+  .rb{flex:none;width:44px;height:44px;border-radius:50%;background:#f4f1ea;font-size:22px;display:flex;align-items:center;justify-content:center;text-decoration:none;box-shadow:0 3px 0 #ddd6c6}
+  .rb:active{transform:translateY(2px);box-shadow:0 1px 0 #ddd6c6}
+  #wrap{position:relative;flex:1;min-height:0}
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:rgba(255,255,255,.95);border-radius:999px;padding:8px 18px;font-weight:900;font-size:clamp(14px,3.6vw,18px);
+    white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.12);pointer-events:none;transition:opacity .4s;max-width:96%;overflow:hidden;text-overflow:ellipsis}
+  #bar{flex:none;background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -4px 14px rgba(0,0,0,.1);padding:8px 6px calc(8px + var(--sb));display:flex;gap:6px;align-items:center;
+    justify-content:safe center;overflow-x:auto;scrollbar-width:none}
+  #bar::-webkit-scrollbar{display:none}
+  .pb{flex:none;width:clamp(48px,10.4vw,64px);height:clamp(60px,13vw,76px);border-radius:16px;background:#f4f1ea;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    box-shadow:0 3px 0 #ddd6c6;border:3px solid transparent}
+  .pb .e{font-size:clamp(26px,6.6vw,36px);line-height:1} .pb .n{font-size:clamp(9px,2.4vw,12px);font-weight:900;white-space:nowrap;letter-spacing:-.5px}
+  .pb.on{background:#fff0f6;border-color:#ff8fb8}
+  .pb:active{transform:translateY(2px)}
+  .sep{flex:none;width:2px;height:48px;background:#eee8dc;margin:0 2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <a class="rb emo" href="../gameselect.html" aria-label="ゲームを えらぶ">🏠</a>
+    <h1>おいたら うごく！</h1>
+    <button class="rb emo" id="btnSound" aria-label="おと">🔊</button>
+  </div>
+  <div id="wrap"><canvas id="cv"></canvas><div id="hint"></div></div>
+  <div id="bar"></div>
+</div>
+<script>
+'use strict';
+/* =========================================================
+   おいたら うごく！ v0.1（スタンプばん）
+   - スタンプを えらんで タップで おくと うごきだす。おいた ものは ドラッグで うごかせる・なげられる
+   - つながる しかけ：ふうせん→うかぶ→✂️で われて おちる／くも→あめ→はな→はち／
+     あめ＋たいよう→にじ／き→りんご→たべる／あめ→おうちに にげこむ／いぬは ついてくる／くるまに のる
+   - 外部ライブラリ・画像・音声ファイル・外部通信なし。おいた ものは この たんまつに ほぞん
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const TAU = Math.PI * 2;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[(Math.random() * a.length) | 0];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const now = () => performance.now() / 1000;
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('oitara_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('oitara_' + k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+};
+let opt = Object.assign({ sound: true }, store.get('opt', {}));
+
+/* ---------- スタンプ ---------- */
+const STAMPS = [
+  { id: 'girl', e: '👧', n: 'おんなのこ' }, { id: 'boy', e: '👦', n: 'おとこのこ' }, { id: 'dog', e: '🐶', n: 'いぬ' }, { id: 'cat', e: '🐱', n: 'ねこ' },
+  { id: 'balloon', e: '🎈', n: 'ふうせん' }, { id: 'cloud', e: '☁️', n: 'くも' }, { id: 'sun', e: '☀️', n: 'たいよう' }, { id: 'tree', e: '🌳', n: 'き' },
+  { id: 'flower', e: '🌷', n: 'はな' }, { id: 'house', e: '🏠', n: 'おうち' }, { id: 'car', e: '🚗', n: 'くるま' }, { id: 'fumikiri', e: '🚃', n: 'ふみきり' }, { id: 'taifu', e: '🌀', n: 'たいふう' },
+  { sep: true },
+  { id: 'hasami', e: '✂️', n: 'はさみ', tool: true, hint: '✂️ ふうせんを なぞるか タップで パン！' },
+  { id: 'keshi', e: '🧽', n: 'けす', tool: true, hint: '🧽 けしたい ものを タップ' },
+  { id: 'zenbu', e: '🗑️', n: 'ぜんぶ', tool: true },
+];
+const HINTS = {
+  girl: 'おいた こは あるきだすよ', boy: 'おいた こは あるきだすよ', dog: 'いぬは こどもに ついていくよ', cat: 'ねこは きまぐれ。たいようが あると ひるね',
+  balloon: 'こどもの うえに おくと くっつくよ', cloud: 'くもから あめ。はなが さくよ', sun: 'あめの あとに たいようで にじ！', tree: 'りんごが なったら きを タップ',
+  flower: 'はなが さくと はちが くるよ', house: 'あめが ふると おうちに にげこむよ', car: 'こどもを くるまの うえに おとすと のるよ',
+  fumikiri: 'ときどき でんしゃが とおるよ。タップで すぐ くる', taifu: 'たいふうが くもを ふきとばすよ',
+};
+const GROUND = ['girl', 'boy', 'dog', 'cat', 'tree', 'flower', 'house', 'car', 'fumikiri'];
+const LIVING = ['girl', 'boy', 'dog', 'cat'];
+const KID = ['girl', 'boy'];
+let sel = 'girl', zenbuArm = 0;
+const BCOL = ['#ff4f8b', '#3fa0ff', '#ffd23f', '#5cc66d', '#9b6bff', '#ff8a2a'];
+const HAIR = ['#5b3a29', '#2b2430', '#c97b3a', '#e8c26a'];
+const CLOTH = ['#ff6fa8', '#5aa9ff', '#ffb347', '#8fd96b', '#b48cff', '#ff6f6f'];
+
+/* ---------- おと ---------- */
+let AC = null, master = null, noiseBuf = null, rainN = null;
+function audio() {
+  try {
+    if (!AC) { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = opt.sound ? .9 : 0; master.connect(AC.destination);
+      noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    if (AC.state === 'suspended') AC.resume();
+  } catch (e) {}
+}
+function osc(type, f, d, { vol = .1, to = null, delay = 0, vib = 0, att = .01 } = {}) {
+  if (!AC) return; const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + d);
+  if (vib) { const l = AC.createOscillator(), lg = AC.createGain(); l.frequency.value = vib; lg.gain.value = f * .07; l.connect(lg).connect(o.frequency); l.start(t); l.stop(t + d + .05); }
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + att); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g).connect(master); o.start(t); o.stop(t + d + .05);
+}
+function noise(d, { vol = .1, f = 1000, q = 1, type = 'bandpass', delay = 0, att = .005 } = {}) {
+  if (!AC) return; const t = AC.currentTime + delay, s = AC.createBufferSource(), fl = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = noiseBuf; fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + att); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  s.connect(fl).connect(g).connect(master); s.start(t, Math.random() * .5); s.stop(t + d + .05);
+}
+const SFX = {
+  place() { osc('sine', 500, .12, { vol: .1, to: 900 }); },
+  pop() { noise(.18, { vol: .3, f: 1800, q: .7, att: .002 }); osc('square', 180, .1, { vol: .1, to: 60 }); },
+  ouch() { osc('square', 700, .2, { vol: .06, to: 320 }); },
+  thud() { osc('sine', 150, .2, { vol: .2, to: 60 }); noise(.1, { vol: .1, f: 300, type: 'lowpass' }); },
+  float() { osc('sine', 400, .6, { vol: .07, to: 900, vib: 6 }); },
+  wah() { osc('triangle', 900, .8, { vol: .07, to: 300, vib: 10 }); },
+  giggle() { for (let i = 0; i < 4; i++) osc('triangle', 900 + i * 90, .08, { vol: .07, delay: i * .085 }); },
+  chomp() { for (let i = 0; i < 3; i++) noise(.07, { vol: .15, f: 900, q: 2, delay: i * .18 }); },
+  yum() { [784, 988, 1175].forEach((f, i) => osc('triangle', f, .15, { vol: .07, delay: i * .08 })); },
+  bloom() { osc('sine', rnd(1200, 1800), .15, { vol: .04, to: 2400 }); },
+  rustle() { noise(.5, { vol: .07, f: 3000, q: .4, att: .1 }); },
+  poof() { noise(.35, { vol: .12, f: 1200, q: .5 }); },
+  woof() { osc('sawtooth', 320, .12, { vol: .08, to: 220 }); osc('sawtooth', 300, .12, { vol: .08, to: 200, delay: .18 }); },
+  meow() { osc('triangle', 700, .35, { vol: .08, to: 1000, vib: 8 }); },
+  honk() { osc('square', 440, .18, { vol: .06 }); osc('square', 440, .25, { vol: .06, delay: .25 }); },
+  buzz() { osc('sawtooth', 220, .4, { vol: .025, vib: 30 }); },
+  door() { osc('triangle', 300, .2, { vol: .06, to: 500 }); },
+  rainbow() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => osc('sine', f, .5, { vol: .06, delay: i * .1 })); },
+  cold() { osc('triangle', 1000, .3, { vol: .06, to: 1500, vib: 20 }); },
+  hop() { osc('sine', 400, .12, { vol: .08, to: 800 }); },
+  kan() { osc('square', 950, .12, { vol: .05 }); },
+  gatan() { for (let i = 0; i < 2; i++) { noise(.08, { vol: .12, f: 220, type: 'lowpass', delay: i * .16 }); osc('sine', 90, .08, { vol: .1, delay: i * .16 }); } },
+  fuwan() { osc('triangle', 660, .5, { vol: .07 }); osc('triangle', 550, .7, { vol: .07, delay: .4 }); },
+  byu() { noise(1.2, { vol: .12, f: 500, q: .5, att: .3 }); },
+};
+function rainSound(on) {
+  if (!AC) return;
+  if (on && !rainN) { const s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = noiseBuf; s.loop = true; f.type = 'highpass'; f.frequency.value = 2400; g.gain.value = .05; s.connect(f).connect(g).connect(master); s.start(); rainN = s; }
+  else if (!on && rainN) { try { rainN.stop(); } catch (e) {} rainN = null; }
+}
+
+/* ---------- がめん ---------- */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+const LH = 700, G = 600;
+let CW = 300, CH = 300, DPR = 1, S = 1, LW = 1000;
+function resize() { const r = cv.getBoundingClientRect(); if (!r.width) return; DPR = Math.min(window.devicePixelRatio || 1, 2.5); CW = r.width; CH = r.height; cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR); S = CH / LH; LW = CW / S; for (const o of objs) o.x = clamp(o.x, 20, LW - 20); }
+window.addEventListener('resize', () => setTimeout(resize, 60)); if (window.ResizeObserver) new ResizeObserver(resize).observe(cv);
+function ell(c, x, y, rx, ry, r = 0) { c.beginPath(); c.ellipse(x, y, Math.max(.1, rx), Math.max(.1, ry), r, 0, TAU); }
+function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function starP(c, x, y, r, n = 5) { c.beginPath(); for (let i = 0; i < n * 2; i++) { const q = i % 2 ? r * .45 : r, a = i * Math.PI / n - Math.PI / 2; c.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q); } c.closePath(); }
+function heartP(c, x, y, r) { c.beginPath(); c.moveTo(x, y + r * .7); c.bezierCurveTo(x - r * 1.5, y - r * .2, x - r * .6, y - r * 1.3, x, y - r * .4); c.bezierCurveTo(x + r * .6, y - r * 1.3, x + r * 1.5, y - r * .2, x, y + r * .7); c.closePath(); }
+
+/* ---------- もの ---------- */
+// x = まんなか、y = あしもと（じめんの もの）／まんなか（そらの もの）
+const SIZE = { girl: [56, 118], boy: [56, 114], dog: [84, 62], cat: [76, 58], balloon: [56, 70], cloud: [170, 78], sun: [120, 120], tree: [170, 230], flower: [34, 50], house: [180, 180], car: [160, 78], fumikiri: [50, 120] };
+let objs = [], uid = 1, flowers = [], gApples = [], parts = [], bees = [];
+let rainbowT = 0, rainedAt = -99, wasRaining = false, rainbowDone = false;
+let train = null, trainT = 4, alarm = false, alarmT = 0, typhoons = [], wind = 0, windDir = 1, windN = null;
+const TRACK = G - 52;
+const byId = id => objs.find(o => o.id === id);
+const isSky = o => o.type === 'balloon' || o.type === 'cloud' || o.type === 'sun';
+function bbox(o) { const [w, h] = SIZE[o.type]; return isSky(o) ? [o.x - w / 2, o.y - h / 2, o.x + w / 2, o.y + h / 2] : [o.x - w / 2, o.y - h, o.x + w / 2, o.y]; }
+function add(type, x, y, extra = {}) {
+  if (objs.length >= 45) { hint('もう いっぱい！ 🧽で けしてね'); return null; }
+  const o = Object.assign({ id: uid++, type, x, y, vx: 0, vy: 0, t: 0, rot: 0, sq: 0, dir: Math.random() < .5 ? -1 : 1, sayT: 0 }, extra);
+  init(o, true); objs.push(o); return o;
+}
+let balloonIdx = 0;
+function init(o, fresh) {
+  const ty = o.type;
+  if (KID.includes(ty)) { o.hair = o.hair || pick(HAIR); o.cloth = o.cloth || pick(CLOTH); o.balloons = o.balloons || []; o.state = 'walk'; o.walk = 0; o.think = rnd(1, 3); }
+  if (ty === 'dog' || ty === 'cat') { o.col = o.col || pick(ty === 'dog' ? ['#d9a066', '#f2e2c8', '#8a5a3c'] : ['#f2a65a', '#c9c3cf', '#3a3440', '#fff4e6']); o.balloons = o.balloons || []; o.state = 'walk'; o.walk = 0; o.think = rnd(1, 3); o.nap = 0; }
+  if (ty === 'balloon') { o.col = o.col || BCOL[balloonIdx++ % BCOL.length]; o.by = o.y; o.ph = rnd(0, 6); if (fresh) { const h = nearestLiving(o, 300); if (h) attach(o, h); } }
+  if (ty === 'cloud') { o.vx = o.vx || (Math.random() < .5 ? -14 : 14); o.rainT = fresh ? 10 : 0; o.flT = 1; }
+  if (ty === 'sun') { o.rot = 0; }
+  if (ty === 'tree') { o.apples = o.apples || []; o.appleT = 2; o.shake = 0; }
+  if (ty === 'flower') { o.col = o.col || pick(['#ff4f8b', '#ffd23f', '#9b6bff', '#ff8a2a', '#3fa0ff']); o.g = fresh ? 0 : 1; }
+  if (ty === 'house') { o.inside = o.inside || []; o.peek = 0; o.doorT = 0; }
+  if (ty === 'car') { o.dir = o.dir || 1; o.riders = o.riders || []; o.stopT = 0; o.wheel = 0; }
+  if (GROUND.includes(ty) && fresh && o.y < G - 2) o.air = true;
+}
+function nearestLiving(o, maxD) { let best = null, bd = maxD; for (const h of objs) if (LIVING.includes(h.type) && h.state !== 'house' && h.state !== 'ride') { const [x0, y0] = bbox(h); const d = Math.hypot(h.x - o.x, y0 - o.y); if (d < bd) { bd = d; best = h; } } return best; }
+function attach(b, h) { if (b.owner) return; b.owner = h.id; h.balloons.push(b.id); say(h, h.type === 'dog' ? 'ワン！？' : h.type === 'cat' ? 'ニャ！？' : pick(['ふうせんだ！', 'わーい！', 'うかぶ〜！'])); SFX.float(); }
+function say(o, text, dur = 1.8) { o.say = text; o.sayT = dur; }
+
+/* ---------- タッチ ---------- */
+let grab = null, cutting = null, lastCut = null, placeArm = null;
+function lp(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / S, (e.clientY - r.top) / S]; }
+function hit(x, y, filter) {
+  const order = ['balloon', 'sun', 'cloud', 'girl', 'boy', 'dog', 'cat', 'car', 'flower', 'tree', 'house'];
+  let best = null, bo = 99;
+  for (const o of objs) { if (o.state === 'house' || o.state === 'ride') continue; if (filter && !filter.includes(o.type)) continue; const [x0, y0, x1, y1] = bbox(o), m = 10; if (x > x0 - m && x < x1 + m && y > y0 - m && y < y1 + m) { const k = order.indexOf(o.type); if (k < bo) { bo = k; best = o; } } }
+  return best;
+}
+cv.addEventListener('pointerdown', e => {
+  audio(); e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  const [x, y] = lp(e);
+  if (sel === 'hasami') { cutting = { id: e.pointerId, pts: [[x, y]] }; cutAt(x, y, x, y); return; }
+  if (sel === 'keshi') { const o = hit(x, y); if (o) erase(o); else { const i = gApples.findIndex(a => Math.hypot(a.x - x, a.y - y) < 22); if (i >= 0) gApples.splice(i, 1); else { const f = flowers.findIndex(f => Math.abs(f.x - x) < 16 && y > G - 60 && y < G + 10); if (f >= 0) flowers.splice(f, 1); } } return; }
+  const o = hit(x, y);
+  if (o && o.type === 'balloon' && sel === 'balloon') { placeArm = { id: e.pointerId, x, y, maybe: o }; return; }
+  if (o) { grab = { id: e.pointerId, o, dx: o.x - x, dy: o.y - y, sx: x, sy: y, moved: false, hist: [[x, y, now()]] }; return; }
+  placeArm = { id: e.pointerId, x, y };
+});
+cv.addEventListener('pointermove', e => {
+  const [x, y] = lp(e);
+  if (placeArm && placeArm.maybe && e.pointerId === placeArm.id && Math.hypot(x - placeArm.x, y - placeArm.y) > 8) { const o = placeArm.maybe; placeArm = null; grab = { id: e.pointerId, o, dx: o.x - x, dy: o.y - y, sx: x, sy: y, moved: true, hist: [[x, y, now()]] }; pickUp(o); }
+  if (cutting && e.pointerId === cutting.id) { const l = cutting.pts[cutting.pts.length - 1]; cutting.pts.push([x, y]); cutAt(l[0], l[1], x, y); return; }
+  if (!grab || e.pointerId !== grab.id) return;
+  const g = grab, o = g.o;
+  if (!g.moved && Math.hypot(x - g.sx, y - g.sy) > 8) { g.moved = true; pickUp(o); }
+  if (!g.moved) return;
+  o.x = clamp(x + g.dx, 10, LW - 10); o.y = clamp(y + g.dy, 20, isSky(o) ? G - 20 : G); if (o.type === 'fumikiri') o.y = G - 30;
+  if (o.type === 'balloon') o.by = o.y;
+  g.hist.push([x, y, now()]); if (g.hist.length > 6) g.hist.shift();
+});
+function up(e) {
+  if (cutting && e.pointerId === cutting.id) { lastCut = { pts: cutting.pts, life: .5 }; cutting = null; return; }
+  if (placeArm && e.pointerId === placeArm.id) { const p = placeArm; placeArm = null; place(sel, p.x, p.y); return; }
+  if (!grab || e.pointerId !== grab.id) return;
+  const g = grab; grab = null; const o = g.o;
+  if (!g.moved) { tapObj(o); return; }
+  o.held = false;
+  const h = g.hist, a = h[0], b = h[h.length - 1], dt = Math.max(.016, b[2] - a[2]);
+  drop(o, clamp((b[0] - a[0]) / dt, -1600, 1600), clamp((b[1] - a[1]) / dt, -1600, 1600));
+}
+cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+
+function place(type, x, y) {
+  const st = STAMPS.find(s => s.id === type); if (!st || st.tool) return;
+  if (type === 'sun' && objs.some(o => o.type === 'sun')) { const s = objs.find(o => o.type === 'sun'); s.x = x; s.y = Math.min(y, G - 150); SFX.place(); return; }
+  let yy = y;
+  if (type === 'taifu') { startTyphoon(x); return; }
+  if (type === 'fumikiri') { if (!objs.some(o => o.type === 'fumikiri')) trainT = 4; yy = G - 30; }
+  if (type === 'sun') yy = Math.min(y, G - 150);
+  if (type === 'cloud') yy = Math.min(y, G - 260);
+  if (type === 'balloon') yy = Math.min(y, G - 50);
+  if (type === 'flower') yy = G;
+  if (['tree', 'house', 'car'].includes(type)) yy = Math.min(G, y + SIZE[type][1] / 2);
+  if (type === 'fumikiri') yy = G - 30;
+  if (LIVING.includes(type)) yy = Math.min(G, y + SIZE[type][1] / 2);
+  const o = add(type, x, yy); if (!o) return;
+  if (type === 'flower') { flowers.push({ x, h: rnd(30, 46), g: 0, col: o.col }); objs.splice(objs.indexOf(o), 1); SFX.bloom(); save(); return; }
+  SFX.place(); burst(o.x, isSky(o) ? o.y : o.y - SIZE[type][1] / 2, 'sparkle');
+  if (KID.includes(type)) say(o, pick(['こんにちは！', 'やっほー！', 'あそぼう！']));
+  if (type === 'dog') { say(o, 'ワン！'); SFX.woof(); }
+  if (type === 'cat') { say(o, 'ニャー'); SFX.meow(); }
+  if (type === 'car') SFX.honk();
+  if (type === 'fumikiri') SFX.kan();
+  save();
+}
+function pickUp(o) {
+  o.held = true; o.vx = o.vy = 0;
+  if (o.type === 'balloon' && o.owner) { const h = byId(o.owner); if (h) h.balloons = h.balloons.filter(id => id !== o.id); o.owner = null; }
+  if (LIVING.includes(o.type)) { say(o, o.type === 'dog' ? 'ワフッ' : o.type === 'cat' ? 'ニャッ！' : pick(['きゃっ', 'たかーい！', 'わわっ']), 1); SFX.giggle(); for (const c of objs) if (c.type === 'car') c.riders = c.riders.filter(id => id !== o.id); }
+}
+function drop(o, vx, vy) {
+  if (o.type === 'balloon') { const h = nearestLiving(o, 160); if (h) attach(o, h); o.by = o.y; return; }
+  if (isSky(o) || o.type === 'fumikiri') return;
+  // おうち・くるまに いれる
+  if (LIVING.includes(o.type)) {
+    const [x0, y0, x1, y1] = [o.x - 10, o.y - 20, o.x + 10, o.y];
+    for (const c of objs) if (c.type === 'car') { const [a0, b0, a1, b1] = bbox(c); if (o.x > a0 && o.x < a1 && o.y > b0 - 40 && o.y < b1) { ride(o, c); return; } }
+    for (const hs of objs) if (hs.type === 'house') { const [a0, b0, a1, b1] = bbox(hs); if (o.x > a0 + 20 && o.x < a1 - 20 && o.y > b0 + 40 && o.y < b1) { enterHouse(o, hs); return; } }
+  }
+  o.vx = vx * .6; o.vy = vy * .6; o.air = true;
+}
+function tapObj(o) {
+  const ty = o.type;
+  if (ty === 'tree') {
+    o.shake = 1; SFX.rustle();
+    const ripe = o.apples.filter(a => a.r > 7);
+    if (!ripe.length) { fx(o.x, o.y - 240, 'まだ ならないよ', '#3fae54', 20); return; }
+    const [x0, y0] = bbox(o);
+    for (const a of ripe) gApples.push({ x: x0 + a.u, y: y0 + a.v, vx: rnd(-60, 60), vy: rnd(-120, 0), landed: false, bounce: 0 });
+    o.apples = o.apples.filter(a => a.r <= 7);
+  } else if (ty === 'cloud') { o.rainT = 10; fx(o.x, o.y - 50, 'ザーザー', '#3fa0ff', 22); SFX.giggle(); }
+  else if (ty === 'sun') { o.spin = 1.2; fx(o.x, o.y - 80, 'ぽかぽか〜', '#ff9a3c', 22); SFX.giggle(); }
+  else if (ty === 'balloon') { o.by -= 0; fx(o.x, o.y - 50, 'ぽよん', '#ff6fa8', 20); o.sq = .2; SFX.hop(); }
+  else if (ty === 'house') { exitHouse(o, true); }
+  else if (ty === 'fumikiri') { if (!train) { trainT = Math.min(trainT, 1.5); fx(o.x, o.y - 140, 'でんしゃ くるよ！', '#ff6fa8', 20); } SFX.kan(); }
+  else if (ty === 'car') { SFX.honk(); fx(o.x, o.y - 100, 'ブッブー！', '#ff8a2a', 24); o.stopT = 1; const rs = o.riders.slice(); o.riders = []; for (const id of rs) { const r = byId(id); if (r) { r.state = 'walk'; r.x = o.x + rnd(-40, 40); r.y = o.y - 60; r.vy = -500; r.vx = rnd(-120, 120); r.air = true; say(r, 'おりる〜！', 1); } } }
+  else if (LIVING.includes(ty)) {
+    if (o.state === 'nap') { o.state = 'walk'; o.nap = 0; say(o, 'ニャッ！？'); SFX.meow(); o.vy = -400; o.air = true; return; }
+    o.vy = -460; o.air = true; o.sq = -.2;
+    if (ty === 'dog') { say(o, 'ワンワン！'); SFX.woof(); }
+    else if (ty === 'cat') { say(o, 'ニャ〜ン'); SFX.meow(); }
+    else { say(o, pick(['くすぐったい！', 'えへへ', 'きゃはは！'])); SFX.giggle(); }
+    burstHearts(o.x, o.y - SIZE[ty][1]);
+  }
+}
+function cutAt(x0, y0, x1, y1) {
+  const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 5));
+  for (const b of objs.filter(o => o.type === 'balloon')) { const [a0, b0, a1, b1] = bbox(b); for (let i = 0; i <= n; i++) { const x = lerp(x0, x1, i / n), y = lerp(y0, y1, i / n); if (x > a0 + 4 && x < a1 - 4 && y > b0 + 2 && y < b1 - 10) { pop(b); break; } } }
+}
+function pop(b) {
+  const i = objs.indexOf(b); if (i < 0) return; objs.splice(i, 1);
+  for (let k = 0; k < 16; k++) { const a = rnd(0, TAU), s = rnd(120, 360); parts.push({ k: 'shred', x: b.x, y: b.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, g: 600, life: 1, max: 1, r: rnd(4, 9), rot: rnd(0, 6), vr: rnd(-12, 12), col: b.col }); }
+  fx(b.x, b.y, 'パン！', '#ff4f8b', 40); SFX.pop();
+  if (b.owner) { const h = byId(b.owner); if (h) { h.balloons = h.balloons.filter(id => id !== b.id); if (!h.balloons.length) { say(h, h.type === 'dog' ? 'キャイ〜ン！' : h.type === 'cat' ? 'ニャ〜〜！' : 'わぁぁ〜！', 1.4); SFX.wah(); h.falling = true; h.air = true; } else say(h, 'あれれ？', 1); } }
+  save();
+}
+function erase(o) {
+  const i = objs.indexOf(o); if (i < 0) return; objs.splice(i, 1);
+  burst(o.x, isSky(o) ? o.y : o.y - SIZE[o.type][1] / 2, 'poof'); SFX.poof();
+  if (o.balloons) for (const id of o.balloons) { const b = byId(id); if (b) { b.owner = null; b.free = true; } }
+  if (o.type === 'balloon' && o.owner) { const h = byId(o.owner); if (h) h.balloons = h.balloons.filter(id => id !== o.id); }
+  if (o.type === 'house') for (const id of o.inside) { const r = byId(id); if (r) { r.state = 'walk'; r.x = o.x; r.y = G; } }
+  if (o.type === 'car') for (const id of o.riders) { const r = byId(id); if (r) { r.state = 'walk'; r.y = G - 40; r.air = true; } }
+  save();
+}
+function ride(o, car) { if (car.riders.length >= 3) { o.air = true; return; } o.state = 'ride'; car.riders.push(o.id); say(o, o.type === 'dog' ? 'ワン♪' : 'ブーブー！', 1.4); SFX.honk(); save(); }
+function enterHouse(o, hs) { o.state = 'house'; o.houseT = rnd(4, 7); hs.inside.push(o.id); hs.doorT = .8; SFX.door(); }
+function exitHouse(hs, tap) {
+  hs.doorT = .8; SFX.door();
+  if (!hs.inside.length) { if (tap) fx(hs.x, hs.y - 200, 'だれも いないよ', '#9b7bff', 20); return; }
+  for (const id of hs.inside) { const r = byId(id); if (r) { r.state = 'walk'; r.x = hs.x + rnd(-10, 10); r.y = G; r.vy = -380; r.air = true; r.dir = Math.random() < .5 ? -1 : 1; say(r, tap ? 'ばあ！' : pick(['はれた〜！', 'おそと いこう！']), 1.4); } }
+  hs.inside = [];
+}
+
+/* ---------- うごき ---------- */
+function raining() { return wind > .3 || objs.some(c => c.type === 'cloud' && c.rainT > 0); }
+function rainOver(x0, x1) { return objs.some(c => c.type === 'cloud' && c.rainT > 0 && c.x - 60 < x1 && c.x + 60 > x0); }
+function update(dt, t) {
+  const rain = raining();
+  if (wasRaining && !rain) rainedAt = t; wasRaining = rain;
+  const sun = objs.find(o => o.type === 'sun');
+  if (sun && (rain || t - rainedAt < 12) && !rainbowDone && rainbowT <= 0) { rainbowT = 14; rainbowDone = true; SFX.rainbow(); fx(LW / 2, 140, 'にじだ！', '#ff6fa8', 36); for (const o of objs) if (KID.includes(o.type) && o.state === 'walk') say(o, pick(['にじだ〜！', 'きれい！']), 2); }
+  if (!rain && t - rainedAt > 12) rainbowDone = false;
+  if (rainbowT > 0) rainbowT -= dt;
+  rainSound(rain);
+  updTrain(dt, t); updWind(dt, t);
+  for (const o of objs) {
+    o.t += dt; if (o.sayT > 0) o.sayT -= dt; o.sq += -o.sq * 10 * dt;
+    if (o.held) continue;
+    const ty = o.type;
+    if (LIVING.includes(ty)) updLiving(o, dt, t, rain, sun);
+    else if (ty === 'balloon') updBalloon(o, dt);
+    else if (ty === 'cloud') updCloud(o, dt);
+    else if (ty === 'sun') { o.rot += dt * (o.spin > 0 ? 4 : .4); if (o.spin > 0) o.spin -= dt; }
+    else if (ty === 'tree') updTree(o, dt, sun);
+    else if (ty === 'house') { if (o.doorT > 0) o.doorT -= dt; o.peek += dt; }
+    else if (ty === 'car') updCar(o, dt);
+    if (o.air && GROUND.includes(ty) && !LIVING.includes(ty)) { o.vy += 1500 * dt; o.y += o.vy * dt; if (o.y >= G) { o.y = G; o.vy = 0; o.air = false; o.sq = .2; SFX.thud(); } }
+  }
+  objs = objs.filter(o => !(o.type === 'balloon' && o.free && o.y < -80));
+  for (const a of gApples) {
+    if (a.landed) continue;
+    a.vy += 1400 * dt; a.x += a.vx * dt; a.y += a.vy * dt;
+    if (a.y >= G - 9) { a.y = G - 9; if (a.bounce < 1 && a.vy > 200) { a.vy *= -.35; a.bounce++; SFX.thud(); } else { a.landed = true; a.vy = 0; } }
+  }
+  for (const f of flowers) f.g = Math.min(1, f.g + dt * (sun ? .9 : .5) * (rainOver(f.x - 1, f.x + 1) ? 3 : 1));
+  // はち
+  const bloomed = flowers.filter(f => f.g >= 1);
+  const want = Math.min(3, Math.floor(bloomed.length / 2));
+  while (bees.length < want) bees.push({ x: rnd(0, LW), y: rnd(250, 450), tx: 0, ty: 0, t: 0, ph: rnd(0, 6), target: null });
+  if (bees.length > want) bees.length = want;
+  for (const b of bees) {
+    b.t += dt; if (!b.target || b.t > 3) { b.target = pick(bloomed) || null; b.t = 0; if (Math.random() < .3) SFX.buzz(); }
+    const tx = b.target ? b.target.x : LW / 2, ty = b.target ? G - b.target.h - 14 : 300;
+    b.x += (tx + Math.sin(b.t * 3 + b.ph) * 30 - b.x) * Math.min(1, dt * 1.5); b.y += (ty + Math.cos(b.t * 4 + b.ph) * 20 - b.y) * Math.min(1, dt * 1.5);
+  }
+}
+function updLiving(o, dt, t, rain, sun) {
+  const ty = o.type, [w, h] = SIZE[ty];
+  if (o.state === 'house') { o.houseT -= dt; return; }
+  if (o.state === 'ride') { const c = objs.find(c => c.type === 'car' && c.riders.includes(o.id)); if (!c) { o.state = 'walk'; o.air = true; return; } const k = c.riders.indexOf(o.id); o.x = c.x + (k - (c.riders.length - 1) / 2) * 34; o.y = c.y - 34; o.dir = c.dir; return; }
+  const n = o.balloons.length;
+  if (n > 0) {
+    const topLimit = 230, targetY = Math.max(topLimit + h, G - 50 - n * 110);
+    o.vy += ((targetY - o.y) * 2.2 - o.vy * 1.6) * dt; o.y += o.vy * dt;
+    o.x += (Math.sin(o.t * .6 + o.id) * 26 + o.dir * 12) * dt; o.x = clamp(o.x, w / 2, LW - w / 2); if (o.x <= w / 2 + 1) o.dir = 1; if (o.x >= LW - w / 2 - 1) o.dir = -1;
+    o.rot = Math.sin(o.t * 1.7) * .12; o.air = true; o.falling = false; o.state = 'float';
+    if (o.sayT <= 0 && Math.random() < dt * .25) say(o, ty === 'dog' ? 'ワオーン！' : ty === 'cat' ? 'ニャ〜！？' : pick(['たかーい！', 'とんでる〜！', 'やっほー！']), 1.6);
+    return;
+  }
+  if (o.state === 'float') o.state = 'walk';
+  if (o.air || o.y < G - .5) {
+    o.vy += 1500 * dt; o.y += o.vy * dt; o.x += o.vx * dt; o.x = clamp(o.x, w / 2, LW - w / 2);
+    o.rot = lerp(o.rot, o.falling ? Math.sin(o.t * 20) * .3 : o.vx * .0004, .2);
+    if (o.y >= G) {
+      o.y = G; const imp = o.vy;
+      if (imp > 650) { o.vy = -imp * .28; o.sq = .35; o.dizzy = 1.8; say(o, ty === 'dog' ? 'キャン！' : ty === 'cat' ? 'ギャッ！' : pick(['いたっ！', 'いたた…', 'ドスン！']), 1.6); SFX.thud(); SFX.ouch(); for (let k = 0; k < 6; k++) { const a = rnd(0, TAU); parts.push({ k: 'star', x: o.x, y: o.y - h, vx: Math.cos(a) * 140, vy: Math.sin(a) * 140 - 80, g: 300, life: .8, max: .8, r: rnd(5, 9), rot: 0, vr: 5, col: '#ffd23f' }); } }
+      else { o.vy = 0; if (imp > 200) { o.sq = .15; SFX.thud(); } }
+      if (o.vy > -80) { o.vy = 0; o.air = false; o.falling = false; o.vx = 0; }
+    }
+    return;
+  }
+  o.rot = lerp(o.rot, wind > .05 ? (o.windLean || 0) : 0, .2); if (wind < .05) o.windLean = 0; if (o.dizzy > 0) { o.dizzy -= dt; return; }
+  if (o.state === 'eat') { o.eatT -= dt; if (o.eatT <= 0) { o.state = 'walk'; say(o, ty === 'dog' ? 'ワン♪' : 'おいしい！', 1.6); SFX.yum(); burstHearts(o.x, o.y - h); } return; }
+  if (o.state === 'nap') { o.nap -= dt; if (Math.random() < dt * .8) parts.push({ k: 'txt', x: o.x + 20, y: o.y - h, vx: 12, vy: -24, g: 0, life: 1.6, max: 1.6, r: 18, rot: 0, vr: 0, col: '#8fa8ff', text: 'Z' }); if (o.nap <= 0 || rain) { o.state = 'walk'; if (rain) say(o, 'ニャッ！'); } return; }
+  // あめ → おうちへ
+  const wet = rainOver(o.x - w / 2, o.x + w / 2);
+  const house = objs.find(hh => hh.type === 'house');
+  let sp = ty === 'dog' ? 70 : ty === 'cat' ? 40 : 45, target = null;
+  if (rain && house && ty !== 'dog') { target = house.x; sp = 120; if (o.sayT <= 0) say(o, ty === 'cat' ? 'ニャッ！' : pick(['あめだ〜！', 'おうちに はいろう！']), 1.4); if (Math.abs(house.x - o.x) < 20) { enterHouse(o, house); return; } }
+  else if (wet && o.sayT <= 0) { say(o, ty === 'dog' ? 'ワフッ！' : ty === 'cat' ? 'ニャ〜' : pick(['つめたい！', 'ぬれちゃう〜']), 1.4); SFX.cold(); sp *= 2; }
+  if (target == null && KID.includes(ty)) { let a = null, bd = 1e9; for (const ap of gApples) if (ap.landed) { const d = Math.abs(ap.x - o.x); if (d < bd) { bd = d; a = ap; } } if (a) { target = a.x; sp = 75; if (bd < 14) { gApples.splice(gApples.indexOf(a), 1); o.state = 'eat'; o.eatT = 1.3; say(o, 'もぐもぐ', 1.3); SFX.chomp(); return; } } }
+  if (target == null && ty === 'dog') {
+    let k = null, bd = 1e9; for (const kk of objs) if (KID.includes(kk.type) && kk.state !== 'house' && kk.state !== 'ride') { const d = Math.abs(kk.x - o.x); if (d < bd) { bd = d; k = kk; } }
+    if (k) { if (k.state === 'float') { if (o.sayT <= 0) { say(o, 'ワンワン！', 1.2); SFX.woof(); o.vy = -420; o.air = true; return; } target = k.x; } else if (bd > 70) target = k.x - Math.sign(k.x - o.x) * 50; else { o.walk += dt * 3; if (Math.random() < dt * .2) { say(o, 'ワン！', 1); SFX.woof(); } return; } }
+  }
+  if (target == null && ty === 'cat' && sun && Math.random() < dt * .05) { o.state = 'nap'; o.nap = rnd(6, 10); say(o, 'ふにゃ〜', 1.2); return; }
+  if (target == null && ty === 'cat' && bees.length && Math.random() < dt * .3) { const b = bees[0]; o.dir = b.x > o.x ? 1 : -1; o.vy = -560; o.air = true; o.vx = o.dir * 120; say(o, 'ニャッ！'); return; }
+  if (target != null) o.dir = target > o.x ? 1 : -1;
+  else { o.think -= dt; if (o.think <= 0) { o.think = rnd(2, 5); if (Math.random() < .25) { o.idle = rnd(1, 2); } else o.dir = Math.random() < .5 ? -1 : 1; } if (o.idle > 0) { o.idle -= dt; return; } }
+  if (wind > .3 && o.dir !== windDir) sp *= .3;
+  o.x += o.dir * sp * dt; o.walk += dt * sp / 6;
+  if (o.x < w / 2) { o.x = w / 2; o.dir = 1; } if (o.x > LW - w / 2) { o.x = LW - w / 2; o.dir = -1; }
+}
+function updBalloon(o, dt) {
+  if (o.free) { o.y -= 70 * dt; o.x += (Math.sin(o.t + o.ph) * 20 + (o.windX || 0) * 380) * dt; if (o.x < -100 || o.x > LW + 100) o.y = -200; return; }
+  const h = o.owner ? byId(o.owner) : null;
+  if (o.owner && (!h || h.state === 'house' || h.state === 'ride')) { if (h) h.balloons = h.balloons.filter(id => id !== o.id); o.owner = null; o.free = true; return; }
+  if (h) {
+    const k = h.balloons.indexOf(o.id), n = h.balloons.length, hh = SIZE[h.type][1];
+    const tx = h.x + (k - (n - 1) / 2) * 50 + Math.sin(o.t * 1.2 + o.ph) * 6, ty = h.y - hh - 110 - (k % 2) * 24 + Math.sin(o.t * 1.5 + o.ph) * 5;
+    const f = Math.min(1, dt * 5); o.x += (tx - o.x) * f; o.y += (ty - o.y) * f;
+  } else {
+    o.y = o.by + Math.sin(o.t * 1.4 + o.ph) * 6;
+    for (const l of objs) if (LIVING.includes(l.type) && l.state === 'walk' && !l.air && Math.abs(l.x - o.x) < 90 && l.y - SIZE[l.type][1] > o.y && l.y - SIZE[l.type][1] - o.y < 300) { attach(o, l); break; }
+  }
+}
+function updCloud(o, dt) {
+  o.x += o.vx * dt; if (!o.blown) { if (o.x < 60) o.vx = Math.abs(o.vx); if (o.x > LW - 60) o.vx = -Math.abs(o.vx); }
+  if (o.rainT > 0) {
+    o.rainT -= dt;
+    const n = Math.floor(dt * 55 + Math.random());
+    for (let i = 0; i < n; i++) parts.push({ k: 'rain', x: rnd(o.x - 60, o.x + 60), y: o.y + 20, vx: 0, vy: rnd(480, 560), g: 0, life: 2, max: 2, r: 3, rot: 0, vr: 0, col: '#5aaeff' });
+    o.flT -= dt;
+    if (o.flT <= 0 && flowers.length < 40) { o.flT = rnd(.9, 1.5); const x = rnd(o.x - 60, o.x + 60); if (x > 10 && x < LW - 10 && !objs.some(q => (q.type === 'house' || q.type === 'tree') && Math.abs(q.x - x) < SIZE[q.type][0] / 2 - 10)) { flowers.push({ x, h: rnd(24, 44), g: 0, col: pick(['#ff4f8b', '#ffd23f', '#9b6bff', '#ff8a2a', '#3fa0ff']) }); SFX.bloom(); } }
+  }
+}
+function updTree(o, dt, sun) {
+  o.shake = Math.max(0, o.shake - dt * 2);
+  o.appleT -= dt * (rainOver(o.x - 60, o.x + 60) ? 3 : 1) * (sun ? 1.5 : 1);
+  if (o.appleT <= 0) { o.appleT = 3.5; if (o.apples.length < 6) o.apples.push({ u: rnd(.2, .8) * SIZE.tree[0], v: rnd(.12, .5) * SIZE.tree[1], r: 0 }); }
+  for (const a of o.apples) a.r = Math.min(10, a.r + dt * 6);
+}
+function updCar(o, dt) {
+  o.wheel += dt * (o.stopT > 0 ? 0 : 6) * o.dir; if (o.stopT > 0) { o.stopT -= dt; return; }
+  if (crossBlock(o)) { o.wheel -= dt * 6 * o.dir; return; }
+  o.x += o.dir * 90 * dt; const w = SIZE.car[0];
+  if (o.x > LW - w / 2) { o.x = LW - w / 2; o.dir = -1; } if (o.x < w / 2) { o.x = w / 2; o.dir = 1; }
+}
+// でんしゃ
+function updTrain(dt, t) {
+  const cross = objs.filter(o => o.type === 'fumikiri');
+  if (!cross.length) { train = null; alarm = false; return; }
+  if (!train) { trainT -= dt; if (trainT <= 0) { const d = Math.random() < .5 ? 1 : -1; train = { x: d > 0 ? -520 : LW + 520, dir: d, t: 0, gt: 0 }; SFX.fuwan(); } }
+  else {
+    train.t += dt; if (train.t > 1.8) train.x += train.dir * 300 * dt;
+    train.gt -= dt; if (train.gt <= 0 && train.t > 1.8 && train.x > -400 && train.x < LW + 400) { train.gt = .45; SFX.gatan(); }
+    if ((train.dir > 0 && train.x > LW + 540) || (train.dir < 0 && train.x < -540)) { train = null; trainT = rnd(16, 26); }
+    if (train && Math.random() < dt * .8) for (const k of objs) if (KID.includes(k.type) && k.state === 'walk' && !k.air && k.sayT <= 0) { say(k, pick(['でんしゃだ〜！', 'おーい！', 'バイバーイ！']), 1.6); break; }
+  }
+  const was = alarm; alarm = !!train;
+  if (alarm) { alarmT += dt; if (Math.floor(alarmT / .45) !== Math.floor((alarmT - dt) / .45)) SFX.kan(); } else alarmT = 0;
+  for (const c of cross) c.gate = clamp((c.gate || 0) + (alarm && alarmT > .6 ? dt * 1.5 : -dt * 1.5), 0, 1);
+}
+function crossBlock(car) { for (const c of objs) if (c.type === 'fumikiri' && (c.gate || 0) > .05) { const d = (c.x - car.x) * car.dir; if (d > 50 && d < 110) return true; } return false; }
+// たいふう
+function startTyphoon(x) {
+  const d = x < LW / 2 ? 1 : -1;
+  typhoons.push({ x: d > 0 ? -160 : LW + 160, y: 230, dir: d, t: 0, rot: 0 });
+  windDir = d; SFX.byu(); hint('🌀 たいふうが きた〜！');
+}
+function updWind(dt, t) {
+  for (const ty of typhoons) { ty.t += dt; ty.x += ty.dir * (LW + 320) / 9 * dt; ty.rot += dt * 5; }
+  typhoons = typhoons.filter(ty => ty.t < 9.5);
+  const target = typhoons.length ? 1 : 0; wind = lerp(wind, target, 1 - Math.exp(-dt * 1.5));
+  if (typhoons.length) windDir = typhoons[typhoons.length - 1].dir;
+  if (AC) { if (wind > .1 && !windN) { const s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = noiseBuf; s.loop = true; f.type = 'bandpass'; f.frequency.value = 500; f.Q.value = .6; g.gain.value = 0; s.connect(f).connect(g).connect(master); s.start(); windN = { s, g }; }
+    if (windN) { windN.g.gain.value = wind * .12; if (wind < .05) { try { windN.s.stop(); } catch (e) {} windN = null; } } }
+  if (wind < .05) return;
+  const W2 = wind * windDir;
+  if (Math.random() < dt * 30 * wind) parts.push({ k: 'wind', x: windDir > 0 ? -60 : LW + 60, y: rnd(40, G - 20), vx: windDir * rnd(700, 1000), vy: rnd(-20, 20), g: 0, life: 2, max: 2, r: rnd(40, 90), rot: 0, vr: 0, col: 'rgba(255,255,255,.75)' });
+  if (Math.random() < dt * 8 * wind) parts.push({ k: 'leaf', x: windDir > 0 ? -20 : LW + 20, y: rnd(150, G - 10), vx: windDir * rnd(300, 600), vy: rnd(-60, 60), g: 40, life: 3, max: 3, r: rnd(5, 8), rot: rnd(0, 6), vr: rnd(-10, 10), col: pick(['#5cc66d', '#8fd96b', '#ffb347']) });
+  if (Math.random() < dt * 60 * wind) parts.push({ k: 'rain', x: rnd(-100, LW + 100), y: -10, vx: windDir * 260, vy: rnd(520, 640), g: 0, life: 2, max: 2, r: 3, rot: 0, vr: 0, col: '#7fb8ff' });
+  for (const o of objs) {
+    if (o.type === 'cloud') { o.vx += W2 * 260 * dt; if (Math.abs(o.vx) > 120 && !o.blown) { o.blown = true; o.rainT = 0; } o.spinA = (o.spinA || 0) + dt * o.vx * .01; }
+    if (o.type === 'balloon' && !o.owner && !o.held) { o.free = true; o.windX = W2; }
+    if (o.type === 'tree') { o.shake = Math.max(o.shake, wind); for (const a of o.apples.filter(a => a.r > 7)) if (Math.random() < dt * .8 * wind) { const [x0, y0] = bbox(o); gApples.push({ x: x0 + a.u, y: y0 + a.v, vx: windDir * rnd(80, 180), vy: 0, landed: false, bounce: 0 }); o.apples.splice(o.apples.indexOf(a), 1); } }
+    if (o.type === 'car') o.stopT = Math.max(o.stopT, .2);
+    if (LIVING.includes(o.type) && !o.held && o.state !== 'house' && o.state !== 'ride') {
+      if (o.state === 'float') { o.x += W2 * 110 * dt; if (o.sayT <= 0 && Math.random() < dt) say(o, o.type === 'dog' ? 'キャ〜ン！' : 'とばされる〜！', 1.4); }
+      else if (!o.air) { o.windLean = W2 * .22; if (o.sayT <= 0 && Math.random() < dt * .7) say(o, o.type === 'dog' ? 'ワフッ！' : o.type === 'cat' ? 'ニャ〜〜！' : pick(['かぜが つよい〜！', 'ビュ〜〜！', 'とばされちゃう〜']), 1.4); }
+    }
+  }
+  objs = objs.filter(o => !(o.type === 'cloud' && o.blown && (o.x < -220 || o.x > LW + 220)));
+}
+// おうちから でる
+setInterval(() => { for (const hs of objs) if (hs.type === 'house' && hs.inside.length && !raining()) { const ready = hs.inside.every(id => { const r = byId(id); return !r || r.houseT <= 0; }); if (ready) exitHouse(hs, false); } }, 500);
+
+/* ---------- つぶつぶ ---------- */
+function fx(x, y, text, col, size) { parts.push({ k: 'txt', x, y, vx: 0, vy: -36, g: 0, life: 1.3, max: 1.3, r: size || 26, rot: 0, vr: 0, col: col || '#ff6fa8', text }); }
+function burst(x, y, kind) {
+  for (let i = 0; i < 14; i++) { const a = rnd(0, TAU), s = rnd(60, 220);
+    parts.push(kind === 'poof' ? { k: 'dot', x, y, vx: Math.cos(a) * s * .6, vy: Math.sin(a) * s * .6, g: 0, life: .7, max: .7, r: rnd(8, 16), rot: 0, vr: 0, col: 'rgba(230,230,230,.9)' }
+      : { k: 'star', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, g: 0, life: .8, max: .8, r: rnd(5, 9), rot: 0, vr: rnd(-5, 5), col: pick(['#ffd23f', '#ff8fb8', '#8fd3ff']) }); }
+}
+function burstHearts(x, y) { for (let k = 0; k < 4; k++) parts.push({ k: 'heart', x: x + rnd(-20, 20), y, vx: rnd(-20, 20), vy: rnd(-90, -50), g: 0, life: 1.2, max: 1.2, r: rnd(7, 11), rot: 0, vr: 0, col: '#ff6f91' }); }
+function stepParts(dt) {
+  for (const p of parts) { p.life -= dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+    if (p.k === 'rain') { let stop = G - 2; for (const hs of objs) if (hs.type === 'house' && Math.abs(hs.x - p.x) < 90) stop = Math.min(stop, hs.y - 150); if (p.y >= stop) { p.life = 0; if (Math.random() < .3) parts.push({ k: 'dot', x: p.x, y: stop, vx: rnd(-40, 40), vy: rnd(-90, -40), g: 500, life: .3, max: .3, r: 2, rot: 0, vr: 0, col: '#7fc0ff' }); } } }
+  parts = parts.filter(p => p.life > 0);
+}
+function drawParts(c) {
+  for (const p of parts) {
+    c.save(); c.globalAlpha = clamp(p.life / (p.max * .35), 0, 1); c.translate(p.x, p.y); c.rotate(p.rot); c.fillStyle = p.col; c.strokeStyle = p.col;
+    if (p.k === 'star') { starP(c, 0, 0, p.r); c.fill(); }
+    else if (p.k === 'heart') { heartP(c, 0, 0, p.r); c.fill(); }
+    else if (p.k === 'rain') { c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, 0); c.lineTo(p.vx * .02, 12); c.stroke(); }
+    else if (p.k === 'wind') { c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-Math.sign(p.vx) * p.r * .5, -6, -Math.sign(p.vx) * p.r, 0); c.stroke(); }
+    else if (p.k === 'leaf') { ell(c, 0, 0, p.r, p.r * .5); c.fill(); }
+    else if (p.k === 'shred') { c.beginPath(); c.moveTo(-p.r, -p.r * .4); c.lineTo(p.r, -p.r * .2); c.lineTo(p.r * .6, p.r * .5); c.lineTo(-p.r * .8, p.r * .3); c.closePath(); c.fill(); }
+    else if (p.k === 'txt') { c.font = `900 ${p.r}px "Hiragino Maru Gothic ProN",sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 6; c.strokeStyle = '#fff'; c.strokeText(p.text, 0, 0); c.fillText(p.text, 0, 0); }
+    else { ell(c, 0, 0, p.r, p.r); c.fill(); }
+    c.restore();
+  }
+}
+
+/* ---------- え ---------- */
+const OL = '#4a3a40';
+function face(c, x, y, s, mood, t, dir = 1) {
+  c.save(); c.translate(x, y); c.scale(s, s); c.lineCap = 'round'; c.strokeStyle = OL; c.fillStyle = OL;
+  const ex = 7;
+  if (mood === 'dizzy') { c.lineWidth = 1.8; for (const q of [-1, 1]) { c.beginPath(); for (let a = 0; a < TAU * 1.6; a += .4) c.lineTo(q * ex + Math.cos(a + t * 10) * a * .9, Math.sin(a + t * 10) * a * .9); c.stroke(); } }
+  else if (mood === 'ouch') { c.lineWidth = 2.4; for (const q of [-1, 1]) { c.beginPath(); c.moveTo(q * ex - q * 3, -3); c.lineTo(q * ex + q * 2, 0); c.lineTo(q * ex - q * 3, 3); c.stroke(); } }
+  else if (mood === 'happy' || mood === 'eat') { c.lineWidth = 2.4; for (const q of [-1, 1]) { c.beginPath(); c.arc(q * ex, 2, 3.5, Math.PI * 1.15, Math.PI * 1.85); c.stroke(); } }
+  else if (mood === 'sleep') { c.lineWidth = 2.2; for (const q of [-1, 1]) { c.beginPath(); c.moveTo(q * ex - 3.5, 0); c.quadraticCurveTo(q * ex, 3, q * ex + 3.5, 0); c.stroke(); } }
+  else if (mood === 'wow') { for (const q of [-1, 1]) { c.fillStyle = '#fff'; ell(c, q * ex, 0, 4.6, 5); c.fill(); c.lineWidth = 1.5; c.stroke(); c.fillStyle = OL; ell(c, q * ex, 0, 2, 2); c.fill(); } }
+  else { for (const q of [-1, 1]) { ell(c, q * ex + dir * .8, 0, 2.8, 3.4); c.fill(); c.fillStyle = '#fff'; ell(c, q * ex - .8 + dir * .8, -1.2, 1, 1); c.fill(); c.fillStyle = OL; } }
+  c.fillStyle = 'rgba(255,120,150,.45)'; ell(c, -12, 6, 3.5, 2.3); c.fill(); ell(c, 12, 6, 3.5, 2.3); c.fill();
+  c.fillStyle = '#c23a55'; c.strokeStyle = '#c23a55'; c.lineWidth = 1.8;
+  if (mood === 'wow' || mood === 'ouch' || mood === 'dizzy') { ell(c, 0, 9, 3, 4); c.fill(); }
+  else if (mood === 'eat') { ell(c, 0, 9, 3.5, 1.5 + Math.abs(Math.sin(t * 14)) * 2.5); c.fill(); }
+  else if (mood === 'happy') { c.beginPath(); c.moveTo(-4, 7); c.quadraticCurveTo(0, 13, 4, 7); c.closePath(); c.fill(); }
+  else if (mood === 'sleep') { ell(c, 0, 9, 1.6, 1.6); c.fill(); }
+  else { c.beginPath(); c.moveTo(-3.5, 8); c.quadraticCurveTo(0, 11, 3.5, 8); c.stroke(); }
+  c.restore();
+}
+function moodOf(o) {
+  if (o.dizzy > 0) return 'dizzy';
+  if (o.falling) return 'wow';
+  if (o.held) return 'wow';
+  if (o.state === 'eat') return 'eat';
+  if (o.state === 'nap') return 'sleep';
+  if (o.state === 'float') return 'happy';
+  if (o.sayT > 0 && /いた|ギャ|キャン/.test(o.say)) return 'ouch';
+  if (o.sayT > 0) return 'happy';
+  return 'normal';
+}
+function drawKid(c, o, t) {
+  const girl = o.type === 'girl', m = moodOf(o), walking = o.state === 'walk' && !o.air && !(o.idle > 0) && !(o.dizzy > 0);
+  const sw = walking ? Math.sin(o.walk) : 0, bob = walking ? -Math.abs(Math.sin(o.walk)) * 4 : 0, dangle = o.air || o.state === 'float' ? Math.sin(t * 12 + o.id) : 0;
+  c.save(); c.translate(o.x, o.y + bob); c.rotate(o.rot); c.scale(1 + o.sq, 1 - o.sq);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  // あし
+  c.strokeStyle = '#ffd9c0'; c.lineWidth = 9;
+  c.beginPath(); c.moveTo(-8, -30); c.lineTo(-8 + sw * 8 + dangle * 4, -4); c.moveTo(8, -30); c.lineTo(8 - sw * 8 - dangle * 4, -4); c.stroke();
+  c.fillStyle = '#ff6f91'; ell(c, -8 + sw * 8 + dangle * 4, -3, 8, 5); c.fill(); ell(c, 8 - sw * 8 - dangle * 4, -3, 8, 5); c.fill();
+  // からだ
+  c.fillStyle = o.cloth;
+  if (girl) { c.beginPath(); c.moveTo(-14, -66); c.lineTo(14, -66); c.lineTo(24, -26); c.quadraticCurveTo(0, -20, -24, -26); c.closePath(); c.fill(); c.fillStyle = 'rgba(255,255,255,.6)'; for (const [dx, dy] of [[-8, -38], [8, -44], [0, -32]]) { ell(c, dx, dy, 2.4, 2.4); c.fill(); } }
+  else { rr(c, -15, -66, 30, 30, 8); c.fill(); c.fillStyle = '#4a6fb3'; rr(c, -15, -40, 30, 14, 4); c.fill(); }
+  // うで
+  const up = o.state === 'float' || o.held || (o.sayT > 0 && /にじ|わーい|やっほー|ばあ/.test(o.say || ''));
+  c.strokeStyle = '#ffd9c0'; c.lineWidth = 8;
+  for (const q of [-1, 1]) { c.beginPath(); c.moveTo(q * 13, -60); c.lineTo(q * (up ? 22 : 20), up ? -84 + Math.sin(t * 8 + q) * 3 : -40 + (walking ? -q * sw * 4 : 0)); c.stroke(); }
+  // あたま
+  const hy = -86;
+  c.fillStyle = o.hair; ell(c, 0, hy - 2, 25, 25); c.fill();
+  if (girl) { for (const q of [-1, 1]) { ell(c, q * 26, hy + 6, 8, 12); c.fill(); } c.fillStyle = '#ff6f91'; for (const q of [-1, 1]) { ell(c, q * 22, hy - 4, 5, 4); c.fill(); } c.fillStyle = o.hair; }
+  c.fillStyle = '#ffe3cf'; ell(c, 0, hy + 3, 21, 20); c.fill();
+  c.fillStyle = o.hair; c.beginPath(); c.moveTo(-22, hy); c.quadraticCurveTo(-20, hy - 26, 2, hy - 24); c.quadraticCurveTo(22, hy - 24, 22, hy - 2); c.quadraticCurveTo(10, hy - 12, -2, hy - 10); c.quadraticCurveTo(-12, hy - 6, -22, hy); c.fill();
+  face(c, o.dir * 2, hy + 4, 1, m, t, o.dir);
+  c.restore();
+}
+function drawPet(c, o, t) {
+  const dog = o.type === 'dog', m = moodOf(o), walking = o.state === 'walk' && !o.air && !(o.idle > 0) && !(o.dizzy > 0);
+  const sw = walking ? Math.sin(o.walk * 1.4) : 0, nap = o.state === 'nap';
+  c.save(); c.translate(o.x, o.y); c.rotate(o.rot); c.scale((1 + o.sq) * o.dir, 1 - o.sq);
+  const col = o.col, dk = dog ? '#8a5a3c' : '#a07a5a';
+  c.lineCap = 'round'; c.fillStyle = col;
+  if (nap) { ell(c, 0, -16, 34, 16); c.fill(); ell(c, 24, -20, 15, 13); c.fill(); c.beginPath(); c.moveTo(16, -30); c.lineTo(20, -42); c.lineTo(28, -31); c.moveTo(30, -30); c.lineTo(36, -40); c.lineTo(38, -28); c.fill(); face(c, 24, -20, .6, 'sleep', t); c.restore(); return; }
+  // しっぽ
+  c.strokeStyle = col; c.lineWidth = dog ? 7 : 6; c.beginPath(); c.moveTo(-26, -30);
+  if (dog) c.quadraticCurveTo(-40, -44 + Math.sin(t * 16) * 6, -38, -54 + Math.sin(t * 16) * 8); else c.quadraticCurveTo(-48, -34, -44, -58 + Math.sin(t * 3) * 6);
+  c.stroke();
+  // あし
+  c.strokeStyle = col; c.lineWidth = 8;
+  for (const [x, ph] of [[-18, 0], [-8, Math.PI], [12, Math.PI], [22, 0]]) { c.beginPath(); c.moveTo(x, -22); c.lineTo(x + Math.sin(o.walk * 1.4 + ph) * (walking ? 6 : 0), -3); c.stroke(); }
+  // からだ
+  ell(c, 0, -30, 30, 16); c.fill();
+  // あたま
+  const hx = 24, hy = -46;
+  ell(c, hx, hy, 18, 16); c.fill();
+  if (dog) { c.fillStyle = dk; ell(c, hx - 12, hy - 2, 7, 13, .3); c.fill(); ell(c, hx + 2, hy - 8, 6, 11, -.3); c.fill(); c.fillStyle = '#fff3e6'; ell(c, hx + 10, hy + 6, 9, 7); c.fill(); c.fillStyle = OL; ell(c, hx + 16, hy + 2, 3.5, 3); c.fill(); }
+  else { c.beginPath(); c.moveTo(hx - 14, hy - 8); c.lineTo(hx - 10, hy - 26); c.lineTo(hx - 2, hy - 13); c.moveTo(hx + 4, hy - 13); c.lineTo(hx + 12, hy - 26); c.lineTo(hx + 15, hy - 6); c.fill(); c.strokeStyle = OL; c.lineWidth = 1; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(hx + 10, hy + 4); c.lineTo(hx + 24, hy + 2 + s * 4); c.stroke(); } }
+  face(c, hx + 2, hy - 1, .62, m, t);
+  c.restore();
+}
+function drawBalloon(c, o, t) {
+  c.save(); c.translate(o.x, o.y); c.scale(1 + o.sq, 1 - o.sq);
+  c.fillStyle = o.col; ell(c, 0, -6, 24, 30); c.fill();
+  c.beginPath(); c.moveTo(-5, 24); c.lineTo(5, 24); c.lineTo(0, 18); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.55)'; ell(c, -9, -16, 6, 10, -.4); c.fill();
+  c.restore();
+}
+function drawString(c, o, t) {
+  const h = o.owner ? byId(o.owner) : null;
+  const sx = o.x, sy = o.y + 24; let ex, ey;
+  if (h) { const hh = SIZE[h.type][1]; ex = h.x + (KID.includes(h.type) ? h.dir * 16 : 0); ey = h.y - hh * (KID.includes(h.type) ? .68 : .6); }
+  else { ex = sx + Math.sin(o.t * 1.3) * 8; ey = sy + 80; }
+  c.strokeStyle = '#666'; c.lineWidth = 1.8; c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo((sx + ex) / 2 + Math.sin(o.t * 2 + o.ph) * 14, (sy + ey) / 2, ex, ey); c.stroke();
+}
+function drawCloud(c, o, t) {
+  const r = o.rainT > 0, bob = Math.sin(o.t * 1.2) * 4;
+  c.save(); c.translate(o.x, o.y + bob); if (o.spinA) c.rotate(Math.sin(o.spinA) * .5);
+  c.fillStyle = r ? '#b8c4d8' : '#ffffff';
+  for (const [dx, dy, rr2] of [[-50, 10, 28], [-20, -6, 36], [22, -2, 32], [52, 12, 26], [0, 16, 34]]) { ell(c, dx, dy, rr2, rr2 * .85); c.fill(); }
+  face(c, 0, 8, 1.5, o.blown ? 'wow' : r ? 'sleep' : 'happy', t);
+  if (o.blown && Math.random() < .02) fx(o.x, o.y - 50, pick(['わ〜〜！', 'とばされる〜！', 'バイバーイ！']), '#5a7cc8', 20);
+  c.restore();
+}
+function drawSun(c, o, t) {
+  c.save(); c.translate(o.x, o.y);
+  c.save(); c.rotate(o.rot); c.fillStyle = '#ffb347'; for (let i = 0; i < 12; i++) { c.rotate(TAU / 12); c.beginPath(); c.moveTo(-8, -46); c.lineTo(0, -62 - (i % 2) * 8); c.lineTo(8, -46); c.fill(); } c.restore();
+  const g = c.createRadialGradient(-10, -10, 4, 0, 0, 46); g.addColorStop(0, '#fff3a0'); g.addColorStop(1, '#ffd23f'); c.fillStyle = g; ell(c, 0, 0, 44, 44); c.fill();
+  face(c, 0, 2, 2, o.spin > 0 ? 'happy' : 'happy', t);
+  c.restore();
+}
+function drawTree(c, o, t) {
+  const [w, h] = SIZE.tree, sh = Math.sin(t * 30) * 4 * o.shake;
+  c.save(); c.translate(o.x, o.y); c.scale(1 + o.sq, 1 - o.sq);
+  c.fillStyle = '#8a5a3c'; rr(c, -14, -h * .5, 28, h * .5, 6); c.fill();
+  c.translate(sh, 0);
+  c.fillStyle = '#3fae54'; for (const [dx, dy, r] of [[0, -h * .66, 62], [-46, -h * .56, 42], [46, -h * .56, 42], [-26, -h * .86, 40], [28, -h * .84, 40]]) { ell(c, dx, dy, r, r * .9); c.fill(); }
+  c.fillStyle = '#5cc66d'; ell(c, -20, -h * .8, 22, 16); c.fill();
+  for (const a of o.apples) { const x = a.u - w / 2, y = a.v - h; c.fillStyle = '#ff3b4f'; ell(c, x, y, a.r, a.r * .95); c.fill(); c.fillStyle = 'rgba(255,255,255,.5)'; ell(c, x - a.r * .35, y - a.r * .35, a.r * .25, a.r * .2); c.fill(); }
+  c.restore();
+}
+function drawHouse(c, o, t) {
+  const [w, h] = SIZE.house;
+  c.save(); c.translate(o.x, o.y);
+  c.fillStyle = '#fff3e0'; c.fillRect(-w / 2 + 10, -h * .62, w - 20, h * .62);
+  c.fillStyle = '#ff7a6b'; c.beginPath(); c.moveTo(-w / 2 - 4, -h * .6); c.lineTo(0, -h); c.lineTo(w / 2 + 4, -h * .6); c.closePath(); c.fill();
+  c.fillStyle = '#c96a5a'; c.fillRect(30, -h * .95, 18, 30);
+  // ドア
+  const open = o.doorT > 0;
+  c.fillStyle = '#8a5a3c'; rr(c, -18, -60, 36, 60, 8); c.fill();
+  if (open) { c.fillStyle = '#3a2a20'; rr(c, -18, -60, 36, 60, 8); c.fill(); c.fillStyle = '#a8724a'; c.beginPath(); c.moveTo(18, -60); c.lineTo(34, -56); c.lineTo(34, -2); c.lineTo(18, 0); c.fill(); }
+  else { c.fillStyle = '#ffd23f'; ell(c, 10, -30, 3, 3); c.fill(); }
+  // まど と のぞく かお
+  for (const q of [-1, 1]) {
+    const wx = q * 52, wy = -h * .45;
+    c.fillStyle = '#bfe9ff'; c.fillRect(wx - 18, wy - 16, 36, 32);
+    const peekId = o.inside.length ? o.inside[Math.floor(o.peek / 2.5 + (q > 0 ? 1 : 0)) % o.inside.length] : null, pk = peekId ? byId(peekId) : null;
+    if (pk && Math.sin(o.peek * 1.3 + q) > 0) {
+      c.save(); c.beginPath(); c.rect(wx - 18, wy - 16, 36, 32); c.clip();
+      if (KID.includes(pk.type)) { c.fillStyle = pk.hair; ell(c, wx, wy + 8, 16, 16); c.fill(); c.fillStyle = '#ffe3cf'; ell(c, wx, wy + 12, 13, 12); c.fill(); face(c, wx, wy + 12, .65, 'happy', t); }
+      else { c.fillStyle = pk.col; ell(c, wx, wy + 12, 14, 12); c.fill(); face(c, wx, wy + 11, .55, 'happy', t); }
+      c.restore();
+    }
+    c.strokeStyle = '#fff'; c.lineWidth = 4; c.strokeRect(wx - 18, wy - 16, 36, 32); c.beginPath(); c.moveTo(wx, wy - 16); c.lineTo(wx, wy + 16); c.stroke();
+  }
+  c.restore();
+}
+const CAR_BACK = 14, CAR_SC = .9;
+function drawCar(c, o, t) {
+  c.save(); c.translate(o.x, o.y - CAR_BACK); c.scale(CAR_SC, CAR_SC); c.scale(o.dir * (1 + o.sq), 1 - o.sq);
+  c.fillStyle = '#ff5a5f'; c.beginPath(); c.moveTo(-40, -36); c.lineTo(-24, -64); c.quadraticCurveTo(0, -70, 20, -64); c.lineTo(40, -36); c.closePath(); c.fill();
+  c.fillStyle = '#bfe6ff'; c.beginPath(); c.moveTo(-32, -38); c.lineTo(-20, -59); c.lineTo(16, -59); c.lineTo(30, -38); c.closePath(); c.fill();
+  c.fillStyle = '#ff5a5f'; rr(c, -74, -42, 148, 30, 14); c.fill();
+  c.fillStyle = '#fff6b0'; ell(c, 68, -30, 6, 6); c.fill();
+  for (const wx of [-44, 44]) { c.save(); c.translate(wx, -12); c.rotate(o.wheel); c.fillStyle = '#2f2a3a'; ell(c, 0, 0, 14, 14); c.fill(); c.fillStyle = '#c9cfdd'; ell(c, 0, 0, 6, 6); c.fill(); c.fillStyle = '#2f2a3a'; c.fillRect(-1.5, -6, 3, 12); c.restore(); }
+  c.restore();
+}
+function drawTrack(c, t) {
+  c.fillStyle = 'rgba(160,150,140,.5)'; c.fillRect(-10, TRACK - 4, LW + 20, 12);
+  c.fillStyle = '#9a7a5a'; for (let x = -10; x < LW + 10; x += 22) c.fillRect(x, TRACK - 2, 10, 9);
+  c.fillStyle = '#7c8494'; c.fillRect(-10, TRACK - 6, LW + 20, 3); c.fillRect(-10, TRACK + 1, LW + 20, 3);
+  if (train) drawTrain(c, t);
+}
+function drawTrain(c, t) {
+  const sc = .85, n = 3, len = 150;
+  c.save(); c.translate(train.x, TRACK - 4); c.scale(sc * train.dir, sc);
+  for (let i = 0; i < n; i++) {
+    const x = -i * (len + 8) - len / 2, front = i === 0, bob = Math.sin(t * 20 + i) * 1.2;
+    c.save(); c.translate(0, bob);
+    c.fillStyle = '#fff6fb';
+    if (front) { c.beginPath(); c.moveTo(x - len / 2, -86); c.lineTo(x + len / 2 - 30, -86); c.quadraticCurveTo(x + len / 2 + 10, -80, x + len / 2 + 14, -30); c.lineTo(x + len / 2 + 14, -10); c.lineTo(x - len / 2, -10); c.closePath(); c.fill(); }
+    else { rr(c, x - len / 2, -86, len, 76, 12); c.fill(); }
+    c.fillStyle = '#ff6fa8'; c.fillRect(x - len / 2, -40, len + (front ? 14 : 0), 10);
+    c.fillStyle = '#bfe6ff'; for (let k = 0; k < (front ? 2 : 3); k++) rr(c, x - len / 2 + 12 + k * 44, -76, 32, 26, 6), c.fill();
+    if (front) { c.fillStyle = '#bfe6ff'; c.beginPath(); c.moveTo(x + len / 2 - 26, -76); c.quadraticCurveTo(x + len / 2 + 4, -72, x + len / 2 + 8, -48); c.lineTo(x + len / 2 - 26, -48); c.closePath(); c.fill(); c.fillStyle = '#fff6b0'; ell(c, x + len / 2 + 10, -22, 6, 6); c.fill();
+      c.save(); c.translate(x + len / 2 - 8, -60); c.scale(train.dir, 1); c.restore(); }
+    c.fillStyle = '#3a3440'; for (const wx of [x - len / 2 + 24, x + len / 2 - 24]) { ell(c, wx, -8, 12, 12); c.fill(); }
+    c.restore();
+  }
+  c.restore();
+}
+function drawCross(c, o, t) {
+  const on = alarm, blink = Math.floor(t * 2.4) % 2, g = o.gate || 0;
+  c.save(); c.translate(o.x, o.y);
+  c.fillStyle = '#5a5a66'; c.fillRect(-4, -110, 8, 110);
+  c.save(); c.translate(0, -100); for (const r of [.7, -.7]) { c.save(); c.rotate(r); c.fillStyle = '#ffd23f'; rr(c, -26, -6, 52, 12, 3); c.fill(); c.fillStyle = '#2b2b33'; for (let i = -20; i < 26; i += 14) c.fillRect(i, -6, 6, 12); c.restore(); } c.restore();
+  c.fillStyle = '#2b2b33'; rr(c, -26, -80, 52, 20, 10); c.fill();
+  for (const [dx, k] of [[-14, 0], [14, 1]]) { c.fillStyle = on && blink === k ? '#ff3b3b' : '#6a2a2a'; ell(c, dx, -70, 7, 7); c.fill(); if (on && blink === k) { c.fillStyle = 'rgba(255,60,60,.35)'; ell(c, dx, -70, 16, 16); c.fill(); } }
+  // しゃだんき
+  c.save(); c.translate(6, -40); c.rotate(-Math.PI / 2 * (1 - g)); c.fillStyle = '#fff'; rr(c, 0, -4, 110, 8, 4); c.fill(); c.fillStyle = '#2b2b33'; for (let i = 8; i < 110; i += 22) c.fillRect(i, -4, 11, 8); c.restore();
+  if (on) { c.font = '900 16px "Hiragino Maru Gothic ProN",sans-serif'; c.textAlign = 'center'; c.fillStyle = '#ff3b3b'; c.fillText('カンカン', 0, -128 - (blink ? 2 : 0)); }
+  c.restore();
+}
+function drawTyphoon(c, ty, t) {
+  const a = Math.min(1, ty.t / 1, (9.5 - ty.t) / 1.2);
+  c.save(); c.globalAlpha = .85 * clamp(a, 0, 1); c.translate(ty.x, ty.y); c.rotate(ty.rot * -ty.dir);
+  for (let k = 0; k < 4; k++) { c.rotate(TAU / 4); c.strokeStyle = k % 2 ? 'rgba(200,210,230,.9)' : 'rgba(255,255,255,.95)'; c.lineWidth = 22 - k * 3; c.lineCap = 'round'; c.beginPath(); for (let i = 0; i < 40; i++) { const q = i / 40, r = 20 + q * 150, an = q * 3.2; c.lineTo(Math.cos(an) * r, Math.sin(an) * r * .8); } c.stroke(); }
+  c.fillStyle = 'rgba(120,140,180,.8)'; ell(c, 0, 0, 22, 18); c.fill();
+  c.restore();
+  if (a > .5) { c.font = '900 30px "Hiragino Maru Gothic ProN",sans-serif'; c.textAlign = 'center'; c.lineWidth = 6; c.strokeStyle = '#fff'; c.fillStyle = '#5a7cc8'; c.strokeText('ビュ〜〜！', ty.x, ty.y - 190); c.fillText('ビュ〜〜！', ty.x, ty.y - 190); }
+}
+function drawFlower(c, f, t) {
+  const h = f.h * f.g, x0 = f.x, y = G + 2, x = x0 + wind * windDir * h * (.4 + .15 * Math.sin(t * 9 + x0));
+  c.strokeStyle = '#4aa83a'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(x0, y); c.quadraticCurveTo(x0 + Math.sin(t + x0) * 3, y - h / 2, x, y - h); c.stroke();
+  if (f.g > .3) { c.fillStyle = '#5cc66d'; ell(c, x - 6, y - h * .4, 6, 3, -.5); c.fill(); }
+  if (f.g > .5) { const r = 6 * (f.g - .5) * 2; c.fillStyle = f.col; for (let i = 0; i < 5; i++) { const a = i / 5 * TAU + t * .3; ell(c, x + Math.cos(a) * r, y - h + Math.sin(a) * r, r * .8, r * .8); c.fill(); } c.fillStyle = '#ffe36e'; ell(c, x, y - h, r * .6, r * .6); c.fill(); }
+}
+function drawBee(c, b, t) {
+  c.save(); c.translate(b.x, b.y);
+  c.fillStyle = 'rgba(255,255,255,.8)'; ell(c, -3, -8, 6, 4 + Math.abs(Math.sin(t * 40)) * 3, -.4); c.fill(); ell(c, 4, -8, 6, 4 + Math.abs(Math.sin(t * 40 + 1)) * 3, .4); c.fill();
+  c.fillStyle = '#ffd23f'; ell(c, 0, 0, 11, 8); c.fill(); c.fillStyle = '#3a2a30'; c.fillRect(-3, -8, 3, 16); c.fillRect(4, -7, 3, 14); ell(c, 10, -1, 2, 2); c.fill();
+  c.restore();
+}
+function drawSay(c, o) {
+  if (!o.say || o.sayT <= 0 || o.state === 'house') return;
+  c.save(); c.globalAlpha = clamp(o.sayT * 3, 0, 1);
+  c.font = '900 20px "Hiragino Maru Gothic ProN",sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  const [, y0] = bbox(o);
+  const w = c.measureText(o.say).width + 26, x = clamp(o.x, w / 2 + 6, LW - w / 2 - 6), y = Math.max(26, y0 - 26);
+  c.fillStyle = '#fff'; c.strokeStyle = '#ffb3cf'; c.lineWidth = 3; rr(c, x - w / 2, y - 18, w, 36, 18); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(x - 6, y + 16); c.lineTo(clamp(o.x, x - 20, x + 20), y + 26); c.lineTo(x + 6, y + 16); c.fill();
+  c.fillStyle = '#4a4458'; c.fillText(o.say, x, y + 1); c.restore();
+}
+function drawWorld(c, t) {
+  const rain = raining(), sun = objs.some(o => o.type === 'sun');
+  const g = c.createLinearGradient(0, 0, 0, G); g.addColorStop(0, rain ? '#9fb3cc' : sun ? '#7fd0ff' : '#a6dcff'); g.addColorStop(1, rain ? '#d9e2ee' : '#eaf8ff');
+  c.fillStyle = g; c.fillRect(0, 0, LW, LH);
+  if (rainbowT > 0) { const a = Math.min(1, rainbowT / 2, (14 - rainbowT) / 1.5); ['#ff6f91', '#ffb347', '#ffe36e', '#8fd96b', '#5aa9ff', '#b48cff'].forEach((col, i) => { c.strokeStyle = col; c.globalAlpha = .65 * a; c.lineWidth = 18; c.beginPath(); c.arc(LW / 2, G + 40, Math.min(LW * .45, 480) - i * 18, Math.PI, TAU); c.stroke(); }); c.globalAlpha = 1; }
+  c.fillStyle = '#b6e89a'; c.beginPath(); c.moveTo(0, G - 40); c.quadraticCurveTo(LW * .3, G - 110, LW * .6, G - 50); c.quadraticCurveTo(LW * .85, G - 90, LW, G - 40); c.lineTo(LW, G); c.lineTo(0, G); c.fill();
+  c.fillStyle = '#8fd96b'; c.fillRect(0, G, LW, LH - G);
+  c.fillStyle = '#7cc95a'; for (let x = 0; x < LW; x += 22) { c.beginPath(); c.moveTo(x, G + 2); c.lineTo(x + 6, G - 8 - (x * 13 % 7)); c.lineTo(x + 12, G + 2); c.fill(); }
+  if (objs.some(o => o.type === 'fumikiri')) drawTrack(c, t);
+  if (objs.some(o => o.type === 'car' || o.type === 'fumikiri')) { c.fillStyle = 'rgba(190,170,140,.55)'; rr(c, -10, G - 26, LW + 20, 20, 10); c.fill(); c.fillStyle = 'rgba(255,255,255,.6)'; for (let x = 10; x < LW; x += 60) c.fillRect(x, G - 17, 26, 3); }
+  for (const f of flowers) drawFlower(c, f, t);
+  const order = { sun: 0, cloud: 1, house: 2, tree: 3, fumikiri: 3.5, car: 4, cat: 5, dog: 5, girl: 6, boy: 6, balloon: 8 };
+  const list = objs.filter(o => o.state !== 'house' && o.state !== 'ride').sort((a, b) => (a.held ? 99 : order[a.type]) - (b.held ? 99 : order[b.type]));
+  for (const o of list) if (o.type === 'balloon') drawString(c, o, t);
+  for (const o of list) {
+    const ty = o.type;
+    if (ty === 'sun') drawSun(c, o, t); else if (ty === 'cloud') drawCloud(c, o, t); else if (ty === 'house') drawHouse(c, o, t); else if (ty === 'tree') drawTree(c, o, t);
+    else if (ty === 'fumikiri') drawCross(c, o, t);
+    else if (ty === 'car') drawCar(c, o, t); else if (ty === 'dog' || ty === 'cat') drawPet(c, o, t); else if (KID.includes(ty)) drawKid(c, o, t); else if (ty === 'balloon') drawBalloon(c, o, t);
+  }
+  // くるまの まどから かお
+  for (const car of objs) if (car.type === 'car') car.riders.forEach((id, k) => { const r = byId(id); if (!r) return; const by = car.y - CAR_BACK, x = car.x + ((k - (car.riders.length - 1) / 2) * 22 * car.dir - car.dir * 2) * CAR_SC, y = by - 52 * CAR_SC;
+    c.save(); c.beginPath(); c.moveTo(car.x - 30 * CAR_SC, by - 38 * CAR_SC); c.lineTo(car.x - 20 * CAR_SC, by - 59 * CAR_SC); c.lineTo(car.x + 18 * CAR_SC, by - 59 * CAR_SC); c.lineTo(car.x + 30 * CAR_SC, by - 38 * CAR_SC); c.closePath(); c.clip();
+    if (KID.includes(r.type)) { c.fillStyle = r.hair; ell(c, x, y - 2, 13, 13); c.fill(); c.fillStyle = '#ffe3cf'; ell(c, x, y + 2, 11, 10); c.fill(); face(c, x, y + 2, .55, 'happy', t); } else { c.fillStyle = r.col; ell(c, x, y + 2, 12, 10); c.fill(); face(c, x, y + 2, .5, 'happy', t); }
+    c.restore(); });
+  for (const a of gApples) { c.fillStyle = '#ff3b4f'; ell(c, a.x, a.y, 9, 8.5); c.fill(); c.strokeStyle = '#6b4a2a'; c.lineWidth = 2; c.beginPath(); c.moveTo(a.x, a.y - 9); c.lineTo(a.x + 2, a.y - 14); c.stroke(); }
+  for (const b of bees) drawBee(c, b, t);
+  for (const ty of typhoons) drawTyphoon(c, ty, t);
+  const cut = cutting || lastCut; if (cut && cut.pts.length > 1) { c.globalAlpha = cutting ? 1 : clamp(cut.life * 2, 0, 1); c.setLineDash([10, 8]); c.strokeStyle = 'rgba(90,90,100,.6)'; c.lineWidth = 3; c.beginPath(); cut.pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+    const l = cut.pts[cut.pts.length - 1]; if (cutting) { c.font = '40px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('✂️', l[0] + 20, l[1] - 20); } }
+  drawParts(c);
+  for (const o of objs) if (LIVING.includes(o.type)) drawSay(c, o);
+}
+
+/* ---------- ほぞん ---------- */
+const KEEP = ['id', 'type', 'x', 'y', 'dir', 'hair', 'cloth', 'col', 'balloons', 'owner', 'by', 'apples', 'inside', 'riders', 'state'];
+function save() {
+  const data = { uid, objs: objs.map(o => { const d = {}; for (const k of KEEP) if (o[k] !== undefined) d[k] = o[k]; if (d.state && d.state !== 'house' && d.state !== 'ride') delete d.state; if (typeof d.x === 'number') d.x = +d.x.toFixed(1); if (typeof d.y === 'number') d.y = +d.y.toFixed(1); return d; }),
+    flowers: flowers.map(f => ({ x: +f.x.toFixed(1), h: f.h, col: f.col })) };
+  store.set('scene', data);
+}
+function load() {
+  const d = store.get('scene', null); if (!d) return;
+  uid = d.uid || 1; flowers = (d.flowers || []).map(f => Object.assign({ g: 1 }, f));
+  objs = (d.objs || []).map(o => Object.assign({ vx: 0, vy: 0, t: 0, rot: 0, sq: 0, sayT: 0 }, o));
+  const st = {}; for (const o of objs) st[o.id] = o.state;
+  for (const o of objs) { init(o, false); if (st[o.id] === 'house' || st[o.id] === 'ride') o.state = st[o.id]; if (o.state === 'house') o.houseT = 1; if (o.type === 'balloon') o.by = o.by ?? o.y; }
+  for (const o of objs) if (o.type === 'balloon' && o.owner && !byId(o.owner)) o.owner = null;
+  for (const o of objs) if (o.balloons) o.balloons = o.balloons.filter(id => { const b = byId(id); return b && b.owner === o.id; });
+}
+
+/* ---------- UI ---------- */
+let hintTo = 0;
+function hint(t) { const el = $('#hint'); el.textContent = t; el.style.opacity = t ? 1 : 0; clearTimeout(hintTo); hintTo = setTimeout(() => { el.style.opacity = 0; }, 4000); }
+function buildBar() {
+  const bar = $('#bar'); bar.innerHTML = '';
+  for (const p of STAMPS) {
+    if (p.sep) { const s = document.createElement('span'); s.className = 'sep'; bar.appendChild(s); continue; }
+    const b = document.createElement('button'); b.className = 'pb' + (sel === p.id ? ' on' : ''); b.dataset.id = p.id;
+    b.innerHTML = `<span class="e emo">${p.e}</span><span class="n">${p.id === 'zenbu' && zenbuArm ? 'もういちど' : p.n}</span>`;
+    b.addEventListener('click', () => choose(p.id));
+    bar.appendChild(b);
+  }
+}
+function choose(id) {
+  audio();
+  if (id === 'zenbu') {
+    if (zenbuArm) { objs = []; flowers = []; gApples = []; bees = []; rainbowT = 0; train = null; typhoons = []; zenbuArm = 0; SFX.poof(); save(); hint('まっさらに なったよ！'); }
+    else { zenbuArm = 1; hint('🗑️ もういちど おすと ぜんぶ けすよ'); setTimeout(() => { if (zenbuArm) { zenbuArm = 0; buildBar(); } }, 3000); }
+    buildBar(); return;
+  }
+  sel = id; zenbuArm = 0; buildBar();
+  const p = STAMPS.find(s => s.id === id); hint(p.tool ? p.hint : `${p.e} タップした ところに おけるよ。${HINTS[id] || ''}`);
+}
+function renderSound() { $('#btnSound').textContent = opt.sound ? '🔊' : '🔇'; if (master) master.gain.value = opt.sound ? .9 : 0; }
+$('#btnSound').addEventListener('click', () => { audio(); opt.sound = !opt.sound; store.set('opt', opt); renderSound(); });
+let lastTouch = 0;
+document.addEventListener('touchend', e => { const t = Date.now(); if (t - lastTouch < 350 && !e.target.closest('a,button')) e.preventDefault(); lastTouch = t; }, { passive: false });
+for (const ev of ['gesturestart', 'gesturechange', 'dblclick']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { save(); rainSound(false); } });
+
+/* ---------- ループ ---------- */
+let lastT = now(), saveT = 0;
+function loop() {
+  requestAnimationFrame(loop);
+  const t = now(), dt = Math.min(.05, t - lastT); lastT = t;
+  update(dt, t); stepParts(dt);
+  if (lastCut) { lastCut.life -= dt; if (lastCut.life <= 0) lastCut = null; }
+  saveT += dt; if (saveT > 5) { saveT = 0; save(); }
+  ctx.setTransform(DPR * S, 0, 0, DPR * S, 0, 0);
+  drawWorld(ctx, t);
+}
+load(); resize(); buildBar(); renderSound();
+hint(objs.length ? 'つづきから あそぼう！' : '👧 スタンプを えらんで タップで おいてね！');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

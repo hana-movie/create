@@ -78,6 +78,7 @@
   .g17 { --c: #b7a2ff; --d: #7b5fe0; --bg: #f1ecff; }
   .g18 { --c: #7fd0ff; --d: #2f8fd0; --bg: #e6f6ff; }
   .g19 { --c: #ffb36b; --d: #e07a2a; --bg: #fff3d6; }
+  .g20 { --c: #9fdc6e; --d: #4f9e35; --bg: #fbfbf7; }
 </style>
 </head>
 <body>
@@ -235,6 +236,14 @@
       <div class="body">
         <div class="name">くるくる<wbr>とけい</div>
         <div class="desc">はりを まわして なんじ かな？ ちょうど と はん を おぼえよう！</div>
+        <div class="stars">★☆☆</div>
+      </div>
+    </a>
+    <a class="game g20" href="oitara/index.html">
+      <canvas class="thumb" id="th20"></canvas>
+      <div class="body">
+        <div class="name">おいたら<wbr>うごく！</div>
+        <div class="desc">スタンプを おくと うごきだす！ ふうせんで うかんだり あめで はなが さいたり</div>
         <div class="stars">★☆☆</div>
       </div>
     </a>
@@ -1035,6 +1044,44 @@
     c.restore();
     c.font = '30px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🍪', 350, 200);
     c.font = '900 18px "Hiragino Maru Gothic ProN",sans-serif'; c.fillStyle = '#ff8a3c'; c.fillText('ポッポー', 196, 76);
+  }
+  // 20. おいたら うごく！
+  {
+    const c = setup('th20'), T = Math.PI * 2;
+    const E = (x, y, rx, ry) => { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, T); };
+    const g = c.createLinearGradient(0, 0, 0, 232); g.addColorStop(0, '#7fd0ff'); g.addColorStop(1, '#eaf8ff'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    ['#ff6f91', '#ffb347', '#ffe36e', '#8fd96b', '#5aa9ff', '#b48cff'].forEach((col, i) => { c.strokeStyle = col; c.globalAlpha = .55; c.lineWidth = 8; c.beginPath(); c.arc(200, 250, 170 - i * 8, Math.PI, T); c.stroke(); }); c.globalAlpha = 1;
+    c.fillStyle = '#b6e89a'; c.beginPath(); c.moveTo(0, 214); c.quadraticCurveTo(140, 186, 260, 210); c.quadraticCurveTo(340, 196, 400, 214); c.lineTo(400, 232); c.lineTo(0, 232); c.fill();
+    c.fillStyle = '#8fd96b'; c.fillRect(0, 232, W, 70);
+    // くも と あめ
+    c.fillStyle = '#fff'; for (const [dx, dy, r] of [[-22, 4, 14], [-6, -4, 18], [14, 0, 15], [28, 6, 12]]) { E(92 + dx, 78 + dy, r, r * .85); c.fill(); }
+    c.strokeStyle = '#5aaeff'; c.lineWidth = 2.5; c.lineCap = 'round'; for (let i = 0; i < 7; i++) { const x = 72 + i * 7, y = 98 + (i * 23 % 50); c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + 8); c.stroke(); }
+    for (const [x, col] of [[70, '#ff4f8b'], [92, '#ffd23f'], [112, '#9b6bff']]) { c.strokeStyle = '#4aa83a'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, 234); c.lineTo(x, 218); c.stroke(); c.fillStyle = col; E(x, 216, 5, 5); c.fill(); }
+    // き
+    c.fillStyle = '#8a5a3c'; c.fillRect(318, 180, 12, 52); c.fillStyle = '#3fae54'; for (const [dx, dy, r] of [[0, 150, 30], [-20, 160, 20], [20, 160, 20]]) { E(324 + dx, dy, r, r * .9); c.fill(); }
+    c.fillStyle = '#ff3b4f'; for (const [x, y] of [[312, 146], [336, 158], [326, 136]]) { E(x, y, 5, 5); c.fill(); }
+    // ふうせんの おんなのこ
+    const kx = 206, ky = 186;
+    const bl = [[184, 96, '#ff4f8b'], [208, 86, '#3fa0ff'], [232, 98, '#ffd23f']];
+    c.strokeStyle = '#666'; c.lineWidth = 1.2; for (const [x, y] of bl) { c.beginPath(); c.moveTo(x, y + 15); c.lineTo(kx + 6, ky - 28); c.stroke(); }
+    for (const [x, y, col] of bl) { c.fillStyle = col; E(x, y, 12, 15); c.fill(); c.fillStyle = 'rgba(255,255,255,.55)'; E(x - 4, y - 5, 3, 5); c.fill(); }
+    c.save(); c.translate(kx, ky); c.scale(.62, .62);
+    c.strokeStyle = '#ffd9c0'; c.lineWidth = 9; c.lineCap = 'round'; c.beginPath(); c.moveTo(-8, -30); c.lineTo(-12, -4); c.moveTo(8, -30); c.lineTo(12, -4); c.stroke();
+    c.fillStyle = '#b48cff'; c.beginPath(); c.moveTo(-14, -66); c.lineTo(14, -66); c.lineTo(24, -26); c.quadraticCurveTo(0, -20, -24, -26); c.closePath(); c.fill();
+    c.strokeStyle = '#ffd9c0'; c.lineWidth = 8; c.beginPath(); c.moveTo(-13, -60); c.lineTo(-22, -84); c.moveTo(13, -60); c.lineTo(22, -84); c.stroke();
+    c.fillStyle = '#c97b3a'; E(0, -88, 25, 25); c.fill(); for (const q of [-1, 1]) { E(q * 26, -80, 8, 12); c.fill(); }
+    c.fillStyle = '#ffe3cf'; E(0, -83, 21, 20); c.fill();
+    c.fillStyle = '#c97b3a'; c.beginPath(); c.moveTo(-22, -86); c.quadraticCurveTo(-20, -112, 2, -110); c.quadraticCurveTo(22, -110, 22, -88); c.quadraticCurveTo(10, -98, -2, -96); c.quadraticCurveTo(-12, -92, -22, -86); c.fill();
+    c.strokeStyle = '#4a3a40'; c.lineWidth = 2.4; for (const q of [-1, 1]) { c.beginPath(); c.arc(q * 7, -80, 3.5, Math.PI * 1.15, Math.PI * 1.85); c.stroke(); }
+    c.fillStyle = '#c23a55'; c.beginPath(); c.moveTo(-4, -75); c.quadraticCurveTo(0, -69, 4, -75); c.closePath(); c.fill();
+    c.restore();
+    // いぬ
+    c.save(); c.translate(150, 232); c.scale(.62, .62); c.fillStyle = '#d9a066'; c.strokeStyle = '#d9a066'; c.lineWidth = 8; c.lineCap = 'round';
+    for (const x of [-18, -8, 12, 22]) { c.beginPath(); c.moveTo(x, -22); c.lineTo(x, -3); c.stroke(); }
+    E(0, -30, 30, 16); c.fill(); E(24, -46, 18, 16); c.fill(); c.fillStyle = '#8a5a3c'; E(12, -48, 7, 13); c.fill(); c.fillStyle = '#4a3a40'; E(40, -44, 3.5, 3); c.fill(); E(28, -48, 2.4, 3); c.fill();
+    c.lineWidth = 7; c.strokeStyle = '#d9a066'; c.beginPath(); c.moveTo(-26, -30); c.quadraticCurveTo(-40, -44, -38, -54); c.stroke(); c.restore();
+    c.font = '900 13px "Hiragino Maru Gothic ProN",sans-serif'; c.textAlign = 'center'; c.fillStyle = '#4a4458'; c.fillText('ワン！', 150, 186);
+    c.font = '30px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; c.textBaseline = 'middle'; c.fillText('👆', 268, 210);
   }
 })();
 </script>
